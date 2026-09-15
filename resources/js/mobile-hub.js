@@ -2,7 +2,7 @@ import {
     classifyLocationAccuracy,
     confirmApproximateLocation,
     getLatestKnownLocation,
-    getReliableLocationFix,
+    getQuickLocationFix,
 } from './location-accuracy.js';
 
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -414,14 +414,16 @@ async function getFreshCoords() {
     while (true) {
         let coords = null;
         try {
-            coords = await getReliableLocationFix({
+            coords = await getQuickLocationFix({
                 acceptBestAvailable: true,
                 promptOnError: false,
                 timeoutMs: 8000,
+                cacheMaxAgeMs: 5000,
+                maxAccuracyMeters: 1000,
             });
         } catch (error) {
             coords = getLatestKnownLocation({
-                maxAgeMs: 5 * 60 * 1000,
+                maxAgeMs: 5000,
                 maxAccuracyMeters: 1000,
             });
         }
@@ -431,7 +433,7 @@ async function getFreshCoords() {
             throw Object.assign(new Error('Choose the fire location on the map.'), { locationReason: 'manual' });
         }
 
-        if (coords.source === 'cached' || Number(coords.accuracy) > 100) {
+        if ((coords.source === 'cached' && coords.quickCacheHit !== true) || Number(coords.accuracy) > 100) {
             const choice = await confirmApproximateLocation(coords);
             if (choice === 'improve') continue;
             if (choice === 'map') {

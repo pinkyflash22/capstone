@@ -2531,11 +2531,15 @@
             }
 
             async function getCurrentCoords() {
-                if (typeof window.PyroLocation?.getReliableLocationFix !== 'function') {
+                if (typeof window.PyroLocation?.getQuickLocationFix !== 'function') {
                     throw new Error('Accurate location service is still loading. Please try again.');
                 }
 
-                const coords = await window.PyroLocation.getReliableLocationFix({ acceptBestAvailable: true });
+                const coords = await window.PyroLocation.getQuickLocationFix({
+                    acceptBestAvailable: true,
+                    cacheMaxAgeMs: 5000,
+                    maxAccuracyMeters: 1000,
+                });
                 writeCachedCoords(coords.lat, coords.lng);
                 return coords;
             }
@@ -2559,7 +2563,7 @@
                 if (button instanceof HTMLButtonElement) {
                     button.disabled = true;
                 }
-                showQuickReportStatus('Getting a fresh, accurate GPS fix...', 'success');
+                showQuickReportStatus('Checking current location...', 'success');
                 let pendingReportBody = null;
                 const clientReportId = window.crypto?.randomUUID?.() || null;
 

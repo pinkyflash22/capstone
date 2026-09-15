@@ -1466,7 +1466,8 @@ function getCurrentLocation(){
         },
         {
             enableHighAccuracy: true,
-            timeout: 10000
+            timeout: 10000,
+            maximumAge: 5000
         }
     );
 }

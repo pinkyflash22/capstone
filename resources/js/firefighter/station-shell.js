@@ -1733,10 +1733,44 @@ function bootFirefighterMyStationPage() {
                     showToast('This incident is not available for a new spot investigation report.', 'error');
                 }
             }
+        } else if (reportType === 'progress') {
+            const spotId = params.get('spot_id');
+            const reportStage = params.get('report_stage') || 'single';
+            const stageSelect = progressForm?.querySelector('select[name="report_stage"]');
+            const reportSelect = progressForm?.querySelector('select[name="spot_investigation_id"]');
+
+            if (stageSelect && ['single', 'first', 'second'].includes(reportStage)) {
+                stageSelect.value = reportStage;
+                stageSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            if (spotId && reportSelect) {
+                reportSelect.value = spotId;
+                reportSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+                if (reportSelect.value !== String(spotId)) {
+                    showToast('This report is not available for the selected progress investigation step.', 'error');
+                }
+            }
+        } else if (reportType === 'final') {
+            const progressId = params.get('progress_id');
+            const progressSelect = finalForm?.querySelector('select[name="progress_investigation_id"]');
+
+            if (progressId && progressSelect) {
+                progressSelect.value = progressId;
+                progressSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+                if (progressSelect.value !== String(progressId)) {
+                    showToast('This progress report is not available for a final investigation report.', 'error');
+                }
+            }
         }
 
         params.delete('openReport');
         params.delete('incident_id');
+        params.delete('spot_id');
+        params.delete('progress_id');
+        params.delete('report_stage');
         replaceCurrentQuery(params);
     }
 

@@ -1813,10 +1813,14 @@
             currentLocationButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Locating...';
 
             try {
-                if (typeof window.PyroLocation?.getReliableLocationFix !== 'function') {
+                if (typeof window.PyroLocation?.getQuickLocationFix !== 'function') {
                     throw new Error('Location service is still loading. Please try again.');
                 }
-                const fix = await window.PyroLocation.getReliableLocationFix({ acceptBestAvailable: true });
+                const fix = await window.PyroLocation.getQuickLocationFix({
+                    acceptBestAvailable: true,
+                    cacheMaxAgeMs: 5000,
+                    maxAccuracyMeters: 1000,
+                });
                 const lat = fix.lat;
                 const lng = fix.lng;
                 setCoordinates(lat, lng);

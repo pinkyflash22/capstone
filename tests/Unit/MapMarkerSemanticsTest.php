@@ -57,7 +57,29 @@ class MapMarkerSemanticsTest extends TestCase
         $this->assertStringContainsString('Ignored an implausible apparatus GPS jump.', $dashboardScript);
         $this->assertStringNotContainsString('updateUserLocation(window.currentUserId, 15.8222, 120.3297)', $dashboardScript);
         $this->assertStringContainsString('function usableStoredGpsLocation', $mapScript);
-        $this->assertStringContainsString('{ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }', $mapScript);
+        $this->assertStringContainsString('{ enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }', $mapScript);
+    }
+
+    public function test_user_location_requests_reuse_only_a_five_second_cache(): void
+    {
+        $locationScript = file_get_contents(__DIR__.'/../../resources/js/location-accuracy.js');
+        $mapScript = file_get_contents(__DIR__.'/../../resources/js/map.js');
+        $citizenView = file_get_contents(__DIR__.'/../../resources/views/citizen/dashboard.blade.php');
+        $mobileHubScript = file_get_contents(__DIR__.'/../../resources/js/mobile-hub.js');
+        $barangayLayout = file_get_contents(__DIR__.'/../../resources/views/barangay/layouts/app.blade.php');
+
+        $this->assertStringContainsString('QUICK_LOCATION_CACHE_MAX_AGE_MS = 5000', $locationScript);
+        $this->assertStringContainsString('export async function getQuickLocationFix', $locationScript);
+        $this->assertStringContainsString('maximumAge: browserCacheMaxAgeMs', $locationScript);
+        $this->assertStringContainsString('getQuickLocationFix', $citizenView);
+        $this->assertStringContainsString('fireLocationFreshness', $citizenView);
+        $this->assertStringContainsString('startCitizenReportLocationRefresh', $citizenView);
+        $this->assertStringContainsString('forceFresh: true', $citizenView);
+        $this->assertStringContainsString('maxAgeMs: 5000', $citizenView);
+        $this->assertStringContainsString('candidate.quickCacheHit !== true', $citizenView);
+        $this->assertStringContainsString('getQuickLocationFix', $mobileHubScript);
+        $this->assertStringContainsString('getQuickLocationFix', $barangayLayout);
+        $this->assertStringContainsString('{ enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }', $mapScript);
     }
 
     public function test_directions_use_an_arrow_and_actual_responses_use_apparatus_markers(): void

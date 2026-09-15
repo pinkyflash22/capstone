@@ -139,6 +139,24 @@ class FirefighterMyStationLifecycleUiTest extends TestCase
     }
 
     #[Test]
+    public function incident_registry_links_to_the_next_investigation_report_step(): void
+    {
+        $controller = file_get_contents(app_path('Http/Controllers/staff/FirefighterController.php'));
+        $incidentsView = file_get_contents(resource_path('views/firefighters/incidents.blade.php'));
+        $stationScript = file_get_contents(resource_path('js/firefighter/station-shell.js'));
+
+        $this->assertStringContainsString("'investigation_action' => \$nextInvestigationAction", $controller);
+        $this->assertStringContainsString("'openReport' => 'progress'", $controller);
+        $this->assertStringContainsString("'openReport' => 'final'", $controller);
+        $this->assertStringContainsString('ProgressInvestigationReport::STAGE_SECOND', $controller);
+        $this->assertStringContainsString('incident.investigation_action', $incidentsView);
+        $this->assertStringContainsString('Start Final Report', $controller);
+        $this->assertStringContainsString("params.get('spot_id')", $stationScript);
+        $this->assertStringContainsString("params.get('progress_id')", $stationScript);
+        $this->assertStringContainsString("params.get('report_stage')", $stationScript);
+    }
+
+    #[Test]
     public function investigation_report_modal_has_one_authoritative_mobile_height_layer(): void
     {
         $styles = file_get_contents(resource_path('css/firefighters/station-shell.css'));

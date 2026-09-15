@@ -916,9 +916,14 @@
                 const imageUrl = resolveStorageUrl(incident.image_url);
                 const statusBucket = getStatusBucket(incident.incident_status_id);
                 const statusLabel = statusBucket === 'active' ? 'Active / Available' : (statusBucket === 'completed' ? 'Completed' : 'Closed');
-                const investigationAction = incident.investigation_ready && incident.investigation_url
-                    ? `<a class="action-btn investigation" href="${escapeHtml(incident.investigation_url)}"><i class="fa-solid fa-magnifying-glass"></i> Start Spot Report</a>`
-                    : (incident.has_spot_report ? `<span class="action-note"><i class="fa-solid fa-file-circle-check"></i> Spot report filed</span>` : '');
+                const nextInvestigation = incident.investigation_action || {};
+                const investigationAction = incident.investigation_ready && nextInvestigation.url
+                    ? `<a class="action-btn investigation" href="${escapeHtml(nextInvestigation.url)}"><i class="fa-solid ${escapeHtml(nextInvestigation.icon || 'fa-file-circle-plus')}"></i> ${escapeHtml(nextInvestigation.label || 'Continue Investigation')}</a>`
+                    : (incident.has_final_report
+                        ? `<span class="action-note"><i class="fa-solid fa-file-circle-check"></i> Final report filed</span>`
+                        : (incident.has_progress_report
+                            ? `<span class="action-note"><i class="fa-solid fa-file-lines"></i> Progress report filed</span>`
+                            : (incident.has_spot_report ? `<span class="action-note"><i class="fa-solid fa-file-circle-check"></i> Spot report filed</span>` : '')));
                 const viewAction = `<button type="button" class="action-btn primary" data-view-incident="${incident.incident_id}"><i class="fa-regular fa-eye"></i> View Details</button>`;
                 return `
                     <article class="incident-item is-clickable" data-incident-row data-incident-id="${incident.incident_id}" role="button" tabindex="0" aria-label="Open incident details for ${escapeHtml(incident.title || `Incident ${incident.incident_id}`)}">

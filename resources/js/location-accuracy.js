@@ -4,6 +4,7 @@ const ACCURACY_WARNING_METERS = 100;
 const DEFAULT_TARGET_ACCURACY_METERS = 35;
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_FIX_AGE_MS = 15000;
+const QUICK_LOCATION_CACHE_MAX_AGE_MS = 5000;
 const LATEST_LOCATION_CACHE_KEY = 'pyrosense:latest-known-location:v1';
 const DEFAULT_CACHED_LOCATION_MAX_AGE_MS = 5 * 60 * 1000;
 const DEFAULT_CACHED_LOCATION_MAX_ACCURACY_METERS = 1000;
@@ -323,6 +324,7 @@ function collectReliableFix(options = {}) {
     const maxAccuracyMeters = Number(options.maxAccuracyMeters) || DEFAULT_MAX_ACCURACY_METERS;
     const targetAccuracyMeters = Number(options.targetAccuracyMeters) || DEFAULT_TARGET_ACCURACY_METERS;
     const timeoutMs = Number(options.timeoutMs) || DEFAULT_TIMEOUT_MS;
+    const browserCacheMaxAgeMs = Number(options.browserCacheMaxAgeMs ?? options.cacheMaxAgeMs) || QUICK_LOCATION_CACHE_MAX_AGE_MS;
     const acceptBestAvailable = options.acceptBestAvailable === true;
 
     return new Promise((resolve, reject) => {
@@ -379,7 +381,7 @@ function collectReliableFix(options = {}) {
                     finish(Object.assign(new Error('Device location is unavailable.'), { locationReason: 'unavailable' }));
                 }
             },
-            { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: browserCacheMaxAgeMs }
         );
     });
 }
@@ -408,6 +410,23 @@ async function requestReliableLocationFix(options = {}) {
 
 export function getReliableLocationFix(options = {}) {
     const acceptsBestAvailable = options.acceptBestAvailable === true;
+    const forceFresh = options.forceFresh === true;
+    const cacheMaxAgeMs = Number(options.cacheMaxAgeMs) || QUICK_LOCATION_CACHE_MAX_AGE_MS;
+    const cached = !forceFresh
+        ? getLatestKnownLocation({
+            maxAgeMs: cacheMaxAgeMs,
+            maxAccuracyMeters: Number(options.maxAccuracyMeters) || DEFAULT_CACHED_LOCATION_MAX_ACCURACY_METERS,
+        })
+        : null;
+
+    if (cached) {
+        return Promise.resolve({
+            ...cached,
+            source: cached.source || 'cached',
+            quickCacheHit: true,
+        });
+    }
+
     if (activeReliableFixRequest) {
         // An emergency report must not inherit a stricter background map request
         // that would reject the best fix and block submission.
@@ -448,9 +467,32 @@ export function getReliableLocationFix(options = {}) {
     return activeReliableFixRequest;
 }
 
+export async function getQuickLocationFix(options = {}) {
+    const cacheMaxAgeMs = Number(options.cacheMaxAgeMs) || QUICK_LOCATION_CACHE_MAX_AGE_MS;
+    const maxAccuracyMeters = Number(options.maxAccuracyMeters) || DEFAULT_CACHED_LOCATION_MAX_ACCURACY_METERS;
+    const cached = getLatestKnownLocation({
+        maxAgeMs: cacheMaxAgeMs,
+        maxAccuracyMeters,
+    });
+
+    if (cached) {
+        return {
+            ...cached,
+            source: cached.source || 'cached',
+            quickCacheHit: true,
+        };
+    }
+
+    return getReliableLocationFix({
+        ...options,
+        maxAccuracyMeters,
+    });
+}
+
 window.PyroLocation = {
     ...(window.PyroLocation || {}),
     getReliableLocationFix,
+    getQuickLocationFix,
     getLatestKnownLocation,
     rememberLocation: cacheLatestKnownLocation,
     classifyLocationAccuracy,

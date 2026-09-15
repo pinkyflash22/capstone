@@ -381,7 +381,14 @@ class FirefighterController extends Controller
                 'barangay:barangay_id,barangay_name,city_id',
                 'barangay.city:city_id,city_name',
                 'spotInvestigationReport:spot_investigation_report_id,incident_id,place_of_occurrence',
-                'spotInvestigationReport.progressInvestigation:progress_investigation_report_id,spot_investigation_id',
+                'spotInvestigationReport.progressInvestigation' => function ($query) {
+                    $query->select([
+                        'progress_investigation_report.progress_investigation_report_id',
+                        'progress_investigation_report.spot_investigation_id',
+                        'progress_investigation_report.report_stage',
+                        'progress_investigation_report.parent_progress_investigation_id',
+                    ]);
+                },
                 'spotInvestigationReport.progressInvestigation.finalInvestigation:final_investigation_report_id,progress_investigation_id,exact_address',
             ])
             ->where(function ($query) use ($teamId) {
@@ -1166,7 +1173,57 @@ class FirefighterController extends Controller
                     $reporterName = trim(($incident->reporter?->first_name ?? '') . ' ' . ($incident->reporter?->last_name ?? ''));
                     $incidentStatusId = $this->getIncidentStatusId($incident->status);
                     $spotReportId = $spotReportMap[(int) $incident->incident_id] ?? null;
-                    $investigationReady = $incidentStatusId === 4 && $spotReportId === null;
+                    $investigationReady = $incidentStatusId === 4;
+                    $spotReport = $incident->spotInvestigationReport;
+                    $progressReport = $spotReport?->progressInvestigation;
+                    $finalReport = $progressReport?->finalInvestigation;
+                    $nextInvestigationAction = null;
+
+                    if ($investigationReady) {
+                        if (! $spotReportId) {
+                            $nextInvestigationAction = [
+                                'type' => 'spot',
+                                'label' => 'Start Spot Report',
+                                'icon' => 'fa-magnifying-glass',
+                                'url' => route('firefighter.my-station', [
+                                    'openReport' => 'spot',
+                                    'incident_id' => $incident->incident_id,
+                                ]),
+                            ];
+                        } elseif (! $progressReport) {
+                            $nextInvestigationAction = [
+                                'type' => 'progress',
+                                'label' => 'Start Progress Report',
+                                'icon' => 'fa-file-signature',
+                                'url' => route('firefighter.my-station', [
+                                    'openReport' => 'progress',
+                                    'spot_id' => $spotReportId,
+                                    'report_stage' => ProgressInvestigationReport::STAGE_SINGLE,
+                                ]),
+                            ];
+                        } elseif ($progressReport->report_stage === ProgressInvestigationReport::STAGE_FIRST) {
+                            $nextInvestigationAction = [
+                                'type' => 'progress',
+                                'label' => 'Start 2nd Progress Report',
+                                'icon' => 'fa-file-circle-plus',
+                                'url' => route('firefighter.my-station', [
+                                    'openReport' => 'progress',
+                                    'spot_id' => $spotReportId,
+                                    'report_stage' => ProgressInvestigationReport::STAGE_SECOND,
+                                ]),
+                            ];
+                        } elseif (! $finalReport && $progressReport->isEligibleForFinal()) {
+                            $nextInvestigationAction = [
+                                'type' => 'final',
+                                'label' => 'Start Final Report',
+                                'icon' => 'fa-file-circle-check',
+                                'url' => route('firefighter.my-station', [
+                                    'openReport' => 'final',
+                                    'progress_id' => $progressReport->progress_investigation_report_id,
+                                ]),
+                            ];
+                        }
+                    }
                     $finalAddress = trim((string) ($incident->spotInvestigationReport?->progressInvestigation?->finalInvestigation?->exact_address ?? ''));
                     $placeOfOccurrence = trim((string) ($incident->spotInvestigationReport?->place_of_occurrence ?? ''));
                     $barangayLocation = collect([
@@ -1235,13 +1292,14 @@ class FirefighterController extends Controller
                         'image_url' => $this->normalizeStoredMediaPath($marker?->image),
                         'has_spot_report' => $spotReportId !== null,
                         'spot_report_id' => $spotReportId,
-                        'investigation_ready' => $investigationReady,
-                        'investigation_url' => $investigationReady
-                            ? route('firefighter.my-station', [
-                                'openReport' => 'spot',
-                                'incident_id' => $incident->incident_id,
-                            ])
-                            : null,
+                        'has_progress_report' => $progressReport !== null,
+                        'progress_report_id' => $progressReport?->progress_investigation_report_id,
+                        'progress_report_stage' => $progressReport?->report_stage,
+                        'has_final_report' => $finalReport !== null,
+                        'final_report_id' => $finalReport?->final_investigation_report_id,
+                        'investigation_ready' => $investigationReady && $nextInvestigationAction !== null,
+                        'investigation_action' => $nextInvestigationAction,
+                        'investigation_url' => $nextInvestigationAction['url'] ?? null,
                     ];
                 })->values();
 
