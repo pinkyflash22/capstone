@@ -24,6 +24,7 @@ use App\Models\FinalInvestigationReport;
 use App\Models\HistoricalFireIncident;
 use App\Models\Barangay;
 use App\Models\FullAddress;
+use App\Notifications\InvestigationReportReviewedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -118,6 +119,24 @@ class ManagementController extends Controller
             'reviewed_at' => now(),
         ])->save();
 
+        $reviewerName = trim((Auth::user()?->first_name ?? '') . ' ' . (Auth::user()?->last_name ?? '')) ?: 'Command reviewer';
+        $preparer = StationOfficer::query()
+            ->with('user')
+            ->whereKey($report->station_officer_id)
+            ->first()
+            ?->user;
+
+        if ($preparer) {
+            $notification = InvestigationReportReviewedNotification::fromReport(
+                $report,
+                $kind,
+                $validated['decision'],
+                $validated['review_comments'] ?? null,
+                $reviewerName
+            );
+            DB::afterCommit(fn () => $preparer->notify($notification));
+        }
+
         $this->clearManagementReportCaches($report);
         UserActivityLogger::log($validated['decision'] . ' ' . $kind . ' investigation report', Auth::id(), $request);
 
@@ -129,7 +148,7 @@ class ManagementController extends Controller
                 'review_status' => $report->review_status,
                 'review_comments' => $report->review_comments,
                 'reviewed_at' => optional($report->reviewed_at)->toIso8601String(),
-                'reviewed_by_name' => trim((Auth::user()?->first_name ?? '') . ' ' . (Auth::user()?->last_name ?? '')),
+                'reviewed_by_name' => $reviewerName,
             ],
         ]);
     }
@@ -1365,7 +1384,10 @@ protected function storeHistoricalFireIncident(Request $request)
         }
 
         if ($request->filled('status')) {
-            $reports = $reports->where('report_kind', $request->status);
+            $status = (string) $request->status;
+            $reports = in_array($status, ['submitted', 'approved', 'rejected'], true)
+                ? $reports->where('review_status', $status)
+                : $reports->where('report_kind', $status);
         }
 
         $reports = $reports->values();

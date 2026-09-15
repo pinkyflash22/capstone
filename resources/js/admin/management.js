@@ -12,6 +12,7 @@ class ManagementPage {
         this.currentEditId = null;
         this.currentDeleteId = null;
         this.currentItem = null;
+        this.pendingReview = null;
         this.fetchTimeoutMs = 10000;
         this.data = {
             incidents: window.incidentDb || [],
@@ -153,7 +154,7 @@ class ManagementPage {
                 } else if (actionBtn.classList.contains('approve')) {
                     await this.reviewReport(id, 'approved');
                 } else if (actionBtn.classList.contains('reject')) {
-                    await this.reviewReport(id, 'rejected');
+                    this.openRejectReportModal(id);
                 } else if (actionBtn.classList.contains('edit')) {
                     this.editItem(id);
                 } else if (actionBtn.classList.contains('delete')) {
@@ -176,6 +177,8 @@ class ManagementPage {
     }
 
     initModals() {
+        this.ensureRejectReportModal();
+
         // View modal
         document.getElementById('viewModalClose')?.addEventListener('click', () => {
             this.closeModal('viewModal');
@@ -205,6 +208,16 @@ class ManagementPage {
 
         document.getElementById('confirmDeleteBtn')?.addEventListener('click', () => {
             this.confirmDelete();
+        });
+
+        document.getElementById('rejectReportModalClose')?.addEventListener('click', () => {
+            this.closeModal('rejectReportModal');
+        });
+        document.getElementById('cancelRejectReportBtn')?.addEventListener('click', () => {
+            this.closeModal('rejectReportModal');
+        });
+        document.getElementById('confirmRejectReportBtn')?.addEventListener('click', () => {
+            this.confirmRejectReport();
         });
     }
 
@@ -367,8 +380,8 @@ class ManagementPage {
                 { value: '4', label: 'Resolved' }
             ],
             reports: [
-                { value: '', label: 'All Status' },
-                { value: 'pending', label: 'Pending' },
+                { value: '', label: 'All Review Status' },
+                { value: 'submitted', label: 'Submitted' },
                 { value: 'approved', label: 'Approved' },
                 { value: 'rejected', label: 'Rejected' }
             ],
@@ -493,9 +506,11 @@ class ManagementPage {
 
         if (this.filters.status) {
             data = data.filter(item => {
-                const statusValue = item.incident_status_id?.toString() || 
-                                   (item.status_id?.toString()) || 
-                                   item.status || '';
+                const statusValue = this.currentTab === 'reports'
+                    ? (item.review_status || 'submitted')
+                    : item.incident_status_id?.toString() ||
+                        (item.status_id?.toString()) ||
+                        item.status || '';
                 return statusValue === this.filters.status;
             });
         }
@@ -1939,14 +1954,61 @@ class ManagementPage {
         document.body.style.overflow = 'hidden';
     }
 
-    async reviewReport(id, decision) {
+    ensureRejectReportModal() {
+        if (document.getElementById('rejectReportModal')) return;
+
+        document.body.insertAdjacentHTML('beforeend', `
+            <div id="rejectReportModal" class="modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>Reject Report</h2>
+                        <button class="modal-close" id="rejectReportModalClose" type="button">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label class="form-label" for="rejectReportComments">Review comments</label>
+                            <textarea id="rejectReportComments" class="form-textarea" rows="5" placeholder="Describe what the firefighter needs to revise."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" id="cancelRejectReportBtn" type="button">Cancel</button>
+                        <button class="btn-primary" id="confirmRejectReportBtn" type="button" style="background:#dc2626;">
+                            <i class="fa-solid fa-xmark"></i> Reject
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+    }
+
+    openRejectReportModal(id) {
         const report = this.data.reports.find(item => item.id == id);
         if (!report?.report_kind || !report?.report_id) return;
 
-        let reviewComments = '';
-        if (decision === 'rejected') {
-            reviewComments = window.prompt('Reason for rejecting this report:', report.review_comments || '') || '';
+        this.pendingReview = { id, decision: 'rejected' };
+        const textarea = document.getElementById('rejectReportComments');
+        if (textarea) textarea.value = report.review_comments || '';
+        document.getElementById('rejectReportModal')?.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => textarea?.focus(), 50);
+    }
+
+    async confirmRejectReport() {
+        if (!this.pendingReview?.id) return;
+
+        const comments = document.getElementById('rejectReportComments')?.value || '';
+        const updated = await this.reviewReport(this.pendingReview.id, 'rejected', comments);
+        if (updated) {
+            this.pendingReview = null;
+            this.closeModal('rejectReportModal');
         }
+    }
+
+    async reviewReport(id, decision, reviewComments = '') {
+        const report = this.data.reports.find(item => item.id == id);
+        if (!report?.report_kind || !report?.report_id) return;
 
         try {
             this.showLoading(true);
@@ -1973,9 +2035,11 @@ class ManagementPage {
             this.showToast(`Report ${decision}`, 'success');
             this.renderTable();
             this.updateStats();
+            return true;
         } catch (error) {
             console.error('Review error:', error);
             this.showToast(error.message || 'Failed to update report review', 'error');
+            return false;
         } finally {
             this.showLoading(false);
         }
