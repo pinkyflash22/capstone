@@ -777,6 +777,8 @@ class FirefighterController extends Controller
                     'report_completed_at' => optional($report->report_completed_at)->toIso8601String(),
                     'memorandum_for' => $report->memorandum_for,
                     'place_of_occurrence' => $report->place_of_occurrence,
+                    'incident_location_lat' => $report->incident?->marker?->lat,
+                    'incident_location_lng' => $report->incident?->marker?->lng,
                     'involved_structure' => $report->involved_structure,
                     'establishment_name' => $report->establishment_name,
                     'occupant' => $report->occupant,
@@ -1010,6 +1012,8 @@ class FirefighterController extends Controller
                 'updated_at' => optional($incident->updated_at)->format('Y-m-d\TH:i'),
                 'occurred_at' => optional($incident->occurred_at)->format('Y-m-d\TH:i'),
                 'occurred_at_verified' => (bool) $incident->occurred_at_verified_at,
+                'marker_lat' => $incident->marker?->lat,
+                'marker_lng' => $incident->marker?->lng,
             ];
         })->values()->all();
     }

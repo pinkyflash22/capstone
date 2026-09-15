@@ -1652,9 +1652,12 @@ function inferCitizenSharedMarkerAsset(categoryKey, marker = {}) {
 
 function createCitizenStaticImageIcon(categoryInput, marker = {}) {
     const categoryKey = getCitizenMarkerCategoryKey(categoryInput) || 'default';
-    const imagePath = inferCitizenSharedMarkerAsset(categoryKey, marker);
+    const isInactiveIncident = categoryKey === 'fire' && !isCitizenActiveFireIncident(null, marker);
+    const imagePath = isInactiveIncident ? null : inferCitizenSharedMarkerAsset(categoryKey, marker);
     const size = imagePath ? (categoryKey === 'fire' ? 42 : 36) : 24;
-    const fallback = getCitizenMarkerPresentation(categoryKey);
+    const fallback = isInactiveIncident
+        ? { icon: 'fa-magnifying-glass', color: '#10b981' }
+        : getCitizenMarkerPresentation(categoryKey);
     const safeImagePath = imagePath ? String(imagePath).replace(/"/g, '&quot;') : '';
 
     return L.divIcon({

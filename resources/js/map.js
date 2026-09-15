@@ -2182,7 +2182,7 @@ function getIncidentTypePresentation(input = {}) {
 
     if (incidentStatus === 'controlled') {
         presentation.label = 'Investigation';
-        presentation.iconClass = 'fa-fire';
+        presentation.iconClass = 'fa-magnifying-glass';
         presentation.bgColor = '#10b981';
         presentation.borderColor = '#10b981';
         return presentation;
@@ -2210,10 +2210,10 @@ function getIncidentTypePresentation(input = {}) {
 
 function createIncidentTypeIcon(marker = {}, extraClass = '') {
     const { iconClass, bgColor } = getIncidentTypePresentation(marker);
-    const imagePath = inferMarkerImagePath(marker, { id: 'incident' });
+    const isActiveIncident = isActiveFireIncidentMarker(marker);
+    const imagePath = isActiveIncident ? inferMarkerImagePath(marker, { id: 'incident' }) : null;
     const markerSize = 42;
     const markerAnchor = 21;
-    const isActiveIncident = isActiveFireIncidentMarker(marker);
 
     return L.divIcon({
         className: `custom-fa-icon pyro-map-marker-icon incident-type-icon ${isActiveIncident ? 'incident-type-icon--active' : ''} ${extraClass}`.trim(),

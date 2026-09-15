@@ -8,6 +8,7 @@
     <title>PyroSense - My Station</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     @vite([
         'resources/css/app.css',
         'resources/css/firefighters/portal.css',
@@ -295,6 +296,24 @@
                         <div class="form-group full">
                             <label class="form-label">Place of Occurrence</label>
                             <input type="text" name="place_of_occurrence" class="form-input" placeholder="Street, barangay, city, landmark">
+                        </div>
+                        <div class="form-group full spot-location-picker" data-spot-location-picker>
+                            <label class="form-label">Fire Incident Pin</label>
+                            <div class="spot-location-picker__map" data-spot-location-map></div>
+                            <div class="spot-location-picker__fields">
+                                <label>
+                                    <span>Latitude</span>
+                                    <input type="number" step="0.0000001" min="-90" max="90" name="incident_location_lat" class="form-input" data-spot-location-lat>
+                                </label>
+                                <label>
+                                    <span>Longitude</span>
+                                    <input type="number" step="0.0000001" min="-180" max="180" name="incident_location_lng" class="form-input" data-spot-location-lng>
+                                </label>
+                                <button type="button" class="btn btn-outline spot-location-picker__reported" data-spot-location-reported disabled>
+                                    <i class="fa-solid fa-location-crosshairs"></i>
+                                    <span>Reported point</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Estimated Damage</label>
@@ -727,6 +746,7 @@
         };
     </script>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     @vite('resources/js/firefighter/station-shell.js')
     </div>
     @include('partials.pwa-body')

@@ -149,4 +149,22 @@ class MapMarkerSemanticsTest extends TestCase
         $this->assertStringContainsString('applyTruckHeading(currentTruck.animatedVehicle, currentSegment.angle);', $mapScript);
         $this->assertStringContainsString('applyTruckHeading(currentTruck.animatedVehicle, currentSegment.angle);', $citizenScript);
     }
+
+    public function test_controlled_incidents_remain_visible_as_investigation_markers(): void
+    {
+        $mapScript = file_get_contents(__DIR__.'/../../resources/js/map.js');
+        $citizenScript = file_get_contents(__DIR__.'/../../resources/js/user.js');
+        $incidentController = file_get_contents(__DIR__.'/../../app/Http/Controllers/IncidentController.php');
+        $firefighterController = file_get_contents(__DIR__.'/../../app/Http/Controllers/FirefighterIncidentResponseController.php');
+        $markerFeed = file_get_contents(__DIR__.'/../../app/Support/MarkerFeedBuilder.php');
+
+        $this->assertStringContainsString("self::STATUS_CONTROLLED => 'completed'", $incidentController);
+        $this->assertStringContainsString("\$locked->marker->forceFill(['status' => 'completed'])->save();", $firefighterController);
+        $this->assertStringContainsString("'marker_status' => \$marker->status", $markerFeed);
+        $this->assertStringContainsString("'incident_status' => \$incident?->status", $markerFeed);
+        $this->assertStringContainsString("presentation.iconClass = 'fa-magnifying-glass';", $mapScript);
+        $this->assertStringContainsString("const imagePath = isActiveIncident ? inferMarkerImagePath(marker, { id: 'incident' }) : null;", $mapScript);
+        $this->assertStringContainsString("!isCitizenActiveFireIncident(null, marker)", $citizenScript);
+        $this->assertStringContainsString("icon: 'fa-magnifying-glass'", $citizenScript);
+    }
 }

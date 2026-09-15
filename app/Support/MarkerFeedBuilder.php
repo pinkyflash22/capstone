@@ -57,8 +57,10 @@ class MarkerFeedBuilder
             'lng' => $marker->lng,
             'category' => $marker->category,
             'status' => $marker->status,
+            'marker_status' => $marker->status,
             'image' => $marker->image,
             'incident_id' => $incident?->incident_id,
+            'incident_status' => $incident?->status,
             'station' => $station ? [
                 'station_id' => $station->station_id,
                 'station_name' => static::publicValue($station->station_name),

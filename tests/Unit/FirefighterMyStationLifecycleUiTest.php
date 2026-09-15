@@ -120,6 +120,25 @@ class FirefighterMyStationLifecycleUiTest extends TestCase
     }
 
     #[Test]
+    public function spot_investigation_reports_can_adjust_the_incident_marker_location(): void
+    {
+        $controller = file_get_contents(app_path('Http/Controllers/SpotInvestigationReportController.php'));
+        $stationController = file_get_contents(app_path('Http/Controllers/staff/FirefighterController.php'));
+        $view = file_get_contents(resource_path('views/firefighters/mystation.blade.php'));
+        $script = file_get_contents(resource_path('js/firefighter/station-shell.js'));
+        $styles = file_get_contents(resource_path('css/firefighters/station-shell.css'));
+
+        $this->assertStringContainsString("'incident_location_lat' => 'nullable|required_with:incident_location_lng|numeric|between:-90,90'", $controller);
+        $this->assertStringContainsString('private function syncIncidentMarkerLocation', $controller);
+        $this->assertStringContainsString("'marker_lat' => \$incident->marker?->lat", $stationController);
+        $this->assertStringContainsString('data-spot-location-picker', $view);
+        $this->assertStringContainsString('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', $view);
+        $this->assertStringContainsString('function bindSpotLocationPicker', $script);
+        $this->assertStringContainsString('data-marker-lat', $script);
+        $this->assertStringContainsString('.spot-location-picker__map', $styles);
+    }
+
+    #[Test]
     public function investigation_report_modal_has_one_authoritative_mobile_height_layer(): void
     {
         $styles = file_get_contents(resource_path('css/firefighters/station-shell.css'));

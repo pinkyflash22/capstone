@@ -105,6 +105,8 @@ class SpotInvestigationReportController extends Controller
             'estimated_area' => 'required|numeric|min:0',
             'memorandum_for' => 'nullable|string|max:255',
             'place_of_occurrence' => 'nullable|string|max:255',
+            'incident_location_lat' => 'nullable|required_with:incident_location_lng|numeric|between:-90,90',
+            'incident_location_lng' => 'nullable|required_with:incident_location_lat|numeric|between:-180,180',
             'involved_structure' => 'nullable|string|max:255',
             'establishment_name' => 'nullable|string|max:255',
             'occupant' => 'nullable|string|max:255',
@@ -119,10 +121,12 @@ class SpotInvestigationReportController extends Controller
             ...InvestigationReportImageService::validationRules(),
         ]);
 
+        $incidentLocation = $this->pullIncidentLocationPayload($validated);
         unset($validated['proof_images']);
         $validated['report_completed_at'] = now();
 
         $response = SpotInvestigationReport::create($validated);
+        $this->syncIncidentMarkerLocation($response, $incidentLocation);
         $imageService->store($request, $response, 'spot');
         if ($response->fire_started) {
             $incident = Incident::find($response->incident_id);
@@ -177,6 +181,8 @@ class SpotInvestigationReportController extends Controller
             'estimated_area' => 'sometimes|required|numeric|min:0',
             'memorandum_for' => 'nullable|string|max:255',
             'place_of_occurrence' => 'nullable|string|max:255',
+            'incident_location_lat' => 'nullable|required_with:incident_location_lng|numeric|between:-90,90',
+            'incident_location_lng' => 'nullable|required_with:incident_location_lat|numeric|between:-180,180',
             'involved_structure' => 'nullable|string|max:255',
             'establishment_name' => 'nullable|string|max:255',
             'occupant' => 'nullable|string|max:255',
@@ -191,8 +197,10 @@ class SpotInvestigationReportController extends Controller
             ...InvestigationReportImageService::validationRules(),
         ]);
 
+        $incidentLocation = $this->pullIncidentLocationPayload($validated);
         unset($validated['proof_images']);
         $spot->update($validated);
+        $this->syncIncidentMarkerLocation($spot, $incidentLocation);
         $imageService->store($request, $spot, 'spot');
         if (array_key_exists('fire_started', $validated) && $spot->fire_started) {
             $incident = Incident::find($spot->incident_id);
@@ -210,6 +218,35 @@ class SpotInvestigationReportController extends Controller
         $payload = ['success'=>true, 'data' => InvestigationReportImageService::responsePayload($spot->fresh())];
 
         return response()->json($imageService->rememberSubmissionResponse($request, "spot:update:{$id}", $payload));
+    }
+
+    private function pullIncidentLocationPayload(array &$validated): array
+    {
+        $location = [
+            'lat' => $validated['incident_location_lat'] ?? null,
+            'lng' => $validated['incident_location_lng'] ?? null,
+        ];
+
+        unset($validated['incident_location_lat'], $validated['incident_location_lng']);
+
+        return $location;
+    }
+
+    private function syncIncidentMarkerLocation(SpotInvestigationReport $report, array $location): void
+    {
+        if ($location['lat'] === null || $location['lat'] === '' || $location['lng'] === null || $location['lng'] === '') {
+            return;
+        }
+
+        $incident = Incident::with('marker')->find($report->incident_id);
+        if (! $incident?->marker) {
+            return;
+        }
+
+        $incident->marker->update([
+            'lat' => (float) $location['lat'],
+            'lng' => (float) $location['lng'],
+        ]);
     }
 
     public function draftNarrative(Request $request, SpotNarrativeDraftService $draftService)

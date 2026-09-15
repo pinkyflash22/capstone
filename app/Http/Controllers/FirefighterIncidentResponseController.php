@@ -109,6 +109,10 @@ class FirefighterIncidentResponseController extends Controller
             abort_unless(strtolower(trim((string) $locked->status)) === 'on scene', 409, 'Confirm arrival before completing this incident.');
 
             $locked->forceFill(['status' => 'Controlled'])->save();
+            if ($locked->marker) {
+                $locked->marker->forceFill(['status' => 'completed'])->save();
+            }
+
             return $locked;
         });
 

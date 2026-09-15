@@ -332,6 +332,24 @@ class IncidentController extends Controller
         }
     }
 
+    private function syncIncidentMarkerLifecycle(Incident $incident, int $statusId): void
+    {
+        if (! $incident->marker_id) {
+            return;
+        }
+
+        $markerStatus = match ($statusId) {
+            self::STATUS_CONTROLLED => 'completed',
+            self::STATUS_CLOSED => 'inactive',
+            default => 'active',
+        };
+
+        Marker::where('marker_id', $incident->marker_id)->update([
+            'status' => $markerStatus,
+            'updated_at' => now(),
+        ]);
+    }
+
     private function getStationsSortedByDistance(float $lat, float $lng)
     {
         return Station::with('marker')
@@ -1252,12 +1270,7 @@ class IncidentController extends Controller
         $incident->updated_at = now();
         $incident->save();
 
-        if ((int) $statusId === self::STATUS_CLOSED && $incident->marker_id) {
-            Marker::where('marker_id', $incident->marker_id)->update([
-                'status' => 'inactive',
-                'updated_at' => now(),
-            ]);
-        }
+        $this->syncIncidentMarkerLifecycle($incident, (int) $statusId);
         
         $this->syncTeamAndStationOfficerStatuses($incident, (int) $statusId);
         UserActivityLogger::log('updated inc status', Auth::user()?->user_id, $request);
@@ -1626,7 +1639,9 @@ class IncidentController extends Controller
             $incident->status = $resolvedStatus;
             $incident->save();
 
-            $this->syncTeamAndStationOfficerStatuses($incident, $this->mapStatusNameToId($resolvedStatus));
+            $resolvedStatusId = $this->mapStatusNameToId($resolvedStatus);
+            $this->syncIncidentMarkerLifecycle($incident, $resolvedStatusId);
+            $this->syncTeamAndStationOfficerStatuses($incident, $resolvedStatusId);
             UserActivityLogger::log('updated inc status', Auth::user()?->user_id, $request);
             
             Log::info('Incident status updated', [

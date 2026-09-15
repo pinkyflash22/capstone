@@ -1317,6 +1317,189 @@ function bootFirefighterMyStationPage() {
         }).join('');
     }
 
+    function parseCoordinate(value, minimum, maximum) {
+        const numeric = Number.parseFloat(value);
+        if (!Number.isFinite(numeric) || numeric < minimum || numeric > maximum) return null;
+        return numeric;
+    }
+
+    function formatCoordinate(value) {
+        const numeric = Number.parseFloat(value);
+        return Number.isFinite(numeric) ? numeric.toFixed(7) : '';
+    }
+
+    function getSpotLocationFromOption(option) {
+        if (!option?.value) return null;
+        const lat = parseCoordinate(option.dataset.markerLat, -90, 90);
+        const lng = parseCoordinate(option.dataset.markerLng, -180, 180);
+        if (lat === null || lng === null) return null;
+        return {
+            lat,
+            lng,
+            label: option.dataset.location || option.textContent?.trim() || 'Reported incident',
+        };
+    }
+
+    function getSpotLocationFromForm(form) {
+        if (!form) return null;
+        const lat = parseCoordinate(form.querySelector('[data-spot-location-lat]')?.value, -90, 90);
+        const lng = parseCoordinate(form.querySelector('[data-spot-location-lng]')?.value, -180, 180);
+        if (lat === null || lng === null) return null;
+        return { lat, lng };
+    }
+
+    function setSpotLocationFields(form, location, { updateMarker = true } = {}) {
+        if (!form || !location) return;
+        const latInput = form.querySelector('[data-spot-location-lat]');
+        const lngInput = form.querySelector('[data-spot-location-lng]');
+        if (!latInput || !lngInput) return;
+
+        latInput.value = formatCoordinate(location.lat);
+        lngInput.value = formatCoordinate(location.lng);
+
+        const picker = form.querySelector('[data-spot-location-picker]');
+        picker?.setAttribute('data-location-ready', 'true');
+
+        if (updateMarker) {
+            updateSpotLocationMarker(form, location);
+        }
+    }
+
+    function clearSpotLocationFields(form) {
+        const picker = form?.querySelector('[data-spot-location-picker]');
+        const latInput = form?.querySelector('[data-spot-location-lat]');
+        const lngInput = form?.querySelector('[data-spot-location-lng]');
+        const reportedButton = picker?.querySelector('[data-spot-location-reported]');
+        if (latInput) latInput.value = '';
+        if (lngInput) lngInput.value = '';
+        if (picker) {
+            picker.removeAttribute('data-location-ready');
+            picker._reportedLocation = null;
+        }
+        if (reportedButton) {
+            reportedButton.disabled = true;
+            reportedButton.removeAttribute('title');
+        }
+        const marker = picker?.querySelector('[data-spot-location-map]')?._spotLocationMarker;
+        marker?.setOpacity?.(0);
+    }
+
+    function renderSpotLocationPicker(location = {}) {
+        return `
+            <div class="form-group full spot-location-picker" data-spot-location-picker>
+                <label class="form-label">Fire Incident Pin</label>
+                <div class="spot-location-picker__map" data-spot-location-map></div>
+                <div class="spot-location-picker__fields">
+                    <label>
+                        <span>Latitude</span>
+                        <input type="number" step="0.0000001" min="-90" max="90" name="incident_location_lat" class="form-input" data-spot-location-lat value="${escapeHtml(formatCoordinate(location.lat))}">
+                    </label>
+                    <label>
+                        <span>Longitude</span>
+                        <input type="number" step="0.0000001" min="-180" max="180" name="incident_location_lng" class="form-input" data-spot-location-lng value="${escapeHtml(formatCoordinate(location.lng))}">
+                    </label>
+                    <button type="button" class="btn btn-outline spot-location-picker__reported" data-spot-location-reported disabled>
+                        <i class="fa-solid fa-location-crosshairs"></i>
+                        <span>Reported point</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function updateSpotLocationMarker(form, location) {
+        const mapElement = form?.querySelector('[data-spot-location-map]');
+        const map = mapElement?._spotLocationMap;
+        const marker = mapElement?._spotLocationMarker;
+        if (!map || !marker || !location) return;
+
+        const nextLatLng = [location.lat, location.lng];
+        marker.setOpacity?.(1);
+        marker.setLatLng(nextLatLng);
+        map.setView(nextLatLng, Math.max(map.getZoom(), 16));
+    }
+
+    function bindSpotLocationPicker(form, initialLocation = null) {
+        const picker = form?.querySelector('[data-spot-location-picker]');
+        if (!form || !picker) return;
+
+        const mapElement = picker.querySelector('[data-spot-location-map]');
+        const latInput = picker.querySelector('[data-spot-location-lat]');
+        const lngInput = picker.querySelector('[data-spot-location-lng]');
+        const reportedButton = picker.querySelector('[data-spot-location-reported]');
+        if (!mapElement || !latInput || !lngInput) return;
+
+        if (initialLocation) {
+            picker._reportedLocation = initialLocation;
+            reportedButton.disabled = false;
+            reportedButton.title = initialLocation.label || 'Reported point';
+        }
+
+        const currentLocation = getSpotLocationFromForm(form) || initialLocation;
+        if (currentLocation) setSpotLocationFields(form, currentLocation, { updateMarker: false });
+
+        if (picker.dataset.spotLocationBound !== 'true') {
+            picker.dataset.spotLocationBound = 'true';
+
+            const handleManualCoordinate = () => {
+                const nextLocation = getSpotLocationFromForm(form);
+                if (nextLocation) {
+                    picker.setAttribute('data-location-ready', 'true');
+                    updateSpotLocationMarker(form, nextLocation);
+                }
+            };
+
+            latInput.addEventListener('change', handleManualCoordinate);
+            lngInput.addEventListener('change', handleManualCoordinate);
+            reportedButton?.addEventListener('click', () => {
+                if (picker._reportedLocation) {
+                    setSpotLocationFields(form, picker._reportedLocation);
+                }
+            });
+        }
+
+        if (!window.L) {
+            mapElement.textContent = 'Map unavailable. Enter coordinates to save the exact point.';
+            return;
+        }
+
+        if (mapElement._spotLocationMap) {
+            if (currentLocation) updateSpotLocationMarker(form, currentLocation);
+            window.setTimeout(() => mapElement._spotLocationMap.invalidateSize(), 50);
+            return;
+        }
+
+        const center = currentLocation || { lat: 8.228, lng: 124.245 };
+        const map = window.L.map(mapElement, {
+            zoomControl: true,
+            attributionControl: false,
+        }).setView([center.lat, center.lng], currentLocation ? 16 : 13);
+
+        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
+
+        const marker = window.L.marker([center.lat, center.lng], {
+            draggable: true,
+            title: 'Fire incident pin',
+        }).addTo(map);
+        if (!currentLocation) marker.setOpacity?.(0);
+
+        mapElement._spotLocationMap = map;
+        mapElement._spotLocationMarker = marker;
+
+        marker.on('dragend', () => {
+            const next = marker.getLatLng();
+            setSpotLocationFields(form, { lat: next.lat, lng: next.lng }, { updateMarker: false });
+        });
+
+        map.on('click', (event) => {
+            setSpotLocationFields(form, { lat: event.latlng.lat, lng: event.latlng.lng });
+        });
+
+        window.setTimeout(() => map.invalidateSize(), 50);
+    }
+
     function populateOfficerSelect(select, selectedValue = '') {
         const officerOptions = referenceCache.spot?.officers
             || referenceCache.progress?.officers
@@ -1354,8 +1537,9 @@ function bootFirefighterMyStationPage() {
         const officerSelects = spotForm?.querySelectorAll('select[data-station-ref="officers"]');
         if (!incidentSelect || !officerSelects) return;
 
-        incidentSelect.innerHTML = `<option value="">Select incident</option>${createOptions(data.incidents || [], '', (item) => `data-updated-at="${escapeHtml(item.updated_at || '')}" data-occurred-at="${escapeHtml(item.occurred_at || '')}" data-occurred-at-verified="${item.occurred_at_verified ? '1' : '0'}" data-location="${escapeHtml(item.label || '')}"` )}`;
+        incidentSelect.innerHTML = `<option value="">Select incident</option>${createOptions(data.incidents || [], '', (item) => `data-updated-at="${escapeHtml(item.updated_at || '')}" data-occurred-at="${escapeHtml(item.occurred_at || '')}" data-occurred-at-verified="${item.occurred_at_verified ? '1' : '0'}" data-location="${escapeHtml(item.label || '')}" data-marker-lat="${escapeHtml(item.marker_lat || '')}" data-marker-lng="${escapeHtml(item.marker_lng || '')}"` )}`;
         officerSelects.forEach((select) => populateOfficerSelect(select));
+        bindSpotLocationPicker(spotForm);
 
         if (incidentSelect.dataset.occurrenceBound !== 'true') {
             incidentSelect.dataset.occurrenceBound = 'true';
@@ -1364,6 +1548,17 @@ function bootFirefighterMyStationPage() {
                 const occurredAtInput = spotForm?.querySelector('input[name="fire_started"]');
                 if (occurredAtInput && selected?.dataset?.occurredAt) {
                     occurredAtInput.value = selected.dataset.occurredAt.slice(0, 16);
+                }
+                const placeInput = spotForm?.querySelector('input[name="place_of_occurrence"]');
+                if (placeInput && !placeInput.value.trim() && selected?.dataset?.location) {
+                    placeInput.value = selected.dataset.location;
+                }
+                const selectedLocation = getSpotLocationFromOption(selected);
+                if (selectedLocation) {
+                    bindSpotLocationPicker(spotForm, selectedLocation);
+                    setSpotLocationFields(spotForm, selectedLocation);
+                } else {
+                    clearSpotLocationFields(spotForm);
                 }
             });
         }
@@ -1825,6 +2020,7 @@ function bootFirefighterMyStationPage() {
                     <div class="form-group"><label class="form-label">Fire Occurred At</label><input class="form-input" type="datetime-local" name="fire_started" value="${escapeHtml((report.fire_started || '').slice(0, 16))}"><small class="table-muted">Correcting this updates the verified incident occurrence time and its audit history.</small></div>
                     <div class="form-group"><label class="form-label">Fire Out</label><input class="form-input" type="datetime-local" name="fire_out" value="${escapeHtml((report.fire_out || '').slice(0, 16))}"></div>
                     <div class="form-group full"><label class="form-label">Place of Occurrence</label><input class="form-input" type="text" name="place_of_occurrence" value="${escapeHtml(report.place_of_occurrence || '')}"></div>
+                    ${renderSpotLocationPicker({ lat: report.incident_location_lat, lng: report.incident_location_lng })}
                     <div class="form-group"><label class="form-label">Estimated Damage</label><input class="form-input" type="number" min="0" step="0.01" name="estimated_damage" value="${escapeHtml(report.estimated_damage || 0)}"></div>
                     <div class="form-group"><label class="form-label">Estimated Area</label><input class="form-input" type="number" min="0" step="0.01" name="estimated_area" value="${escapeHtml(report.estimated_area || 0)}"></div>
                     <div class="form-group"><label class="form-label">Affected Establishments</label><input class="form-input" type="number" min="0" step="1" name="affected_establishments_count" value="${escapeHtml(report.affected_establishments_count || 0)}"></div>
@@ -1918,6 +2114,14 @@ function bootFirefighterMyStationPage() {
         bindProofImagePreviews(manageReportModalBody);
         bindProofImageDeletion(manageReportModalBody);
         bindExistingProofImageOrdering(manageReportModalBody, type, report.id);
+        if (type === 'spot') {
+            bindSpotLocationPicker(
+                manageReportModalBody.querySelector('#manageReportEditForm'),
+                parseCoordinate(report.incident_location_lat, -90, 90) !== null && parseCoordinate(report.incident_location_lng, -180, 180) !== null
+                    ? { lat: report.incident_location_lat, lng: report.incident_location_lng, label: report.incident_location }
+                    : null
+            );
+        }
         manageReportModalFooter.innerHTML = `
             <button type="button" class="btn btn-outline" data-close-manage-modal>Cancel</button>
             <button type="button" class="btn btn-primary" id="saveManagedReportButton"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
@@ -1965,6 +2169,8 @@ function bootFirefighterMyStationPage() {
                 updated.fire_started = formData.get('fire_started');
                 updated.fire_out = formData.get('fire_out');
                 updated.place_of_occurrence = formData.get('place_of_occurrence');
+                updated.incident_location_lat = formData.get('incident_location_lat');
+                updated.incident_location_lng = formData.get('incident_location_lng');
                 updated.estimated_damage = formData.get('estimated_damage');
                 updated.estimated_area = formData.get('estimated_area');
                 updated.affected_establishments_count = formData.get('affected_establishments_count');
@@ -2247,6 +2453,8 @@ function bootFirefighterMyStationPage() {
                 report_completed_at: data.report_completed_at || new Date().toISOString(),
                 memorandum_for: formData.get('memorandum_for'),
                 place_of_occurrence: formData.get('place_of_occurrence'),
+                incident_location_lat: formData.get('incident_location_lat'),
+                incident_location_lng: formData.get('incident_location_lng'),
                 involved_structure: formData.get('involved_structure'),
                 establishment_name: formData.get('establishment_name'),
                 occupant: formData.get('occupant'),
