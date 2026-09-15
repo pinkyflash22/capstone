@@ -1810,32 +1810,38 @@ function bootFirefighterMyStationPage() {
     }
 
     function createActionButtons(type, report) {
+        const reviewStatus = report.review_status || 'submitted';
+        const canRevise = reviewStatus === 'rejected';
         const actions = [
             `<button type="button" class="table-action view" data-report-action="view" data-report-type="${type}" data-report-id="${report.id}">View</button>`,
         ];
 
         if (type === 'spot') {
             actions.push(`<a class="table-action edit" href="${buildSirRoute(report.id)}">Word</a>`);
-            actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
-            if (!report.has_progress) {
+            if (canRevise) {
+                actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
+            }
+            if (canRevise && !report.has_progress) {
                 actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="${type}" data-report-id="${report.id}">Delete</button>`);
             }
         }
 
         if (type === 'progress') {
             actions.push(`<a class="table-action edit" href="${buildPirRoute(report.id)}">Word</a>`);
-            if (!report.has_final) {
+            if (canRevise && !report.has_final) {
                 actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
             }
-            if (!report.has_final && !report.has_second) {
+            if (canRevise && !report.has_final && !report.has_second) {
                 actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="${type}" data-report-id="${report.id}">Delete</button>`);
             }
         }
 
         if (type === 'final') {
             actions.push(`<a class="table-action edit" href="${buildFirRoute(report.id)}">Word</a>`);
-            actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
-            actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="${type}" data-report-id="${report.id}">Delete</button>`);
+            if (canRevise) {
+                actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
+                actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="${type}" data-report-id="${report.id}">Delete</button>`);
+            }
         }
 
         if (type === 'aar') {
@@ -1850,6 +1856,10 @@ function bootFirefighterMyStationPage() {
         return `<div class="table-actions">${actions.join('')}</div>`;
     }
 
+    function reportReviewLabel(report) {
+        return String(report?.review_status || 'submitted').replaceAll('_', ' ');
+    }
+
     function appendSpotReportRow(report) {
         const tbody = document.getElementById('spotReportsTableBody');
         if (!tbody || !report?.id) return;
@@ -1858,7 +1868,7 @@ function bootFirefighterMyStationPage() {
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="spot-report-${report.id}">
-                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Spot report</div></td>
+                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Spot report | ${escapeHtml(reportReviewLabel(report))}</div></td>
                 <td data-label="Investigator">${createCurrentOfficerTrigger('Spot report investigator')}</td>
                 <td data-label="Fire timeline">${escapeHtml(formatDateTime(report.fire_started))}<br>${escapeHtml(formatDateTime(report.fire_out))}</td>
                 <td data-label="Damage">${escapeHtml(formatMoney(report.estimated_damage))}</td>
@@ -1878,7 +1888,7 @@ function bootFirefighterMyStationPage() {
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="progress-report-${report.id}">
-                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">${escapeHtml(report.report_stage_label || 'Progress Report')}</div></td>
+                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">${escapeHtml(report.report_stage_label || 'Progress Report')} | ${escapeHtml(reportReviewLabel(report))}</div></td>
                 <td data-label="Fire origin">${escapeHtml(report.fire_origin_name || 'N/A')}</td>
                 <td data-label="Cause">${escapeHtml(report.fire_cause || 'N/A')}</td>
                 <td data-label="Responsible party">${escapeHtml(report.responsible_arson || 'Not specified')}</td>
@@ -1898,7 +1908,7 @@ function bootFirefighterMyStationPage() {
 
         tbody.insertAdjacentHTML('afterbegin', `
             <tr id="final-report-${report.id}">
-                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Final report</div></td>
+                <td data-label="Incident"><div class="table-title">${escapeHtml(report.incident_location || 'Fire incident')}</div><div class="table-muted">Final report | ${escapeHtml(reportReviewLabel(report))}</div></td>
                 <td data-label="Address">${escapeHtml(report.exact_address || 'N/A')}</td>
                 <td data-label="Total damage">${escapeHtml(formatMoney(report.total_damage))}</td>
                 <td data-label="Investigator">${createCurrentOfficerTrigger('Final report investigator')}</td>

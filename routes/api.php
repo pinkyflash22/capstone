@@ -162,6 +162,7 @@ Route::middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])-
     Route::put('/personnel/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updatePersonnel']);
     Route::put('/equipment/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updateEquipment']);
     Route::put('/reports/{kind}/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updateInvestigationReport']);
+    Route::patch('/reports/{kind}/{id}/review', [App\Http\Controllers\Chief\ManagementController::class, 'reviewInvestigationReport']);
     Route::delete('/reports/{kind}/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'destroyInvestigationReport']);
     Route::delete('/{type}/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'destroy']);
 });

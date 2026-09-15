@@ -28,6 +28,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
 use App\Support\UserActivityLogger;
@@ -99,6 +100,40 @@ class ManagementController extends Controller
         };
     }
 
+    public function reviewInvestigationReport(Request $request, string $kind, int $id)
+    {
+        $report = $this->resolveManagedInvestigationReport($kind, $id);
+
+        abort_unless(Schema::hasColumn($report->getTable(), 'review_status'), 503, 'Report review workflow is not available yet.');
+
+        $validated = $request->validate([
+            'decision' => ['required', Rule::in(['approved', 'rejected'])],
+            'review_comments' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $report->forceFill([
+            'review_status' => $validated['decision'],
+            'review_comments' => $validated['review_comments'] ?? null,
+            'reviewed_by_user_id' => Auth::id(),
+            'reviewed_at' => now(),
+        ])->save();
+
+        $this->clearManagementReportCaches($report);
+        UserActivityLogger::log($validated['decision'] . ' ' . $kind . ' investigation report', Auth::id(), $request);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'report_id' => $report->getKey(),
+                'report_kind' => $kind,
+                'review_status' => $report->review_status,
+                'review_comments' => $report->review_comments,
+                'reviewed_at' => optional($report->reviewed_at)->toIso8601String(),
+                'reviewed_by_name' => trim((Auth::user()?->first_name ?? '') . ' ' . (Auth::user()?->last_name ?? '')),
+            ],
+        ]);
+    }
+
     private function resolveManagedInvestigationReport(string $kind, int $id)
     {
         $model = match ($kind) {
@@ -121,6 +156,19 @@ class ManagementController extends Controller
         abort_unless($belongsToStation, 404);
 
         return $report;
+    }
+
+    private function clearManagementReportCaches($report): void
+    {
+        Cache::forget('management:reports:all');
+
+        $stationId = StationOfficer::query()
+            ->whereKey($report->station_officer_id)
+            ->value('station_id');
+
+        if ($stationId) {
+            Cache::forget('management:reports:' . $stationId);
+        }
     }
     /**
      * Display a listing of the resource.
@@ -1354,7 +1402,7 @@ protected function storeHistoricalFireIncident(Request $request)
                 });
         };
 
-        $spotReports = SpotInvestigationReport::with(['incident.marker', 'incident.reporter', 'investigator.user', 'progressInvestigation.finalInvestigation'])
+        $spotReports = SpotInvestigationReport::with(['incident.marker', 'incident.reporter', 'investigator.user', 'progressInvestigation.finalInvestigation', 'reviewer'])
             ->when($stationId, fn ($query) => $query->where(function ($scope) use ($stationOfficerIds, $scopeIncident) {
                 $scope->whereIn('station_officer_id', $stationOfficerIds)
                     ->orWhereHas('incident', $scopeIncident);
@@ -1374,11 +1422,12 @@ protected function storeHistoricalFireIncident(Request $request)
                     'status' => $report->progressInvestigation ? 'progressed' : 'filed',
                     'created_at' => optional($report->created_at)?->toIso8601String(),
                     'description' => $report->incident?->marker?->description,
+                    ...$this->investigationReviewPayload($report),
                     'fields' => collect($report->getAttributes())->except(['created_at', 'updated_at'])->all(),
                 ];
             });
 
-        $progressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'investigator.user', 'fireOrigin', 'finalInvestigation'])
+        $progressReports = ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'investigator.user', 'fireOrigin', 'finalInvestigation', 'reviewer'])
             ->when($stationId, fn ($query) => $query->where(function ($scope) use ($stationOfficerIds, $scopeIncident) {
                 $scope->whereIn('station_officer_id', $stationOfficerIds)
                     ->orWhereHas('spotInvestigation.incident', $scopeIncident);
@@ -1398,11 +1447,12 @@ protected function storeHistoricalFireIncident(Request $request)
                     'status' => $report->finalInvestigation ? 'finalized' : 'conducting',
                     'created_at' => optional($report->created_at)?->toIso8601String(),
                     'description' => $report->fire_cause,
+                    ...$this->investigationReviewPayload($report),
                     'fields' => collect($report->getAttributes())->except(['created_at', 'updated_at'])->all(),
                 ];
             });
 
-        $finalReports = FinalInvestigationReport::with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.investigator.user'])
+        $finalReports = FinalInvestigationReport::with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.investigator.user', 'reviewer'])
             ->when($stationId, fn ($query) => $query->where(function ($scope) use ($stationOfficerIds, $scopeIncident) {
                 $scope->whereIn('station_officer_id', $stationOfficerIds)
                     ->orWhereHas('progressInvestigation.spotInvestigation.incident', $scopeIncident);
@@ -1423,6 +1473,7 @@ protected function storeHistoricalFireIncident(Request $request)
                     'status' => 'completed',
                     'created_at' => optional($report->created_at)?->toIso8601String(),
                     'description' => $report->exact_address,
+                    ...$this->investigationReviewPayload($report),
                     'fields' => collect($report->getAttributes())->except(['created_at', 'updated_at'])->all(),
                 ];
             });
@@ -1432,6 +1483,20 @@ protected function storeHistoricalFireIncident(Request $request)
             ->concat($finalReports)
             ->sortByDesc('created_at')
             ->values();
+    }
+
+    private function investigationReviewPayload($report): array
+    {
+        $status = $report->review_status ?: 'submitted';
+        $reviewer = $report->reviewer;
+
+        return [
+            'review_status' => $status,
+            'review_status_label' => ucfirst(str_replace('_', ' ', $status)),
+            'review_comments' => $report->review_comments,
+            'reviewed_at' => optional($report->reviewed_at)?->toIso8601String(),
+            'reviewed_by_name' => trim(($reviewer?->first_name ?? '') . ' ' . ($reviewer?->last_name ?? '')),
+        ];
     }
 
     private function deriveEquipmentAvailabilityStatus(EquipmentToStation $assignment): string

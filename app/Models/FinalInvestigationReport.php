@@ -33,12 +33,17 @@ class FinalInvestigationReport extends Model
         'approved_by_station_officer_id',
         'progress_investigation_id',
         'total_damage',
+        'review_status',
+        'review_comments',
+        'reviewed_by_user_id',
+        'reviewed_at',
     ];
 
     protected $casts = [
         'report_completed_at' => 'datetime',
         'alarm_at' => 'datetime',
         'substantiating_documents' => 'array',
+        'reviewed_at' => 'datetime',
     ];
 
     public function progressInvestigation()
@@ -59,6 +64,11 @@ class FinalInvestigationReport extends Model
     public function approvedBy()
     {
         return $this->belongsTo(StationOfficer::class, 'approved_by_station_officer_id', 'station_officer_id');
+    }
+
+    public function reviewer()
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_user_id', 'user_id');
     }
 
     protected function investigationReportType(): string

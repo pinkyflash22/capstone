@@ -42,11 +42,12 @@
                     @php
                         $hasFinal = (bool) $report->finalInvestigation;
                         $hasSecond = (bool) $report->secondProgressInvestigation;
+                        $canRevise = ($report->review_status ?: 'submitted') === 'rejected';
                     @endphp
                     <tr id="progress-report-{{ $report->progress_investigation_report_id }}">
                         <td data-label="Incident">
                             <div class="table-title">{{ $report->spotInvestigation?->incident?->marker?->title ?? 'Fire incident' }}</div>
-                            <div class="table-muted">{{ $report->report_stage_label }}</div>
+                            <div class="table-muted">{{ $report->report_stage_label }} | {{ str($report->review_status ?: 'submitted')->replace('_', ' ')->title() }}</div>
                         </td>
                         <td data-label="Fire origin">{{ $report->fireOrigin?->origin ?? 'N/A' }}</td>
                         <td data-label="Cause">{{ $report->fire_cause ?? 'N/A' }}</td>
@@ -56,12 +57,12 @@
                             <div class="table-actions">
                                 <button type="button" class="table-action view" data-report-action="view" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}">View</button>
                                 <a class="table-action edit" href="{{ route('firefighter.progress-reports.pir.word', ['progressReportId' => $report->progress_investigation_report_id]) }}">Word</a>
-                                @unless($hasFinal)
+                                @if($canRevise && ! $hasFinal)
                                     <button type="button" class="table-action edit" data-report-action="edit" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}">Edit</button>
-                                @endunless
-                                @unless($hasFinal || $hasSecond)
+                                @endif
+                                @if($canRevise && ! $hasFinal && ! $hasSecond)
                                     <button type="button" class="table-action delete" data-report-action="delete" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}">Delete</button>
-                                @endunless
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -93,10 +94,11 @@
             </thead>
             <tbody id="finalReportsTableBody">
                 @forelse($reports as $report)
+                    @php $canRevise = ($report->review_status ?: 'submitted') === 'rejected'; @endphp
                     <tr id="final-report-{{ $report->final_investigation_report_id }}">
                         <td data-label="Incident">
                             <div class="table-title">{{ $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title ?? 'Fire incident' }}</div>
-                            <div class="table-muted">Progress report</div>
+                            <div class="table-muted">Final report | {{ str($report->review_status ?: 'submitted')->replace('_', ' ')->title() }}</div>
                         </td>
                         <td data-label="Address">{{ $report->exact_address ?? 'N/A' }}</td>
                         <td data-label="Total damage">PHP {{ number_format((float) ($report->total_damage ?? 0), 2) }}</td>
@@ -106,8 +108,10 @@
                             <div class="table-actions">
                                 <button type="button" class="table-action view" data-report-action="view" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">View</button>
                                 <a class="table-action edit" href="{{ route('firefighter.final-reports.fir.word', ['finalReportId' => $report->final_investigation_report_id]) }}">Word</a>
-                                <button type="button" class="table-action edit" data-report-action="edit" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">Edit</button>
-                                <button type="button" class="table-action delete" data-report-action="delete" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">Delete</button>
+                                @if($canRevise)
+                                    <button type="button" class="table-action edit" data-report-action="edit" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">Edit</button>
+                                    <button type="button" class="table-action delete" data-report-action="delete" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">Delete</button>
+                                @endif
                             </div>
                         </td>
                     </tr>
@@ -139,11 +143,14 @@
             </thead>
             <tbody id="spotReportsTableBody">
                 @forelse($reports as $report)
-                    @php $hasProgress = (bool) $report->progressInvestigation; @endphp
+                    @php
+                        $hasProgress = (bool) $report->progressInvestigation;
+                        $canRevise = ($report->review_status ?: 'submitted') === 'rejected';
+                    @endphp
                     <tr id="spot-report-{{ $report->spot_investigation_report_id }}">
                         <td data-label="Incident">
                             <div class="table-title">{{ $report->incident?->marker?->title ?? 'Fire incident' }}</div>
-                            <div class="table-muted">Spot report</div>
+                            <div class="table-muted">Spot report | {{ str($report->review_status ?: 'submitted')->replace('_', ' ')->title() }}</div>
                         </td>
                         <td data-label="Investigator">@include('firefighters.partials.person-trigger', ['personOfficer' => $report->investigator, 'contextLabel' => 'Spot report investigator'])</td>
                         <td data-label="Fire timeline">{{ optional($report->fire_started)->format('M d, Y h:i A') ?: 'N/A' }}<br>{{ optional($report->fire_out)->format('M d, Y h:i A') ?: 'N/A' }}</td>
@@ -153,10 +160,12 @@
                             <div class="table-actions">
                                 <button type="button" class="table-action view" data-report-action="view" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">View</button>
                                 <a class="table-action edit" href="{{ route('firefighter.spot-reports.sir.word', ['spotReportId' => $report->spot_investigation_report_id]) }}">Word</a>
-                                <button type="button" class="table-action edit" data-report-action="edit" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">Edit</button>
-                                @unless($hasProgress)
+                                @if($canRevise)
+                                    <button type="button" class="table-action edit" data-report-action="edit" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">Edit</button>
+                                @endif
+                                @if($canRevise && ! $hasProgress)
                                     <button type="button" class="table-action delete" data-report-action="delete" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">Delete</button>
-                                @endunless
+                                @endif
                             </div>
                         </td>
                     </tr>

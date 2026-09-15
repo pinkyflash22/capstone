@@ -167,6 +167,10 @@ class ManagementPage {
 
                 if (actionBtn.classList.contains('view')) {
                     await this.viewItem(id);
+                } else if (actionBtn.classList.contains('approve')) {
+                    await this.reviewReport(id, 'approved');
+                } else if (actionBtn.classList.contains('reject')) {
+                    await this.reviewReport(id, 'rejected');
                 } else if (actionBtn.classList.contains('edit')) {
                     this.editItem(id);
                 } else if (actionBtn.classList.contains('delete')) {
@@ -392,7 +396,7 @@ class ManagementPage {
                 return ['reported', 'responding', 'active'].includes(status);
             }).length,
             totalReports: this.currentTab === 'reports' ? this.pagination.total : this.data.reports.length,
-            pendingReports: this.data.reports.filter(r => ['filed', 'conducting'].includes(r.status)).length,
+            pendingReports: this.data.reports.filter(r => (r.review_status || 'submitted') === 'submitted').length,
             totalPersonnel: this.currentTab === 'personnel' ? this.pagination.total : this.data.personnel.length,
             totalEquipment: this.currentTab === 'equipment' ? this.pagination.total : this.data.equipment.length
         };
@@ -400,7 +404,7 @@ class ManagementPage {
         document.getElementById('totalIncidents') && (document.getElementById('totalIncidents').textContent = stats.totalIncidents);
         document.getElementById('activeIncidents') && (document.getElementById('activeIncidents').textContent = `${stats.activeIncidents} active`);
         document.getElementById('totalReports') && (document.getElementById('totalReports').textContent = stats.totalReports);
-        document.getElementById('pendingReports') && (document.getElementById('pendingReports').textContent = `${stats.pendingReports} open`);
+        document.getElementById('pendingReports') && (document.getElementById('pendingReports').textContent = `${stats.pendingReports} submitted`);
         document.getElementById('totalPersonnel') && (document.getElementById('totalPersonnel').textContent = stats.totalPersonnel);
         document.getElementById('totalEquipment') && (document.getElementById('totalEquipment').textContent = stats.totalEquipment);
     }
@@ -820,11 +824,14 @@ class ManagementPage {
     }
 
     renderReportRow(report) {
+        const reviewStatus = report.review_status || 'submitted';
         const statusClass = {
-            spot: 'status-badge pending',
-            progress: 'status-badge active',
-            final: 'status-badge approved'
-        }[report.report_kind] || 'status-badge pending';
+            submitted: 'status-badge pending',
+            approved: 'status-badge approved',
+            rejected: 'status-badge rejected'
+        }[reviewStatus] || 'status-badge pending';
+        const canApprove = reviewStatus !== 'approved';
+        const canReject = reviewStatus !== 'rejected';
 
         return `
             <tr data-id="${report.id}">
@@ -836,9 +843,10 @@ class ManagementPage {
                 <td data-label="Actions">
                     <div class="action-buttons">
                         <button class="action-btn view" title="View"><i class="fa-regular fa-eye"></i></button>
-                        <button class="action-btn edit" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>
+                        ${canApprove ? '<button class="action-btn approve" title="Approve"><i class="fa-solid fa-check"></i></button>' : ''}
+                        ${canReject ? '<button class="action-btn reject" title="Reject"><i class="fa-solid fa-xmark"></i></button>' : ''}
                         <button class="action-btn delete" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
-                        <span class="${statusClass}">${this.escapeHtml(report.report_kind || 'report')}</span>
+                        <span class="${statusClass}">${this.escapeHtml(report.review_status_label || reviewStatus)}</span>
                     </div>
                 </td>
             </tr>
@@ -2077,7 +2085,9 @@ class ManagementPage {
             : report.report_kind === 'final'
                 ? `${prefix}/final-reports/${encodeURIComponent(report.report_id)}/fir.docx`
                 : `${prefix}/spot-reports/${encodeURIComponent(report.report_id)}/sir.docx`;
-        const hiddenFields = new Set(['spot_investigation_report_id', 'progress_investigation_report_id', 'final_investigation_report_id', 'station_officer_id']);
+        const reviewStatus = report.review_status || 'submitted';
+        const reviewedAt = report.reviewed_at ? formatDate(report.reviewed_at) : 'Not reviewed yet';
+        const hiddenFields = new Set(['spot_investigation_report_id', 'progress_investigation_report_id', 'final_investigation_report_id', 'station_officer_id', 'review_status', 'review_comments', 'reviewed_by_user_id', 'reviewed_at']);
         const fieldRows = Object.entries(report.fields || {})
             .filter(([key, value]) => !hiddenFields.has(key) && value !== null && value !== '')
             .map(([key, value]) => {
@@ -2123,6 +2133,21 @@ class ManagementPage {
                             <span class="stat-label">Incident</span>
                             <span class="stat-value">${this.escapeHtml(report.incident_title || 'N/A')}</span>
                         </div>
+                    </div>
+                    <div class="quick-stat-card">
+                        <div class="stat-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+                        <div class="stat-content">
+                            <span class="stat-label">Review</span>
+                            <span class="stat-value">${this.escapeHtml(report.review_status_label || reviewStatus)}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="info-card">
+                    <div class="card-title"><i class="fa-solid fa-user-check"></i><h3>Review decision</h3></div>
+                    <div class="card-content">
+                        <div class="info-row"><span class="info-label">Reviewed by</span><span class="info-value">${this.escapeHtml(report.reviewed_by_name || 'Pending')}</span></div>
+                        <div class="info-row"><span class="info-label">Reviewed at</span><span class="info-value">${this.escapeHtml(reviewedAt)}</span></div>
+                        <div class="info-row"><span class="info-label">Comments</span><span class="info-value">${this.escapeHtml(report.review_comments || 'No comments recorded.')}</span></div>
                     </div>
                 </div>
                 <div class="info-card">
@@ -2342,6 +2367,50 @@ class ManagementPage {
         this.currentDeleteId = id;
         document.getElementById('deleteModal').classList.add('active');
         document.body.style.overflow = 'hidden';
+    }
+
+    async reviewReport(id, decision) {
+        const report = this.data.reports.find(item => this.getItemIdentifier(item) == id);
+        if (!report?.report_kind || !report?.report_id) return;
+
+        let reviewComments = '';
+        if (decision === 'rejected') {
+            reviewComments = window.prompt('Reason for rejecting this report:', report.review_comments || '') || '';
+        }
+
+        try {
+            this.showLoading(true);
+            const response = await fetch(`/api/managements/reports/${encodeURIComponent(report.report_kind)}/${encodeURIComponent(report.report_id)}/review`, {
+                method: 'PATCH',
+                headers: {
+                    'X-CSRF-TOKEN': this.csrfToken,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    decision,
+                    review_comments: reviewComments
+                })
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.success === false) {
+                throw new Error(payload.message || 'Review update failed');
+            }
+
+            Object.assign(report, payload.data || {}, {
+                review_status_label: decision.charAt(0).toUpperCase() + decision.slice(1)
+            });
+
+            this.showToast(`Report ${decision}`, 'success');
+            this.renderTable();
+            this.updateStats();
+        } catch (error) {
+            console.error('Review error:', error);
+            this.showToast(error.message || 'Failed to update report review', 'error');
+        } finally {
+            this.showLoading(false);
+        }
     }
 
     async confirmDelete() {

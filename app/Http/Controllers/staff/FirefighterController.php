@@ -6,6 +6,7 @@ use App\Models\DutyException;
 use App\Models\DutyShift;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 // use App\Models\Coordinate;
@@ -799,6 +800,9 @@ class FirefighterController extends Controller
                     'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                    'review_status' => $this->investigationReviewStatus($report),
+                    'review_comments' => $report->review_comments,
+                    'reviewed_at' => optional($report->reviewed_at)->toIso8601String(),
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
                     'has_progress' => (bool) $report->progressInvestigation,
                 ],
@@ -844,6 +848,9 @@ class FirefighterController extends Controller
                     'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                    'review_status' => $this->investigationReviewStatus($report),
+                    'review_comments' => $report->review_comments,
+                    'reviewed_at' => optional($report->reviewed_at)->toIso8601String(),
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
                     'has_final' => (bool) $report->finalInvestigation,
                     'has_second' => (bool) $report->secondProgressInvestigation,
@@ -895,6 +902,9 @@ class FirefighterController extends Controller
                     'approved_by_name' => trim(($report->approvedBy?->user?->first_name ?? '') . ' ' . ($report->approvedBy?->user?->last_name ?? '')),
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
+                    'review_status' => $this->investigationReviewStatus($report),
+                    'review_comments' => $report->review_comments,
+                    'reviewed_at' => optional($report->reviewed_at)->toIso8601String(),
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
                 ],
             ];
@@ -947,6 +957,16 @@ class FirefighterController extends Controller
             'url' => MediaPath::url($image->file_path),
             'size' => (int) $image->file_size,
         ])->values()->all();
+    }
+
+    protected function investigationReviewStatus($report): string
+    {
+        return $report->review_status ?: 'submitted';
+    }
+
+    protected function reviewWorkflowEnabled(string $table): bool
+    {
+        return Schema::hasColumn($table, 'review_status');
     }
 
     protected function loadAvailableSpotIncidents($stationTeamIds, BoundaryMatcherService $boundaryMatcherService)
@@ -1177,6 +1197,8 @@ class FirefighterController extends Controller
                     $spotReport = $incident->spotInvestigationReport;
                     $progressReport = $spotReport?->progressInvestigation;
                     $finalReport = $progressReport?->finalInvestigation;
+                    $spotApproved = ! $this->reviewWorkflowEnabled('spot_investigation_report') || ($spotReport?->review_status ?? 'submitted') === 'approved';
+                    $progressApproved = ! $this->reviewWorkflowEnabled('progress_investigation_report') || ($progressReport?->review_status ?? 'submitted') === 'approved';
                     $nextInvestigationAction = null;
 
                     if ($investigationReady) {
@@ -1190,7 +1212,7 @@ class FirefighterController extends Controller
                                     'incident_id' => $incident->incident_id,
                                 ]),
                             ];
-                        } elseif (! $progressReport) {
+                        } elseif (! $progressReport && $spotApproved) {
                             $nextInvestigationAction = [
                                 'type' => 'progress',
                                 'label' => 'Start Progress Report',
@@ -1201,7 +1223,7 @@ class FirefighterController extends Controller
                                     'report_stage' => ProgressInvestigationReport::STAGE_SINGLE,
                                 ]),
                             ];
-                        } elseif ($progressReport->report_stage === ProgressInvestigationReport::STAGE_FIRST) {
+                        } elseif ($progressReport->report_stage === ProgressInvestigationReport::STAGE_FIRST && $progressApproved) {
                             $nextInvestigationAction = [
                                 'type' => 'progress',
                                 'label' => 'Start 2nd Progress Report',
@@ -1212,7 +1234,7 @@ class FirefighterController extends Controller
                                     'report_stage' => ProgressInvestigationReport::STAGE_SECOND,
                                 ]),
                             ];
-                        } elseif (! $finalReport && $progressReport->isEligibleForFinal()) {
+                        } elseif (! $finalReport && $progressReport->isEligibleForFinal() && $progressApproved) {
                             $nextInvestigationAction = [
                                 'type' => 'final',
                                 'label' => 'Start Final Report',
@@ -1292,11 +1314,14 @@ class FirefighterController extends Controller
                         'image_url' => $this->normalizeStoredMediaPath($marker?->image),
                         'has_spot_report' => $spotReportId !== null,
                         'spot_report_id' => $spotReportId,
+                        'spot_report_review_status' => $spotReport ? $this->investigationReviewStatus($spotReport) : null,
                         'has_progress_report' => $progressReport !== null,
                         'progress_report_id' => $progressReport?->progress_investigation_report_id,
                         'progress_report_stage' => $progressReport?->report_stage,
+                        'progress_report_review_status' => $progressReport ? $this->investigationReviewStatus($progressReport) : null,
                         'has_final_report' => $finalReport !== null,
                         'final_report_id' => $finalReport?->final_investigation_report_id,
+                        'final_report_review_status' => $finalReport ? $this->investigationReviewStatus($finalReport) : null,
                         'investigation_ready' => $investigationReady && $nextInvestigationAction !== null,
                         'investigation_action' => $nextInvestigationAction,
                         'investigation_url' => $nextInvestigationAction['url'] ?? null,
@@ -1728,6 +1753,7 @@ class FirefighterController extends Controller
             $availableSpotReports = SpotInvestigationReport::with(['incident.marker', 'incident.barangay.city'])
                 ->whereDoesntHave('progressInvestigations')
                 ->whereIn('station_officer_id', $stationOfficerIds)
+                ->when($this->reviewWorkflowEnabled('spot_investigation_report'), fn ($query) => $query->where('review_status', 'approved'))
                 ->latest()
                 ->get();
 
@@ -1735,6 +1761,7 @@ class FirefighterController extends Controller
                 ->where('report_stage', ProgressInvestigationReport::STAGE_FIRST)
                 ->whereDoesntHave('secondProgressInvestigation')
                 ->whereIn('station_officer_id', $stationOfficerIds)
+                ->when($this->reviewWorkflowEnabled('progress_investigation_report'), fn ($query) => $query->where('review_status', 'approved'))
                 ->latest()
                 ->get();
 
@@ -1748,6 +1775,7 @@ class FirefighterController extends Controller
                 ->eligibleForFinal()
                 ->whereDoesntHave('finalInvestigation')
                 ->whereIn('station_officer_id', $stationOfficerIds)
+                ->when($this->reviewWorkflowEnabled('progress_investigation_report'), fn ($query) => $query->where('review_status', 'approved'))
                 ->latest()
                 ->get();
 

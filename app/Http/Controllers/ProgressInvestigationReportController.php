@@ -15,6 +15,7 @@ use App\Support\UserActivityLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ProgressInvestigationReportController extends Controller
@@ -28,7 +29,9 @@ class ProgressInvestigationReportController extends Controller
 
     public function create()
     {
-        $spotReports = SpotInvestigationReport::doesntHave('progressInvestigations')->get();
+        $spotReports = SpotInvestigationReport::doesntHave('progressInvestigations')
+            ->when($this->reviewWorkflowEnabled('spot_investigation_report'), fn ($query) => $query->where('review_status', 'approved'))
+            ->get();
         $fireOrigins = FireOrigin::all();
         $users = User::all();
         
@@ -89,6 +92,7 @@ class ProgressInvestigationReportController extends Controller
     {
         $spotInvestigations = SpotInvestigationReport::with('incident')
             ->whereDoesntHave('progressInvestigations')
+            ->when($this->reviewWorkflowEnabled('spot_investigation_report'), fn ($query) => $query->where('review_status', 'approved'))
             ->get();
         
         return response()->json($spotInvestigations);
@@ -133,6 +137,12 @@ class ProgressInvestigationReportController extends Controller
         if (!$progress) {
             return response()->json(['success' => false, 'message' => 'Report not found'], 404);
         }
+        if (! $this->canReviseReport($progress)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This report is already submitted for review and cannot be edited unless it is rejected for revision.',
+            ], 403);
+        }
         if ($cached = $imageService->cachedSubmissionResponse($request, "progress:update:{$id}")) {
             return response()->json($cached);
         }
@@ -153,6 +163,7 @@ class ProgressInvestigationReportController extends Controller
         ]);
 
         unset($validated['proof_images']);
+        $validated = $this->markResubmittedAfterRevision($validated);
         $validated['fire_origin_id'] = $this->resolveFireOriginId(
             $validated['fire_origin_id'] ?? null,
             $validated['fire_origin_other'] ?? null
@@ -244,6 +255,17 @@ class ProgressInvestigationReportController extends Controller
 
     public function destroy(ProgressInvestigationReport $progressInvestigationReport)
     {
+        if (! $this->canReviseReport($progressInvestigationReport)) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.',
+                ], 403);
+            }
+
+            return back()->with('error', 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.');
+        }
+
         if ($progressInvestigationReport->secondProgressInvestigation) {
             $message = 'Delete the 2nd Progress Report before deleting the 1st Progress Report.';
 
@@ -309,10 +331,16 @@ class ProgressInvestigationReportController extends Controller
         $stage = $validated['report_stage'] ?? ProgressInvestigationReport::STAGE_SINGLE;
         $spotId = (int) $validated['spot_investigation_id'];
 
-        SpotInvestigationReport::query()
+        $spotReport = SpotInvestigationReport::query()
             ->whereKey($spotId)
             ->lockForUpdate()
             ->firstOrFail();
+
+        if ($this->reviewWorkflowEnabled('spot_investigation_report') && ($spotReport->review_status ?? 'submitted') !== 'approved') {
+            throw ValidationException::withMessages([
+                'spot_investigation_id' => 'The Spot Investigation Report must be approved before creating a Progress Report.',
+            ]);
+        }
 
         if ($stage === ProgressInvestigationReport::STAGE_SECOND) {
             $parentId = (int) ($validated['parent_progress_investigation_id'] ?? 0);
@@ -339,6 +367,12 @@ class ProgressInvestigationReportController extends Controller
                 ]);
             }
 
+            if ($this->reviewWorkflowEnabled('progress_investigation_report') && ($firstReport->review_status ?? 'submitted') !== 'approved') {
+                throw ValidationException::withMessages([
+                    'parent_progress_investigation_id' => 'The 1st Progress Report must be approved before creating the 2nd Progress Report.',
+                ]);
+            }
+
             $validated['parent_progress_investigation_id'] = $firstReport->getKey();
         } else {
             if (ProgressInvestigationReport::query()->where('spot_investigation_id', $spotId)->exists()) {
@@ -353,5 +387,35 @@ class ProgressInvestigationReportController extends Controller
         $validated['report_stage'] = $stage;
 
         return $validated;
+    }
+
+    private function canReviseReport(ProgressInvestigationReport $report): bool
+    {
+        if (! $this->reviewWorkflowEnabled('progress_investigation_report')) {
+            return true;
+        }
+
+        if (strtolower((string) (auth()->user()?->role?->role ?? '')) !== 'firefighter') {
+            return true;
+        }
+
+        return ($report->review_status ?? 'submitted') === 'rejected';
+    }
+
+    private function markResubmittedAfterRevision(array $validated): array
+    {
+        if ($this->reviewWorkflowEnabled('progress_investigation_report')) {
+            $validated['review_status'] = 'submitted';
+            $validated['review_comments'] = null;
+            $validated['reviewed_by_user_id'] = null;
+            $validated['reviewed_at'] = null;
+        }
+
+        return $validated;
+    }
+
+    private function reviewWorkflowEnabled(string $table): bool
+    {
+        return Schema::hasColumn($table, 'review_status');
     }
 }

@@ -13,6 +13,7 @@ use App\Support\IncidentOccurrenceSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class SpotInvestigationReportController extends Controller
 {
@@ -167,6 +168,12 @@ class SpotInvestigationReportController extends Controller
         if (!$spot) {
             return response()->json(['success' => false, 'message' => 'Report not found'], 404);
         }
+        if (! $this->canReviseReport($spot)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This report is already submitted for review and cannot be edited unless it is rejected for revision.',
+            ], 403);
+        }
         if ($cached = $imageService->cachedSubmissionResponse($request, "spot:update:{$id}")) {
             return response()->json($cached);
         }
@@ -199,6 +206,7 @@ class SpotInvestigationReportController extends Controller
 
         $incidentLocation = $this->pullIncidentLocationPayload($validated);
         unset($validated['proof_images']);
+        $validated = $this->markResubmittedAfterRevision($validated);
         $spot->update($validated);
         $this->syncIncidentMarkerLocation($spot, $incidentLocation);
         $imageService->store($request, $spot, 'spot');
@@ -335,6 +343,12 @@ class SpotInvestigationReportController extends Controller
             return response()->json(['success' => false, 'message' => 'not found'], 404);
 
         }
+        if (! $this->canReviseReport($spot)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.',
+            ], 403);
+        }
 
         $incidentId = (int) $spot->incident_id;
         InvestigationReportImageService::deleteForReport($spot);
@@ -342,5 +356,30 @@ class SpotInvestigationReportController extends Controller
         HistoricalFireIncidentSynchronizer::syncForIncidentId($incidentId);
         UserActivityLogger::log('deleted spot report', auth()->user()?->user_id, request());
         return response()->json(['success'=>true]);
+    }
+
+    private function canReviseReport(SpotInvestigationReport $report): bool
+    {
+        if (! Schema::hasColumn('spot_investigation_report', 'review_status')) {
+            return true;
+        }
+
+        if (strtolower((string) (auth()->user()?->role?->role ?? '')) !== 'firefighter') {
+            return true;
+        }
+
+        return ($report->review_status ?? 'submitted') === 'rejected';
+    }
+
+    private function markResubmittedAfterRevision(array $validated): array
+    {
+        if (Schema::hasColumn('spot_investigation_report', 'review_status')) {
+            $validated['review_status'] = 'submitted';
+            $validated['review_comments'] = null;
+            $validated['reviewed_by_user_id'] = null;
+            $validated['reviewed_at'] = null;
+        }
+
+        return $validated;
     }
 }

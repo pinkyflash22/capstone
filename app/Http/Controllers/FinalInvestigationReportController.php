@@ -11,6 +11,7 @@ use App\Support\HistoricalFireIncidentSynchronizer;
 use App\Support\UserActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class FinalInvestigationReportController extends Controller
@@ -29,7 +30,10 @@ class FinalInvestigationReportController extends Controller
 
     public function create()
     {
-        $progressReports = ProgressInvestigationReport::eligibleForFinal()->doesntHave('finalInvestigation')->get();
+        $progressReports = ProgressInvestigationReport::eligibleForFinal()
+            ->doesntHave('finalInvestigation')
+            ->when(Schema::hasColumn('progress_investigation_report', 'review_status'), fn ($query) => $query->where('review_status', 'approved'))
+            ->get();
         $addresses = FullAddress::with('barangay.city.province')->get();
         
         return view('admin.investigations.final-reports.create', compact('progressReports', 'addresses'));
@@ -87,6 +91,7 @@ class FinalInvestigationReportController extends Controller
         $progressInvestigations = ProgressInvestigationReport::with('spotInvestigation')
             ->eligibleForFinal()
             ->whereDoesntHave('finalInvestigation')
+            ->when(Schema::hasColumn('progress_investigation_report', 'review_status'), fn ($query) => $query->where('review_status', 'approved'))
             ->get();
         
         return response()->json($progressInvestigations);
@@ -115,7 +120,9 @@ class FinalInvestigationReportController extends Controller
 
     public function edit(FinalInvestigationReport $finalInvestigationReport)
     {
-        $progressReports = ProgressInvestigationReport::eligibleForFinal()->get();
+        $progressReports = ProgressInvestigationReport::eligibleForFinal()
+            ->when(Schema::hasColumn('progress_investigation_report', 'review_status'), fn ($query) => $query->where('review_status', 'approved'))
+            ->get();
         $addresses = FullAddress::with('barangay.city.province')->get();
         
         return view('admin.investigations.final-reports.edit', compact('finalInvestigationReport', 'progressReports', 'addresses'));
@@ -126,6 +133,12 @@ class FinalInvestigationReportController extends Controller
         $final = FinalInvestigationReport::find($id);
         if (!$final) {
             return response()->json(['success' => false, 'message' => 'Report not found'], 404);
+        }
+        if (! $this->canReviseReport($final)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This report is already submitted for review and cannot be edited unless it is rejected for revision.',
+            ], 403);
         }
         if ($cached = $imageService->cachedSubmissionResponse($request, "final:update:{$id}")) {
             return response()->json($cached);
@@ -153,6 +166,7 @@ class FinalInvestigationReportController extends Controller
         ]);
 
         unset($validated['proof_images']);
+        $validated = $this->markResubmittedAfterRevision($validated);
         $validated = $this->mergeDerivedDefaults($validated, $final->progressInvestigation);
         $final->update($validated);
         $imageService->store($request, $final, 'final');
@@ -242,6 +256,17 @@ class FinalInvestigationReportController extends Controller
 
     public function destroy(FinalInvestigationReport $finalInvestigationReport)
     {
+        if (! $this->canReviseReport($finalInvestigationReport)) {
+            if (request()->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.',
+                ], 403);
+            }
+
+            return back()->with('error', 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.');
+        }
+
         $incidentId = (int) $finalInvestigationReport->progressInvestigation?->spotInvestigation?->incident_id;
         InvestigationReportImageService::deleteForReport($finalInvestigationReport);
         $finalInvestigationReport->delete();
@@ -263,6 +288,12 @@ class FinalInvestigationReportController extends Controller
         if (! $progressReport->isEligibleForFinal()) {
             throw ValidationException::withMessages([
                 'progress_investigation_id' => 'Complete the 2nd Progress Report before creating the Final Report.',
+            ]);
+        }
+
+        if (Schema::hasColumn('progress_investigation_report', 'review_status') && ($progressReport->review_status ?? 'submitted') !== 'approved') {
+            throw ValidationException::withMessages([
+                'progress_investigation_id' => 'The Progress Investigation Report must be approved before creating the Final Report.',
             ]);
         }
 
@@ -317,5 +348,30 @@ class FinalInvestigationReportController extends Controller
         }
 
         return "Dead: {$dead}; Injured: {$injured}";
+    }
+
+    private function canReviseReport(FinalInvestigationReport $report): bool
+    {
+        if (! Schema::hasColumn('final_investigation_report', 'review_status')) {
+            return true;
+        }
+
+        if (strtolower((string) (auth()->user()?->role?->role ?? '')) !== 'firefighter') {
+            return true;
+        }
+
+        return ($report->review_status ?? 'submitted') === 'rejected';
+    }
+
+    private function markResubmittedAfterRevision(array $validated): array
+    {
+        if (Schema::hasColumn('final_investigation_report', 'review_status')) {
+            $validated['review_status'] = 'submitted';
+            $validated['review_comments'] = null;
+            $validated['reviewed_by_user_id'] = null;
+            $validated['reviewed_at'] = null;
+        }
+
+        return $validated;
     }
 }
