@@ -4229,8 +4229,17 @@ initializeCitizenLocationIfGranted();
             const shouldPickIncidentFromMap = new URLSearchParams(window.location.search).get('pick') === 'map';
             if (shouldOpenIncidentModal || shouldOpenIncidentFromQuery) {
                 window.setTimeout(function() {
-                    document.getElementById('latitude').value = window.userCoords?.currentLatitude ?? '';
-                    document.getElementById('longitude').value = window.userCoords?.currentLongitude ?? '';
+                    const latitudeInput = document.getElementById('latitude');
+                    const longitudeInput = document.getElementById('longitude');
+
+                    if (latitudeInput) {
+                        latitudeInput.value = window.userCoords?.currentLatitude ?? '';
+                    }
+
+                    if (longitudeInput) {
+                        longitudeInput.value = window.userCoords?.currentLongitude ?? '';
+                    }
+
                     if (shouldPickIncidentFromMap) {
                         startCitizenFireMapPick();
                     } else {
@@ -4837,9 +4846,13 @@ initializeCitizenLocationIfGranted();
                 return;
             }
 
+            document.getElementById('incidentReportLoadingOverlay')?.classList.add('hidden');
+            document.getElementById('incidentReportLoadingOverlay')?.classList.remove('flex');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
             modal.style.display = 'flex';
+            modal.style.pointerEvents = '';
+            modal.removeAttribute('inert');
             modal.setAttribute('aria-hidden', 'false');
             if (modal.id === 'fireIncidentModal' || modal.id === 'concernReportModal') {
                 startCitizenReportLocationRefresh();
@@ -4858,6 +4871,7 @@ initializeCitizenLocationIfGranted();
             modal.classList.add('hidden');
             modal.classList.remove('flex');
             modal.style.display = 'none';
+            modal.style.pointerEvents = '';
             modal.setAttribute('aria-hidden', 'true');
             if (modal.id === 'fireIncidentModal' || modal.id === 'concernReportModal') {
                 const fireOpen = !document.getElementById('fireIncidentModal')?.classList.contains('hidden');
@@ -4870,6 +4884,13 @@ initializeCitizenLocationIfGranted();
 
         function openFireIncidentModal() {
             const fireModal = document.getElementById('fireIncidentModal');
+            if (!fireModal) {
+                console.warn('Fire incident modal is missing from the page.');
+                return;
+            }
+
+            stopCitizenFireMapPick();
+            citizenFireDraft.mode = citizenFireDraft.mode === 'picked' ? 'picked' : 'current';
 
             if (citizenFireDraft.selectedLat !== null && citizenFireDraft.selectedLng !== null) {
                 // Keep an explicit map selection; opening the modal must not
@@ -4894,6 +4915,13 @@ initializeCitizenLocationIfGranted();
         }
 
         function openConcernReportModal() {
+            const concernModal = document.getElementById('concernReportModal');
+            if (!concernModal) {
+                console.warn('Concern report modal is missing from the page.');
+                return;
+            }
+
+            stopCitizenHazardMapPick();
             if (citizenHasUsableCoords() && citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null) {
                 citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
                 citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
@@ -4909,7 +4937,7 @@ initializeCitizenLocationIfGranted();
                     .catch(() => updateCitizenHazardLocationUi());
             }
             updateCitizenHazardLocationUi();
-            showCitizenModal(document.getElementById('concernReportModal'));
+            showCitizenModal(concernModal);
         }
 
         function setCitizenConcernType(type) {
@@ -6645,11 +6673,12 @@ document.addEventListener('DOMContentLoaded', function() {
         // Report incident triggers
 document.addEventListener('click', function(event) {
             const trigger = event.target instanceof Element
-                ? event.target.closest('.report-incident-trigger')
+                ? event.target.closest('.report-incident-trigger, [data-citizen-fire-report-open]')
                 : null;
 
             if (trigger) {
                 event.preventDefault();
+                event.stopPropagation();
                 const latitudeInput = document.getElementById('latitude');
                 const longitudeInput = document.getElementById('longitude');
 
