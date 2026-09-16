@@ -1223,7 +1223,7 @@ class FirefighterController extends Controller
                                     'report_stage' => ProgressInvestigationReport::STAGE_SINGLE,
                                 ]),
                             ];
-                        } elseif ($progressReport->report_stage === ProgressInvestigationReport::STAGE_FIRST && $progressApproved) {
+                        } elseif ($progressReport && $progressReport->report_stage === ProgressInvestigationReport::STAGE_FIRST && $progressApproved) {
                             $nextInvestigationAction = [
                                 'type' => 'progress',
                                 'label' => 'Start 2nd Progress Report',
@@ -1234,7 +1234,7 @@ class FirefighterController extends Controller
                                     'report_stage' => ProgressInvestigationReport::STAGE_SECOND,
                                 ]),
                             ];
-                        } elseif (! $finalReport && $progressReport->isEligibleForFinal() && $progressApproved) {
+                        } elseif ($progressReport && ! $finalReport && $progressReport->isEligibleForFinal() && $progressApproved) {
                             $nextInvestigationAction = [
                                 'type' => 'final',
                                 'label' => 'Start Final Report',
