@@ -1872,6 +1872,7 @@ window.addEventListener('pyrosense:report-synced', (event) => {
         return;
     }
 
+    event.preventDefault?.();
     showLandingToast('Your offline emergency report has synced successfully.', false, 3800);
 });
 

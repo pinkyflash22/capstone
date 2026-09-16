@@ -66,6 +66,33 @@ window.addEventListener('pyro:mobile-hub-call-started', () => {
     });
 });
 
+window.addEventListener('pyrosense:report-synced', (event) => {
+    const queueItem = event.detail?.queueItem;
+    if (queueItem?.type !== 'citizen-mobile-fire-report') {
+        return;
+    }
+
+    event.preventDefault?.();
+    showHubStatus('Queued fire report synced successfully.', 'success');
+    showHubToast('Queued fire report synced successfully. Do you want to view the dashboard?', 'success', {
+        actionLabel: 'View',
+        onAction: openDashboard,
+    });
+});
+
+window.addEventListener('pyrosense:report-sync-failed', (event) => {
+    const queueItems = Array.isArray(event.detail?.queue) ? event.detail.queue : [];
+    const hasMobileReport = queueItems.some((item) => item?.type === 'citizen-mobile-fire-report');
+    if (!hasMobileReport) {
+        return;
+    }
+
+    event.preventDefault?.();
+    const message = event.detail?.message || 'Queued fire report is still pending. It will retry when your session and connection are ready.';
+    showHubStatus(message, 'warning');
+    showHubToast(message, 'error');
+});
+
 function showHubStatus(message, type = 'error') {
     if (!statusBox) {
         return;

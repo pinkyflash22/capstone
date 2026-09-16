@@ -283,11 +283,22 @@ class BoundaryLocationController extends Controller
             'lat' => ['required', 'numeric', 'between:-90,90'],
             'lng' => ['required', 'numeric', 'between:-180,180'],
         ]);
+        $user = $request->user();
+        $allowedBarangayIds = $this->visibleBarangayIds($user);
+
+        if ($allowedBarangayIds === []
+            && $user
+            && ! $this->operationalScope->hasProvinceWideAccess($user)
+            && ! $this->operationalScope->isStationResponder($user)) {
+            // Citizens can still identify their current barangay from the
+            // submitted point even when their profile address is incomplete.
+            $allowedBarangayIds = null;
+        }
 
         $boundary = $boundaryMatcherService->locateBarangayBoundary(
             (float) $validated['lat'],
             (float) $validated['lng'],
-            $this->visibleBarangayIds($request->user()),
+            $allowedBarangayIds,
         );
 
         if (! $boundary) {

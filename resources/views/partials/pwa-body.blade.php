@@ -469,6 +469,7 @@
         const REPORT_QUEUE_KEY = `${STORAGE_PREFIX}:report-queue:${ACCOUNT_SCOPE}`;
         const STATUS_KEY = `${STORAGE_PREFIX}:status:${ACCOUNT_SCOPE}`;
         const PAGE_SNAPSHOT_KEY = `${STORAGE_PREFIX}:page-snapshots:${ACCOUNT_SCOPE}`;
+        const PAGE_HTML_CACHE = `${STORAGE_PREFIX}:page-html:${ACCOUNT_SCOPE || 'guest'}`;
         const OFFLINE_RETURN_KEY = `${STORAGE_PREFIX}:offline-return:${ACCOUNT_SCOPE}`;
         const SW_URL = `/sw.js?v={{ $pwaServiceWorkerVersion }}`;
         const AUTH_URL = @json(url('/auth'));
@@ -847,7 +848,34 @@
 
             snapshots[key] = snapshot;
             setPageSnapshots(snapshots);
+            cacheCurrentPageForOffline(snapshot);
             return snapshot;
+        }
+
+        async function cacheCurrentPageForOffline(snapshot = {}) {
+            if (!('caches' in window) || !snapshot?.path) {
+                return;
+            }
+
+            try {
+                const path = snapshot.path || window.location.pathname;
+                if (/^\/(?:auth|login|logout|register|forgot-password|reset-password)(?:\/.*)?$/i.test(path)) {
+                    return;
+                }
+
+                const cache = await caches.open(PAGE_HTML_CACHE);
+                const html = `<!doctype html>\n${document.documentElement.outerHTML}`;
+                const response = new Response(html, {
+                    headers: {
+                        'Content-Type': 'text/html; charset=UTF-8',
+                        'X-PyroSense-Offline-Snapshot': '1',
+                    },
+                });
+
+                await cache.put(new Request(path, { credentials: 'same-origin' }), response);
+            } catch (error) {
+                console.warn('[PyroSense PWA] Failed to cache offline page snapshot:', error);
+            }
         }
 
         function readPageSnapshot(key = null) {
@@ -1037,6 +1065,8 @@
 
             const remaining = [];
             let synced = 0;
+            let failed = 0;
+            let lastFailureMessage = '';
 
             for (let index = 0; index < queue.length; index += 1) {
                 const item = queue[index];
@@ -1048,13 +1078,30 @@
 
                     const syncHeaders = new Headers(item.headers || {});
                     syncHeaders.set('X-Pyro-Offline-Sync', '1');
-                    const response = await pyroFetch(item.url, {
+                    syncHeaders.set('Accept', 'application/json');
+                    syncHeaders.set('X-Requested-With', 'XMLHttpRequest');
+                    const csrfToken = getCsrfToken();
+                    if (csrfToken) {
+                        syncHeaders.set('X-CSRF-TOKEN', csrfToken);
+                    }
+
+                    const response = await nativeFetch(item.url, {
                         method: item.method || 'POST',
                         headers: syncHeaders,
-                        body: item.body || null
+                        body: item.body || null,
+                        credentials: 'same-origin',
+                        cache: 'no-store',
                     });
 
                     if (response.status === 419) {
+                        failed += 1;
+                        lastFailureMessage = 'Your secure session expired before the queued report could sync. Sign in again, then reconnect to retry.';
+                        item.meta = {
+                            ...(item.meta || {}),
+                            last_sync_error: lastFailureMessage,
+                            last_sync_status: response.status,
+                            last_sync_attempted_at: new Date().toISOString(),
+                        };
                         // Preserve the current item and every unprocessed item.
                         // Previously only the current report survived this break.
                         remaining.push(...queue.slice(index));
@@ -1062,6 +1109,18 @@
                     }
 
                     if (!response.ok) {
+                        const payload = await response.json().catch(() => ({}));
+                        const validationMessage = payload?.errors
+                            ? Object.values(payload.errors).flat().find(Boolean)
+                            : null;
+                        failed += 1;
+                        lastFailureMessage = validationMessage || payload?.message || `Queued report sync failed with status ${response.status}.`;
+                        item.meta = {
+                            ...(item.meta || {}),
+                            last_sync_error: lastFailureMessage,
+                            last_sync_status: response.status,
+                            last_sync_attempted_at: new Date().toISOString(),
+                        };
                         remaining.push(item);
                         continue;
                     }
@@ -1069,13 +1128,23 @@
                     const payload = await response.json().catch(() => ({}));
                     synced += 1;
 
-                    window.dispatchEvent(new CustomEvent('pyrosense:report-synced', {
+                    const syncEvent = new CustomEvent('pyrosense:report-synced', {
+                        cancelable: true,
                         detail: {
                             queueItem: item,
                             response: payload
                         }
-                    }));
+                    });
+                    const showDefaultToast = window.dispatchEvent(syncEvent);
+                    item.__pyroDefaultSyncToast = showDefaultToast;
                 } catch (error) {
+                    failed += 1;
+                    lastFailureMessage = error?.message || 'Queued report sync failed. It will retry when the connection is stable.';
+                    item.meta = {
+                        ...(item.meta || {}),
+                        last_sync_error: lastFailureMessage,
+                        last_sync_attempted_at: new Date().toISOString(),
+                    };
                     remaining.push(item);
                 }
             }
@@ -1089,11 +1158,61 @@
 
             updateConnectionState(true);
 
+            if (synced > 0 && queue.some((item) => item.__pyroDefaultSyncToast)) {
+                showPwaStatusToast(
+                    synced === 1
+                        ? 'Queued report synced successfully.'
+                        : `${synced} queued reports synced successfully.`,
+                    false,
+                    3200
+                );
+            }
+
+            if (failed > 0 && remaining.length > 0) {
+                const failureEvent = new CustomEvent('pyrosense:report-sync-failed', {
+                    cancelable: true,
+                    detail: {
+                        failed,
+                        remaining: remaining.length,
+                        message: lastFailureMessage,
+                        queue: remaining.slice(),
+                    },
+                });
+                const showDefaultFailureToast = window.dispatchEvent(failureEvent);
+
+                if (showDefaultFailureToast) {
+                    showPwaStatusToast(
+                        lastFailureMessage || `${remaining.length} queued report${remaining.length === 1 ? '' : 's'} still pending sync.`,
+                        true,
+                        5200
+                    );
+                }
+            }
+
             if (!remaining.length) {
                 window.setTimeout(hideConnectionState, 2200);
             }
 
             return { synced, remaining: remaining.length };
+        }
+
+        function showPwaStatusToast(message, isError = false, duration = 3000) {
+            if (!message) {
+                return;
+            }
+
+            if (typeof window.showCitizenToast === 'function') {
+                window.showCitizenToast(message, isError, duration);
+                return;
+            }
+
+            if (typeof window.PyroNotify?.notify === 'function') {
+                window.PyroNotify.notify(message, isError ? 'error' : 'success', duration);
+                return;
+            }
+
+            showConnectionState(isError ? 'Sync failed' : 'Sync complete', message, isError ? '!' : '✓');
+            window.setTimeout(hideConnectionState, duration);
         }
 
         function storeDataset(name, data) {

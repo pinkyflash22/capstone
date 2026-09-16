@@ -94,6 +94,8 @@ let citizenActiveBaseLayerKey = 'OSM Standard';
 let citizenRouteDiscoveryFailureCount = 0;
 let citizenRouteDiscoveryPausedUntil = 0;
 let citizenMapPreviewPreviousFocus = null;
+let latestCitizenBoundaryRenderedCount = 0;
+let citizenBoundaryReloadTimer = null;
 
 function citizenPageIsVisible() {
     return typeof document === 'undefined' || document.visibilityState === 'visible';
@@ -955,6 +957,42 @@ function getCitizenBoundaryStyle(shape = {}, index = 0) {
     };
 }
 
+function getCitizenCurrentCoords() {
+    const lat = Number(window.userCoords?.currentLatitude);
+    const lng = Number(window.userCoords?.currentLongitude);
+    const hasCoords = typeof window.citizenHasUsableCoords === 'function'
+        ? window.citizenHasUsableCoords()
+        : Boolean(window.userCoords?.ready && Number.isFinite(lat) && Number.isFinite(lng));
+
+    return hasCoords ? { lat, lng } : null;
+}
+
+async function fetchCitizenBoundaryFromCurrentLocation() {
+    const coords = getCitizenCurrentCoords();
+    if (!coords) {
+        return [];
+    }
+
+    const response = await fetchCitizenLiveResponseOnce('citizen-boundary-locate', '/api/boundaries/locate-point', {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(coords),
+        timeoutMs: 10000
+    });
+
+    if (!response.ok) {
+        throw new Error(`Boundary location lookup failed with status ${response.status}`);
+    }
+
+    const payload = await response.json();
+    return payload?.matched && payload?.boundary ? [payload.boundary] : [];
+}
+
 async function loadCitizenBoundaries() {
     if (!window.usermap) {
         console.warn('[CitizenBoundary] Map not ready, skipping boundary load');
@@ -996,6 +1034,8 @@ async function loadCitizenBoundaries() {
             }
         });
 
+        latestCitizenBoundaryRenderedCount = renderedCount;
+
         console.log('[CitizenBoundary] boundaries rendered', {
             source,
             total: shapes.length,
@@ -1023,19 +1063,46 @@ async function loadCitizenBoundaries() {
         }
 
         const payload = await response.json();
-        const shapes = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
+        let shapes = Array.isArray(payload?.data) ? payload.data : (Array.isArray(payload) ? payload : []);
+
+        if (shapes.length === 0) {
+            shapes = await fetchCitizenBoundaryFromCurrentLocation();
+        }
+
         window.pyroPwa?.storeDataset?.('citizen-map-boundaries', shapes);
-        renderShapes(shapes, 'live');
+        renderShapes(shapes, shapes.length === 1 ? 'current-location' : 'live');
     } catch (error) {
         console.error('[CitizenBoundary] Failed to load boundaries', error);
 
         if (!Array.isArray(cachedShapes) || !cachedShapes.length) {
+            try {
+                const fallbackShapes = await fetchCitizenBoundaryFromCurrentLocation();
+                if (fallbackShapes.length) {
+                    renderShapes(fallbackShapes, 'current-location-fallback');
+                    return;
+                }
+            } catch (fallbackError) {
+                console.error('[CitizenBoundary] Current-location boundary fallback failed', fallbackError);
+            }
+
             boundaryLayerGroup.clearLayers();
+            latestCitizenBoundaryRenderedCount = 0;
         }
     }
 }
 
 window.loadCitizenBoundaries = loadCitizenBoundaries;
+
+document.addEventListener('locationReady', () => {
+    if (latestCitizenBoundaryRenderedCount > 0 || citizenBoundaryReloadTimer) {
+        return;
+    }
+
+    citizenBoundaryReloadTimer = window.setTimeout(() => {
+        citizenBoundaryReloadTimer = null;
+        window.loadCitizenBoundaries?.();
+    }, 250);
+});
 
 function ensureCitizenLegendControl() {
     if (document.querySelector('#section-overview .citizen-map-legend-grid')) {

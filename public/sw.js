@@ -12,6 +12,17 @@ const PWA_START_URL = '/pwa/start';
 const PWA_QUICK_REPORT_URL = '/pwa/quick-report';
 const CITIZEN_MOBILE_HUB_URL = '/citizen/mobile-hub';
 const CITIZEN_DASHBOARD_URL = '/citizen/dashboard';
+const OFFLINE_APP_FALLBACK_URLS = [
+    CITIZEN_MOBILE_HUB_URL,
+    CITIZEN_DASHBOARD_URL,
+    '/firefighter/dashboard',
+    '/chief/dashboard',
+    '/admin/dashboard',
+    '/barangay/dashboard',
+    '/dashboard',
+    PWA_START_URL,
+    PWA_QUICK_REPORT_URL
+];
 
 const NO_CACHE_HTML_PATTERNS = [
     /^\/auth(?:\/.*)?$/i,
@@ -335,9 +346,18 @@ async function fetchWithoutUnhandledRejection(request, options = {}) {
 }
 
 async function handleNoCacheNavigationRequest(request) {
+    const requestUrl = new URL(request.url);
+
     try {
         return await fetch(request, { cache: 'no-store', credentials: 'same-origin' });
     } catch (error) {
+        if (['/login', '/auth', PWA_START_URL, PWA_QUICK_REPORT_URL].includes(requestUrl.pathname)) {
+            const cachedAppPage = await matchOfflineAppPage(requestUrl.pathname);
+            if (cachedAppPage) {
+                return cachedAppPage;
+            }
+        }
+
         const offlinePage = await caches.match(OFFLINE_URL, { ignoreSearch: true });
         if (offlinePage) {
             return offlinePage;
@@ -359,8 +379,19 @@ async function handleNavigationRequest(request) {
         if (response && response.ok) {
             await safeCachePut(DYNAMIC_CACHE, request, response);
         }
-        return response;
+            return response;
     } catch (error) {
+        if (
+            requestUrl.pathname === LANDING_URL
+            || requestUrl.pathname === PWA_START_URL
+            || requestUrl.pathname === PWA_QUICK_REPORT_URL
+        ) {
+            const cachedAppPage = await matchOfflineAppPage(requestUrl.pathname);
+            if (cachedAppPage) {
+                return cachedAppPage;
+            }
+        }
+
         const cachedPage = await caches.match(request, { ignoreSearch: true });
         if (cachedPage) {
             return cachedPage;
@@ -407,6 +438,22 @@ async function handleNavigationRequest(request) {
             headers: { 'Content-Type': 'text/plain' }
         });
     }
+}
+
+async function matchOfflineAppPage(preferredPath = null) {
+    const candidates = [
+        preferredPath,
+        ...OFFLINE_APP_FALLBACK_URLS,
+    ].filter(Boolean);
+
+    for (const path of candidates) {
+        const cached = await caches.match(path, { ignoreSearch: true });
+        if (cached) {
+            return cached;
+        }
+    }
+
+    return null;
 }
 
 async function cacheFirst(request, cacheName) {

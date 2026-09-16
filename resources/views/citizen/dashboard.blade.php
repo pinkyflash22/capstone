@@ -4981,6 +4981,18 @@ initializeCitizenLocationIfGranted();
             });
         });
 
+        document.getElementById('fireIncidentModal')?.addEventListener('click', function(event) {
+            if (event.target === this) {
+                cancelCitizenFireReportFlow();
+            }
+        });
+
+        document.getElementById('concernReportModal')?.addEventListener('click', function(event) {
+            if (event.target === this) {
+                cancelCitizenHazardReportFlow();
+            }
+        });
+
         document.getElementById('hazardUseCurrentLocationButton')?.addEventListener('click', function() {
             setCitizenHazardCurrentLocation();
         });
@@ -6584,7 +6596,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-window.addEventListener('pyrosense:report-synced', function() {
+window.addEventListener('pyrosense:report-synced', function(event) {
+    event.preventDefault?.();
     window.showCitizenToast?.('Queued report synced successfully.', false, 2800);
     if (typeof window.refreshCitizenOverviewData === 'function' && window.citizenHasUsableCoords?.()) {
         window.refreshCitizenOverviewData({ force: true });
