@@ -2472,7 +2472,7 @@ function updateRouteInfoCard() {
                     </button>
                 </div>
                 <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
-                    Destination: ${truck.routeDestination?.title || 'Unknown'}
+                    Incident: ${truck.routeDestination?.title || 'Incident location'}
                 </div>
                 <div style="margin-top: 4px;">
                     <div style="background: #e5e7eb; border-radius: 10px; height: 4px; overflow: hidden;">
@@ -8796,35 +8796,41 @@ function getTruckPopupErrorMarkup(truck = {}, message = 'Failed to load truck de
 function getTruckPopupMarkup(truck = {}, payload = {}) {
     const team = payload.team || null;
     const members = Array.isArray(team?.members) ? team.members : [];
+    const incident = payload.incident || {};
     const targetLocation = payload.target_location || {};
+    const coordinates = incident.coordinates || targetLocation || {};
+    const incidentTitle = incident.title || targetLocation.title || truck.routeDestination?.title || 'Fire incident';
+    const readableLocation = incident.location || targetLocation.title || 'Incident location unavailable';
+    const statusLabel = String(incident.status || payload.status || truck.status || 'moving').replaceAll('_', ' ').toUpperCase();
     const membersHtml = members.length
         ? members.map((member, index) => `
             <div style="display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; ${index < members.length - 1 ? 'border-bottom: 1px solid #fed7aa;' : ''}">
-                <span style="font-size: 12px; font-weight: 600; color: #1f2937;">${member.name}</span>
-                <span style="font-size: 11px; color: #9a3412; text-align: right;">${member.role_label}</span>
+                <span style="font-size: 12px; font-weight: 600; color: #1f2937;">${escapeHtml(member.name || 'Responder')}</span>
+                <span style="font-size: 11px; color: #9a3412; text-align: right;">${escapeHtml(member.role_label || member.rank || 'Responder')}</span>
             </div>
         `).join('')
-        : '<div style="font-size: 12px; color: #6b7280;">No team members found.</div>';
+        : '<div style="font-size: 12px; color: #6b7280;">No responder team members found.</div>';
 
     return `
         <div style="min-width: 280px; max-width: 340px; font-family: system-ui, -apple-system, sans-serif;">
             <div style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white; padding: 12px 14px; border-radius: 12px 12px 0 0; margin: -12px -12px 0 -12px;">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                     <div>
-                        <div style="font-size: 15px; font-weight: 700;">${team?.label || `Truck ${truck.routeId || 'N/A'}`}</div>
-                        <div style="font-size: 11px; opacity: 0.9;">${String(payload.status || truck.status || 'moving').toUpperCase()}</div>
+                        <div style="font-size: 15px; font-weight: 700;">${escapeHtml(team?.label || `Truck ${truck.routeId || 'N/A'}`)}</div>
+                        <div style="font-size: 11px; opacity: 0.9;">${escapeHtml(statusLabel)}</div>
                     </div>
                     <i class="fas fa-truck" style="font-size: 20px;"></i>
                 </div>
             </div>
             <div style="padding-top: 12px;">
                 <div style="background: #f8fafc; border-radius: 10px; padding: 10px; margin-bottom: 10px;">
-                    <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">TARGET LOCATION</div>
-                    <div style="font-size: 13px; font-weight: 600; color: #1f2937;">${targetLocation.title || truck.routeDestination?.title || 'Destination unavailable'}</div>
-                    ${(targetLocation.lat && targetLocation.lng) ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px;">${Number(targetLocation.lat).toFixed(6)}, ${Number(targetLocation.lng).toFixed(6)}</div>` : ''}
+                    <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">INCIDENT INFORMATION</div>
+                    <div style="font-size: 13px; font-weight: 700; color: #1f2937;">${escapeHtml(incidentTitle)}</div>
+                    <div style="font-size: 12px; color: #475569; margin-top: 5px; line-height: 1.4;">${escapeHtml(readableLocation)}</div>
+                    ${(coordinates.lat && coordinates.lng) ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px;">${Number(coordinates.lat).toFixed(6)}, ${Number(coordinates.lng).toFixed(6)}</div>` : ''}
                 </div>
                 <div style="background: #fff7ed; border-radius: 10px; padding: 10px;">
-                    <div style="font-size: 11px; color: #9a3412; margin-bottom: 6px;">TEAM MEMBERS</div>
+                    <div style="font-size: 11px; color: #9a3412; margin-bottom: 6px;">RESPONDERS</div>
                     ${membersHtml}
                 </div>
             </div>
@@ -9608,7 +9614,7 @@ async function startSimulationForRoute(routeId) {
         zIndexOffset: 1000
     }));
     if (truck.persisted === false) {
-        truck.animatedVehicle.bindPopup('<strong>Live GPS directions</strong><br><small>This marker moves only when your device moves.</small>');
+        truck.animatedVehicle.bindPopup(getLocalIncidentNavigationPopup(truck));
     } else {
         bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);
     }
@@ -10040,13 +10046,26 @@ function createRouteMovementIcon(routeSource, color = '#2563eb', movementMode = 
 
 function bindNavigationDetailsPopup(routeId, marker, route = null) {
     if (!marker) return;
-    const destination = route?.routeDestination?.title || 'Selected destination';
-    const isDemo = isDemoRouteSource(route?.routeSource);
-    const source = isDemo ? 'Demo truck route' : 'Live navigation';
-    const note = isDemo
-        ? 'Demonstration only. This truck does not dispatch resources or update the incident status.'
-        : 'This arrow represents navigation only. Apparatus appears after a response is accepted.';
-    marker.bindPopup(`<div style="min-width:190px;font-family:system-ui,-apple-system,sans-serif"><strong style="color:#1d4ed8">${source}</strong><div style="margin-top:5px;font-size:12px;color:#475569">Directions to ${escapeHtml(destination)}</div><small style="display:block;margin-top:7px;color:#64748b">${note}</small></div>`);
+    bindTruckDetailsPopup(routeId, marker, route);
+}
+
+function getLocalIncidentNavigationPopup(route = {}) {
+    const destination = route?.routeDestination || window.routeDestination || {};
+    const title = destination.title || 'Incident location';
+    const lat = Number(destination.lat);
+    const lng = Number(destination.lng);
+    const coordinates = Number.isFinite(lat) && Number.isFinite(lng)
+        ? `<div style="font-size:11px;color:#64748b;margin-top:4px;">${lat.toFixed(6)}, ${lng.toFixed(6)}</div>`
+        : '';
+
+    return `
+        <div style="min-width:220px;font-family:system-ui,-apple-system,sans-serif;">
+            <strong style="color:#1f2937;">Incident information</strong>
+            <div style="margin-top:6px;font-size:12px;color:#475569;line-height:1.4;">${escapeHtml(title)}</div>
+            ${coordinates}
+            <small style="display:block;margin-top:8px;color:#9a3412;">Responder details appear after the route is linked to an active incident.</small>
+        </div>
+    `;
 }
 
 function applyTruckHeading(marker, angle) {
@@ -10331,7 +10350,7 @@ async function startSimulationFromPosition(routeId, startIndex) {
         zIndexOffset: 1000
     }));
     if (truck.persisted === false) {
-        truck.animatedVehicle.bindPopup('<strong>Live GPS directions</strong><br><small>This marker moves only when your device moves.</small>');
+        truck.animatedVehicle.bindPopup(getLocalIncidentNavigationPopup(truck));
     } else {
         bindNavigationDetailsPopup(routeId, truck.animatedVehicle, truck);
     }

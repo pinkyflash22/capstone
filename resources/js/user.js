@@ -4077,7 +4077,7 @@ async function userStartSimulationForRoute(routeId) {
         icon: userCreateFireTruckIcon(),
         zIndexOffset: 1000
     }).addTo(window.usermap));
-    truck.animatedVehicle.bindPopup(`🚒 Emergency Vehicle - En Route`);
+    userBindTruckIncidentPopup(routeId, truck.animatedVehicle, truck);
     if (truck.simulationPoints[1]) {
         const nextPoint = truck.simulationPoints[1];
         const initialAngle = Math.atan2(nextPoint[1] - startPoint[1], nextPoint[0] - startPoint[0]) * 180 / Math.PI;
@@ -4128,7 +4128,7 @@ async function userStartSimulationFromPosition(routeId, startIndex) {
         icon: userCreateFireTruckIcon(),
         zIndexOffset: 1000
     }).addTo(window.usermap));
-    truck.animatedVehicle.bindPopup(`🚒 Emergency Vehicle - En Route`);
+    userBindTruckIncidentPopup(routeId, truck.animatedVehicle, truck);
     if (truck.simulationPoints[startIndex + 1]) {
         const nextPoint = truck.simulationPoints[startIndex + 1];
         const initialAngle = Math.atan2(nextPoint[1] - startPoint[1], nextPoint[0] - startPoint[0]) * 180 / Math.PI;
@@ -4372,6 +4372,98 @@ function userCreateFireTruckIcon() {
     });
 }
 
+function userTruckPopupLoadingMarkup(truck = {}) {
+    return `
+        <div style="min-width:260px;max-width:320px;font-family:system-ui,-apple-system,sans-serif;">
+            <strong style="color:#1f2937;">Fetching incident information</strong>
+            <div style="font-size:12px;color:#64748b;margin-top:5px;">Loading responder team and incident location...</div>
+            <div style="background:#f8fafc;border-radius:10px;padding:9px;margin-top:10px;font-size:12px;color:#64748b;">Truck ${escapeCitizenModalHtml(truck.routeId || 'N/A')}</div>
+        </div>
+    `;
+}
+
+function userTruckPopupErrorMarkup(truck = {}, message = 'Unable to load incident information.') {
+    return `
+        <div style="min-width:260px;max-width:320px;font-family:system-ui,-apple-system,sans-serif;">
+            <strong style="color:#b91c1c;">Truck ${escapeCitizenModalHtml(truck.routeId || 'N/A')}</strong>
+            <div style="background:#fef2f2;color:#991b1b;border-radius:10px;padding:9px;margin-top:8px;font-size:12px;">${escapeCitizenModalHtml(message)}</div>
+        </div>
+    `;
+}
+
+function userTruckPopupMarkup(truck = {}, payload = {}) {
+    const team = payload.team || {};
+    const members = Array.isArray(team.members) ? team.members : [];
+    const incident = payload.incident || {};
+    const target = payload.target_location || {};
+    const coordinates = incident.coordinates || target || {};
+    const incidentTitle = incident.title || target.title || truck.routeDestination?.title || 'Fire incident';
+    const readableLocation = incident.location || target.title || 'Incident location unavailable';
+    const statusLabel = String(incident.status || payload.status || truck.status || 'responding').replaceAll('_', ' ').toUpperCase();
+    const membersHtml = members.length
+        ? members.map((member, index) => `
+            <div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;${index < members.length - 1 ? 'border-bottom:1px solid #fed7aa;' : ''}">
+                <span style="font-size:12px;font-weight:600;color:#1f2937;">${escapeCitizenModalHtml(member.name || 'Responder')}</span>
+                <span style="font-size:11px;color:#9a3412;text-align:right;">${escapeCitizenModalHtml(member.role_label || member.rank || 'Responder')}</span>
+            </div>
+        `).join('')
+        : '<div style="font-size:12px;color:#6b7280;">No responder team members found.</div>';
+
+    return `
+        <div style="min-width:280px;max-width:340px;font-family:system-ui,-apple-system,sans-serif;">
+            <div style="background:linear-gradient(135deg,#dc2626 0%,#991b1b 100%);color:white;padding:12px 14px;border-radius:12px 12px 0 0;margin:-12px -12px 0 -12px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <div>
+                        <div style="font-size:15px;font-weight:700;">${escapeCitizenModalHtml(team.label || `Truck ${truck.routeId || 'N/A'}`)}</div>
+                        <div style="font-size:11px;opacity:.9;">${escapeCitizenModalHtml(statusLabel)}</div>
+                    </div>
+                    <i class="fas fa-truck" style="font-size:20px;"></i>
+                </div>
+            </div>
+            <div style="padding-top:12px;">
+                <div style="background:#f8fafc;border-radius:10px;padding:10px;margin-bottom:10px;">
+                    <div style="font-size:11px;color:#64748b;margin-bottom:4px;">INCIDENT INFORMATION</div>
+                    <div style="font-size:13px;font-weight:700;color:#1f2937;">${escapeCitizenModalHtml(incidentTitle)}</div>
+                    <div style="font-size:12px;color:#475569;margin-top:5px;line-height:1.4;">${escapeCitizenModalHtml(readableLocation)}</div>
+                    ${(coordinates.lat && coordinates.lng) ? `<div style="font-size:11px;color:#64748b;margin-top:4px;">${Number(coordinates.lat).toFixed(6)}, ${Number(coordinates.lng).toFixed(6)}</div>` : ''}
+                </div>
+                <div style="background:#fff7ed;border-radius:10px;padding:10px;">
+                    <div style="font-size:11px;color:#9a3412;margin-bottom:6px;">RESPONDERS</div>
+                    ${membersHtml}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function userBindTruckIncidentPopup(routeId, marker, truck = null) {
+    if (!marker) return;
+    const activeTruck = truck || userActiveTrucks.get(normalizeUserRouteId(routeId)) || { routeId };
+    marker.bindPopup(userTruckPopupLoadingMarkup(activeTruck), { minWidth: 260, maxWidth: 360 });
+    marker.on('popupopen', async () => {
+        const popup = marker.getPopup();
+        const currentTruck = truck || userActiveTrucks.get(normalizeUserRouteId(routeId)) || activeTruck;
+        if (popup) popup.setContent(userTruckPopupLoadingMarkup(currentTruck));
+
+        try {
+            const response = await fetch(`/api/route/${encodeURIComponent(routeId)}/truck-details`, {
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.success === false) {
+                throw new Error(payload.error || 'Unable to load incident information.');
+            }
+            if (popup) popup.setContent(userTruckPopupMarkup(currentTruck, payload.data || {}));
+        } catch (error) {
+            console.error('Failed to load citizen truck popup details:', error);
+            if (popup) popup.setContent(userTruckPopupErrorMarkup(currentTruck, error.message || 'Unable to load incident information.'));
+        }
+    });
+}
+
 function userUpdateLiveTruckPosition(routeId, route = {}) {
     routeId = normalizeUserRouteId(routeId);
     const truck = userActiveTrucks.get(routeId);
@@ -4391,7 +4483,7 @@ function userUpdateLiveTruckPosition(routeId, route = {}) {
             icon: userCreateFireTruckIcon(),
             zIndexOffset: 1000,
         }).addTo(window.usermap));
-        truck.animatedVehicle.bindPopup('Emergency vehicle - Live GPS');
+        userBindTruckIncidentPopup(routeId, truck.animatedVehicle, truck);
     } else {
         const previous = truck.animatedVehicle.getLatLng();
         truck.animatedVehicle.setLatLng([lat, lng]);
@@ -4610,7 +4702,7 @@ function userUpdateRouteInfoCard() {
                     </span>
                 </div>
                 <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
-                    Destination: ${truck.routeDestination?.title || 'Incident Location'}
+                    Incident: ${truck.routeDestination?.title || 'Incident location'}
                 </div>
                 <div style="margin-top: 4px;">
                     <div style="background: #e5e7eb; border-radius: 10px; height: 4px; overflow: hidden;">

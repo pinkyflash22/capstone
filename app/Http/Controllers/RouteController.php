@@ -10,6 +10,7 @@ use App\Models\Incident;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -400,52 +401,74 @@ class RouteController extends Controller
         try {
             $route = $this->visibleRouteQuery()->with([
                 'incident.marker',
-                'incident.team.commander',
-                'incident.team.pumpers',
-                'incident.team.teamLeader',
-                'incident.team.officer1',
-                'incident.team.officer2',
-                'incident.team.officer3',
-                'incident.team.rescueRadio',
+                'incident.barangay.city',
+                'incident.team.commander.user',
+                'incident.team.pumpers.user',
+                'incident.team.teamLeader.user',
+                'incident.team.officer1.user',
+                'incident.team.officer2.user',
+                'incident.team.officer3.user',
+                'incident.team.rescueRadio.user',
             ])->findOrFail($id);
 
+            $incident = $route->incident;
             $team = $route->incident?->team;
             $memberMap = [
-                'Commander/Driver' => $team?->commander,
-                'Pumper' => $team?->pumpers,
-                'Team Leader' => $team?->teamLeader,
-                'Firefighter Officer' => $team?->officer1,
-                'Firefighter Officer' => $team?->officer2,
-                'Firefighter Officer' => $team?->officer3,
-                'Rescue Radio' => $team?->rescueRadio,
+                ['Commander / Driver', $team?->commander],
+                ['Pumper', $team?->pumpers],
+                ['Team Leader', $team?->teamLeader],
+                ['Firefighter Officer 1', $team?->officer1],
+                ['Firefighter Officer 2', $team?->officer2],
+                ['Firefighter Officer 3', $team?->officer3],
+                ['Rescue Radio', $team?->rescueRadio],
             ];
 
             $members = collect($memberMap)
-                ->map(function ($user, $roleLabel) {
-                    if (!$user) {
+                ->map(function (array $entry) {
+                    [$roleLabel, $officer] = $entry;
+                    if (!$officer) {
                         return null;
                     }
 
+                    $user = $officer->user;
                     $fullName = trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? ''));
 
                     return [
-                        'user_id' => $user->user_id,
-                        'name' => $fullName !== '' ? $fullName : ($user->name ?? ('User #' . $user->user_id)),
+                        'station_officer_id' => $officer->station_officer_id,
+                        'user_id' => $user?->user_id,
+                        'name' => $fullName !== '' ? $fullName : ($user?->name ?? ('Officer #' . $officer->station_officer_id)),
                         'role_label' => $roleLabel,
+                        'rank' => $officer->rank,
                     ];
                 })
                 ->filter()
                 ->values();
+
+            $incidentLat = $route->destination_lat ?? $incident?->marker?->lat;
+            $incidentLng = $route->destination_lng ?? $incident?->marker?->lng;
+            $incidentCoordinates = [
+                'lat' => $incidentLat !== null ? (float) $incidentLat : null,
+                'lng' => $incidentLng !== null ? (float) $incidentLng : null,
+            ];
+            $incidentLocation = $this->resolveIncidentReadableLocation($route, $incidentCoordinates['lat'], $incidentCoordinates['lng']);
 
             return response()->json([
                 'success' => true,
                 'data' => [
                     'route_id' => $route->route_id,
                     'status' => $route->status,
+                    'incident' => [
+                        'incident_id' => $incident?->incident_id,
+                        'status' => $incident?->status,
+                        'title' => $incident?->marker?->title ?: ($route->destination_title ?: 'Fire incident'),
+                        'description' => $incident?->marker?->description,
+                        'location' => $incidentLocation,
+                        'coordinates' => $incidentCoordinates,
+                    ],
                     'target_location' => [
-                        'title' => $route->destination_title ?: ($route->incident?->marker?->title ?? 'Destination'),
-                        'lat' => $route->destination_lat ?? $route->incident?->marker?->lat,
-                        'lng' => $route->destination_lng ?? $route->incident?->marker?->lng,
+                        'title' => $incidentLocation,
+                        'lat' => $incidentCoordinates['lat'],
+                        'lng' => $incidentCoordinates['lng'],
                     ],
                     'team' => $team ? [
                         'team_id' => $team->team_id,
@@ -467,6 +490,62 @@ class RouteController extends Controller
                 'error' => 'Failed to fetch truck details'
             ], 500);
         }
+    }
+
+    private function resolveIncidentReadableLocation(Route $route, ?float $lat, ?float $lng): string
+    {
+        $incident = $route->incident;
+        $fallback = collect([
+            $route->destination_title,
+            $incident?->marker?->title,
+            $incident?->marker?->description,
+            collect([
+                $incident?->barangay?->barangay_name,
+                $incident?->barangay?->city?->city_name,
+            ])->filter()->join(', '),
+        ])->map(fn ($value) => trim((string) $value))->first(fn ($value) => $value !== '') ?: 'Incident location unavailable';
+
+        if ($lat === null || $lng === null) {
+            return $fallback;
+        }
+
+        $apiKey = trim((string) config('services.geoapify.key'));
+        if ($apiKey === '') {
+            return $fallback;
+        }
+
+        return Cache::remember(
+            sprintf('geoapify:reverse:%0.6f:%0.6f', $lat, $lng),
+            now()->addDays(7),
+            function () use ($lat, $lng, $apiKey, $fallback) {
+                try {
+                    $response = Http::connectTimeout((int) config('services.geoapify.connect_timeout', 5))
+                        ->timeout((int) config('services.geoapify.timeout', 15))
+                        ->get('https://api.geoapify.com/v1/geocode/reverse', [
+                            'lat' => $lat,
+                            'lon' => $lng,
+                            'apiKey' => $apiKey,
+                        ]);
+
+                    if (! $response->ok()) {
+                        return $fallback;
+                    }
+
+                    $properties = data_get($response->json(), 'features.0.properties', []);
+                    $formatted = trim((string) ($properties['formatted'] ?? ''));
+
+                    return $formatted !== '' ? $formatted : $fallback;
+                } catch (\Throwable $exception) {
+                    Log::warning('Geoapify reverse geocode failed for route popup.', [
+                        'lat' => $lat,
+                        'lng' => $lng,
+                        'error' => $exception->getMessage(),
+                    ]);
+
+                    return $fallback;
+                }
+            }
+        );
     }
 
     /**
