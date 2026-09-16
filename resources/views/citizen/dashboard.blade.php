@@ -3231,6 +3231,15 @@
             && Date.now() - timestamp <= maxAgeMs;
     }
 
+    function citizenHasUsableCoords(coords = window.userCoords) {
+        const lat = Number(coords?.currentLatitude ?? coords?.lat ?? coords?.latitude);
+        const lng = Number(coords?.currentLongitude ?? coords?.lng ?? coords?.longitude);
+
+        return Boolean(coords?.ready ?? true)
+            && Number.isFinite(lat)
+            && Number.isFinite(lng);
+    }
+
     function formatCitizenLocationFreshness() {
         const timestamp = Number(window.userCoords?.timestamp);
         if (!window.userCoords?.ready || !Number.isFinite(timestamp)) {
@@ -3254,6 +3263,11 @@
             node.classList.toggle('text-slate-400', !fresh);
         });
     }
+
+    window.citizenCoordsAreFresh = citizenCoordsAreFresh;
+    window.citizenHasUsableCoords = citizenHasUsableCoords;
+    window.formatCitizenLocationFreshness = formatCitizenLocationFreshness;
+    window.updateCitizenLocationFreshnessIndicators = updateCitizenLocationFreshnessIndicators;
 
     function applyCitizenLocationFix(fix, { refreshViews = true } = {}) {
         if (!fix) return false;
@@ -3285,7 +3299,7 @@
             document.dispatchEvent(new Event('locationReady'));
         }
 
-        updateCitizenLocationFreshnessIndicators();
+        window.updateCitizenLocationFreshnessIndicators?.();
 
         if (window.__citizenReportDraftsReady) {
             if (citizenFireDraft.mode === 'current') {
@@ -3425,15 +3439,15 @@
 
             function startCitizenReportLocationRefresh() {
                 stopCitizenReportLocationRefresh();
-                updateCitizenLocationFreshnessIndicators();
+                window.updateCitizenLocationFreshnessIndicators?.();
 
                 if (!citizenCoordsAreFresh(CITIZEN_REPORT_LOCATION_REFRESH_MS)) {
                     window.requestCitizenLocationNow?.({ silent: true, forceFresh: true })
-                        .catch(() => updateCitizenLocationFreshnessIndicators());
+                        .catch(() => window.updateCitizenLocationFreshnessIndicators?.());
                 }
 
                 citizenReportLocationRefreshInterval = setInterval(() => {
-                    updateCitizenLocationFreshnessIndicators();
+                    window.updateCitizenLocationFreshnessIndicators?.();
 
                     const fireOpen = !document.getElementById('fireIncidentModal')?.classList.contains('hidden');
                     const concernOpen = !document.getElementById('concernReportModal')?.classList.contains('hidden');
@@ -3443,7 +3457,7 @@
                     }
 
                     window.requestCitizenLocationNow?.({ silent: true, forceFresh: true })
-                        .catch(() => updateCitizenLocationFreshnessIndicators());
+                        .catch(() => window.updateCitizenLocationFreshnessIndicators?.());
                 }, CITIZEN_REPORT_LOCATION_REFRESH_MS);
             }
 
@@ -4558,7 +4572,7 @@ initializeCitizenLocationIfGranted();
                 return;
             }
 
-            if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) {
+            if (!citizenHasUsableCoords()) {
                 statusNode.textContent = 'Getting current location...';
                 return;
             }
@@ -4581,10 +4595,10 @@ initializeCitizenLocationIfGranted();
             statusNode.textContent = Number.isFinite(accuracy) && accuracy > 0
                 ? `${sourceLabel} location · ${accuracyClass} accuracy (±${Math.round(accuracy)} m).`
                 : `${sourceLabel} location ready.`;
-            updateCitizenLocationFreshnessIndicators();
+            window.updateCitizenLocationFreshnessIndicators?.();
         }
 
-        if (window.userCoords?.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude) {
+        if (citizenHasUsableCoords()) {
             citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
             citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
             citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
@@ -4603,7 +4617,7 @@ initializeCitizenLocationIfGranted();
                 }
             }
 
-            if (!window.userCoords.ready || !window.userCoords.currentLatitude) return;
+            if (!citizenHasUsableCoords()) return;
 
             stopCitizenHazardMapPick();
             citizenHazardDraft.mode = 'current';
@@ -4622,7 +4636,7 @@ initializeCitizenLocationIfGranted();
                 }
             }
 
-            if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) return;
+            if (!citizenHasUsableCoords()) return;
 
             stopCitizenFireMapPick();
             citizenFireDraft.mode = 'current';
@@ -4634,10 +4648,10 @@ initializeCitizenLocationIfGranted();
         function cancelCitizenHazardReportFlow() {
             stopCitizenHazardMapPick();
             citizenHazardDraft.mode = 'current';
-            citizenHazardDraft.selectedLat = window.userCoords?.ready
+            citizenHazardDraft.selectedLat = citizenHasUsableCoords()
                 ? Number(window.userCoords.currentLatitude)
                 : null;
-            citizenHazardDraft.selectedLng = window.userCoords?.ready
+            citizenHazardDraft.selectedLng = citizenHasUsableCoords()
                 ? Number(window.userCoords.currentLongitude)
                 : null;
             updateCitizenHazardLocationUi();
@@ -4647,10 +4661,10 @@ initializeCitizenLocationIfGranted();
         function cancelCitizenFireReportFlow() {
             stopCitizenFireMapPick();
             citizenFireDraft.mode = 'current';
-            citizenFireDraft.selectedLat = window.userCoords?.ready
+            citizenFireDraft.selectedLat = citizenHasUsableCoords()
                 ? Number(window.userCoords.currentLatitude)
                 : null;
-            citizenFireDraft.selectedLng = window.userCoords?.ready
+            citizenFireDraft.selectedLng = citizenHasUsableCoords()
                 ? Number(window.userCoords.currentLongitude)
                 : null;
             updateCitizenFireLocationUi();
@@ -4658,7 +4672,7 @@ initializeCitizenLocationIfGranted();
         }
 
         function startCitizenHazardMapPick() {
-            if (!window.userCoords.ready || !window.userCoords.currentLatitude || !window.userCoords.currentLongitude) {
+            if (!citizenHasUsableCoords()) {
                 window.showCitizenToast?.('Getting your location. Please wait and try again.', true);
                 return;
             }
@@ -4754,11 +4768,7 @@ initializeCitizenLocationIfGranted();
                 citizenFireDraft.mode = 'picked';
                 citizenFireDraft.picking = true;
 
-                const hasOrigin = Boolean(
-                    window.userCoords?.ready
-                    && Number.isFinite(Number(window.userCoords.currentLatitude))
-                    && Number.isFinite(Number(window.userCoords.currentLongitude))
-                );
+                const hasOrigin = citizenHasUsableCoords();
                 const mapCenter = window.usermap.getCenter();
                 const originLat = hasOrigin ? Number(window.userCoords.currentLatitude) : Number(mapCenter.lat);
                 const originLng = hasOrigin ? Number(window.userCoords.currentLongitude) : Number(mapCenter.lng);
@@ -4864,13 +4874,13 @@ initializeCitizenLocationIfGranted();
             if (citizenFireDraft.selectedLat !== null && citizenFireDraft.selectedLng !== null) {
                 // Keep an explicit map selection; opening the modal must not
                 // silently replace it with a later GPS result.
-            } else if (window.userCoords?.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude) {
+            } else if (citizenHasUsableCoords()) {
                 citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
                 citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
             } else {
                 window.requestCitizenLocationNow?.({ silent: true })
                     .then(() => {
-                        if (citizenFireDraft.selectedLat === null && citizenFireDraft.selectedLng === null && window.userCoords?.ready) {
+                        if (citizenFireDraft.selectedLat === null && citizenFireDraft.selectedLng === null && citizenHasUsableCoords()) {
                             citizenFireDraft.selectedLat = Number(window.userCoords.currentLatitude);
                             citizenFireDraft.selectedLng = Number(window.userCoords.currentLongitude);
                         }
@@ -4884,13 +4894,13 @@ initializeCitizenLocationIfGranted();
         }
 
         function openConcernReportModal() {
-            if (window.userCoords?.ready && window.userCoords.currentLatitude && window.userCoords.currentLongitude && citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null) {
+            if (citizenHasUsableCoords() && citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null) {
                 citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
                 citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
             } else {
                 window.requestCitizenLocationNow?.({ silent: true })
                     .then(() => {
-                        if (citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null && window.userCoords?.ready) {
+                        if (citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null && citizenHasUsableCoords()) {
                             citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
                             citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
                         }
@@ -5574,7 +5584,7 @@ async function submitCitizenQuickReport(reportKind) {
     }
 
     // A manually selected fire point remains valid even when GPS is unavailable.
-    if (!hasManualFireLocation && (!window.userCoords.ready || !window.userCoords.currentLatitude)) {
+    if (!hasManualFireLocation && !citizenHasUsableCoords()) {
         showIncidentToast?.('Getting your location. Please wait and try again.', true);
         return;
     }
@@ -5789,10 +5799,10 @@ async function submitCitizenQuickReport(reportKind) {
             if (reportKind === 'fire') {
                 document.getElementById('fireIncidentForm')?.reset();
                 citizenFireDraft.mode = 'current';
-                citizenFireDraft.selectedLat = window.userCoords?.ready
+                citizenFireDraft.selectedLat = citizenHasUsableCoords()
                     ? Number(window.userCoords.currentLatitude)
                     : null;
-                citizenFireDraft.selectedLng = window.userCoords?.ready
+                citizenFireDraft.selectedLng = citizenHasUsableCoords()
                     ? Number(window.userCoords.currentLongitude)
                     : null;
                 stopCitizenFireMapPick();
@@ -5805,8 +5815,12 @@ async function submitCitizenQuickReport(reportKind) {
             }
             if (reportKind === 'concern') {
                 citizenHazardDraft.mode = 'current';
-                citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);
-                citizenHazardDraft.selectedLng = Number(window.userCoords.currentLongitude);
+                citizenHazardDraft.selectedLat = citizenHasUsableCoords()
+                    ? Number(window.userCoords.currentLatitude)
+                    : null;
+                citizenHazardDraft.selectedLng = citizenHasUsableCoords()
+                    ? Number(window.userCoords.currentLongitude)
+                    : null;
                 stopCitizenHazardMapPick();
                 updateCitizenHazardLocationUi();
             }
@@ -5890,7 +5904,7 @@ const CITIZEN_NEARBY_ALERT_SEEN_TTL_MS = 24 * 60 * 60 * 1000;
 function filterCitizenNearbyIncidents(incidents = []) {
     const latitude = Number(window.userCoords?.currentLatitude);
     const longitude = Number(window.userCoords?.currentLongitude);
-    if (!window.userCoords?.ready || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    if (!citizenHasUsableCoords()) {
         return [];
     }
 
@@ -6343,7 +6357,7 @@ window.persistCitizenOverviewOfflineData = function(data = {}) {
 };
 
 window.refreshCitizenOverviewData = async function(options = {}) {
-    if (!window.userCoords?.ready || !window.userCoords?.currentLatitude || !window.userCoords?.currentLongitude) {
+    if (!citizenHasUsableCoords()) {
         return;
     }
 
@@ -6572,7 +6586,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 window.addEventListener('pyrosense:report-synced', function() {
     window.showCitizenToast?.('Queued report synced successfully.', false, 2800);
-    if (typeof window.refreshCitizenOverviewData === 'function' && window.userCoords?.ready) {
+    if (typeof window.refreshCitizenOverviewData === 'function' && window.citizenHasUsableCoords?.()) {
         window.refreshCitizenOverviewData({ force: true });
     }
 });
