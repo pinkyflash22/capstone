@@ -827,11 +827,16 @@ class LoginController extends Controller
      */
     private function redirectBasedOnRole(string $role)
     {
+        $role = strtolower(trim($role));
+
         $messages = [
             'admin' => 'Welcome back, Admin!',
+            'provincial admin' => 'Welcome back, Provincial Admin!',
             'firefighter' => 'Welcome back, Firefighter!',
             'citizen' => 'Welcome back!',
             'chief' => 'Welcome back Chief!',
+            'station admin' => 'Welcome back, Station Admin!',
+            'dispatcher' => 'Welcome back, Dispatcher!',
             'barangay' => 'Welcome back, Barangay Officer!',
             'barangay captain' => 'Welcome back, Barangay Captain!',
             'barangay officer' => 'Welcome back, Barangay Officer!',
@@ -841,6 +846,7 @@ class LoginController extends Controller
 
         $routes = [
              'admin' => 'admin.dashboard',
+            'provincial admin' => 'admin.dashboard',
             'firefighter' => 'firefighter.dashboard',
             'citizen' => 'citizen.dashboard',
             'chief' => 'station-admin.dashboard',
@@ -854,11 +860,11 @@ class LoginController extends Controller
         ];
 
         if ($role === 'citizen' && session()->pull('redirect_to_citizen_mobile_hub', false)) {
-            return redirect()->route('citizen.mobile-hub')->with('success', $messages[$role]);
+            return redirect()->route('citizen.mobile-hub')->with('success', $messages[$role] ?? 'Welcome back!');
         }
 
         if (isset($routes[$role])) {
-            return redirect()->route($routes[$role])->with('success', $messages[$role]);
+            return redirect()->route($routes[$role])->with('success', $messages[$role] ?? 'Welcome back!');
         }
 
         // If role is invalid, logout
