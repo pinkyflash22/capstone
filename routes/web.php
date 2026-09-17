@@ -66,7 +66,7 @@ Route::get('/verify/after-activity-reports/{afterActivityReport}', [AfterActivit
     ->middleware('signed')
     ->name('after-activity-reports.verify');
 
-Route::middleware(['auth', 'role:station admin,chief,provincial admin'])
+Route::middleware(['auth', 'role:stationadmin,chief,provincial admin'])
     ->prefix('command')
     ->name('command.')
     ->group(function () {
@@ -142,7 +142,7 @@ Route::post('/anonymous/incidents', [IncidentController::class, 'storeAnonymous'
     ->middleware('throttle:5,1')
     ->name('anonymous.incidents.store');
 
-Route::middleware(['auth', 'prevent.back.history', 'role:station admin,chief,provincial admin'])
+Route::middleware(['auth', 'prevent.back.history', 'role:stationadmin,chief,provincial admin'])
     ->prefix('landing-content')
     ->name('landing-media.')
     ->group(function () {
@@ -155,7 +155,7 @@ Route::middleware(['auth', 'prevent.back.history', 'role:station admin,chief,pro
 
     //locations based
 Route::get('/api/firefighter/locations', [FirefighterController::class, 'getAllLocations'])
-    ->middleware(['auth', 'role:firefighter,station admin,chief,provincial admin'])
+    ->middleware(['auth', 'role:firefighter,stationadmin,chief,provincial admin'])
     ->name('firefighter-locations.index');
 
     // Route::get('/', [LandingPageController::class, 'index'])->name('landing');
@@ -174,7 +174,7 @@ Route::get('/check-auth', function() {
 
     $redirectTo = match ($role) {
         'admin' => route('admin.dashboard'),
-        'station admin', 'chief' => route('station-admin.dashboard'),
+        'stationadmin', 'chief' => route('station-admin.dashboard'),
         'firefighter' => route('firefighter.dashboard'),
         'barangay', 'barangay captain', 'barangay officer', 'barangay_officer' => route('barangay.dashboard'),
         'citizen' => route('citizen.dashboard'),
@@ -189,7 +189,7 @@ Route::get('/check-auth', function() {
 Route::middleware('auth')->post('/citizen/marker', [MarkerController::class, 'store']);
 // Route::get('/register',[LoginController::class, 'register'])->name('auth.register');
 //register infos
-Route::middleware(['auth', 'role:admin,provincial admin,station admin,chief,firefighter'])->group(function () {
+Route::middleware(['auth', 'role:admin,provincial admin,stationadmin,chief,firefighter'])->group(function () {
     Route::post('/multimedia/store', [MultimediaController::class, 'store'])
         ->middleware('throttle:20,1')
         ->name('multimedia.store');
@@ -266,7 +266,7 @@ Route::middleware(['auth', 'prevent.back.history', 'role:provincial admin'])->ge
 Route::middleware(['auth', 'prevent.back.history'])->group(function () {
     Route::get('/map/markers/feed', [MarkerController::class, 'index'])->name('map.markers.feed');
     Route::get('/map/markers/latest', [MarkerController::class, 'latestForViewer'])->name('map.markers.latest');
-    Route::middleware(['role:admin,provincial admin,station admin,chief'])->group(function () {
+    Route::middleware(['role:admin,provincial admin,stationadmin,chief'])->group(function () {
         Route::post('/map/markers', [ManagedMarkerController::class, 'store'])->name('map.markers.store');
         Route::delete('/map/markers/{markerId}', [ManagedMarkerController::class, 'destroy'])->name('map.markers.destroy');
         Route::post('/map/marker-details/incidents', [IncidentController::class, 'store'])->name('map.marker-details.incidents.store');
@@ -445,7 +445,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/barangay-boundaries/{barangayId}/sync', [BoundaryLocationController::class, 'importBarangayBoundary'])->name('barangay-boundaries.sync');
      });
 
-    Route::middleware(['role:station admin,chief'])->prefix('station-admin')->name('station-admin.')->group(function () {
+    Route::middleware(['role:stationadmin,chief'])->prefix('station-admin')->name('station-admin.')->group(function () {
 
         Route::get('/dashboard', [StationAdminController::class, 'index'])->name('dashboard');
         // Route::get('/request', [StationAdminController::class, 'fsic'])->name('fsic');
