@@ -258,7 +258,7 @@ class StationAdminController extends Controller
 
     protected function buildStationReadinessData()
     {
-        $eligibleRoles = ['firefighter', 'chief', 'station admin'];
+        $eligibleRoles = ['firefighter', 'chief', 'stationadmin'];
 
         $rolePlaceholders = implode(',', array_fill(0, count($eligibleRoles), '?'));
 

@@ -69,7 +69,7 @@ class ResourceManagementController extends Controller
             $provinces = Cache::remember('resource-management:provinces:v1', now()->addMinutes(10), fn () => Province::orderBy('province_name')->get());
             $boundaryBarangays = Cache::remember("{$cacheKey}:boundaries", now()->addSeconds(60), fn () => $this->buildBoundaryBarangayList(null));
             $barangayOfficers = BarangayOfficer::with(['user.role', 'user.address', 'barangay.city'])->orderBy('barangay_id')->orderBy('position')->get();
-            $eligibleBarangayOfficerUsers = User::with('role')->whereDoesntHave('barangayOfficer')->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'station admin', 'chief']))->orderBy('last_name')->get();
+            $eligibleBarangayOfficerUsers = User::with('role')->whereDoesntHave('barangayOfficer')->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'stationadmin', 'chief']))->orderBy('last_name')->get();
             $systemUsers = $allusers;
             $systemUsers->each(fn ($user) => $user->setAttribute('can_manage_resources', true));
             $teamData = $this->serializeTeams($allTeam);
@@ -182,7 +182,7 @@ class ResourceManagementController extends Controller
         $coveredBarangayIds = collect($boundaryBarangays)->pluck('barangay_id')->filter()->map(fn ($id) => (int) $id);
         $barangayOfficers = BarangayOfficer::with(['user.role', 'user.address', 'barangay.city'])->whereIn('barangay_id', $coveredBarangayIds)->orderBy('barangay_id')->orderBy('position')->get();
         $eligibleBarangayOfficerUsers = User::with(['role', 'address.barangay'])->whereDoesntHave('barangayOfficer')
-            ->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'station admin', 'chief']))
+            ->whereHas('role', fn ($query) => $query->whereNotIn(DB::raw('LOWER(role)'), ['firefighter', 'admin', 'provincial admin', 'stationadmin', 'chief']))
             ->where(function ($query) use ($coveredBarangayIds) {
                 $query->whereNull('address_id')->orWhereHas('address', fn ($address) => $address->whereIn('barangay_id', $coveredBarangayIds));
             })->orderBy('last_name')->orderBy('first_name')->get();

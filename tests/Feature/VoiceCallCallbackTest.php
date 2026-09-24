@@ -83,7 +83,7 @@ class VoiceCallCallbackTest extends TestCase
         });
 
         DB::table('roles')->insert([
-            ['role_id' => 1, 'role' => 'station admin'],
+            ['role_id' => 1, 'role' => 'stationadmin'],
             ['role_id' => 2, 'role' => 'citizen'],
             ['role_id' => 3, 'role' => 'provincial admin'],
         ]);

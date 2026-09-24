@@ -2117,7 +2117,7 @@ public function updateMyProfilePassword(Request $request)
     public function getAllLocations(Request $request)
     {
         $role = Role::roleNameForId((int) ($request->user()?->role_id ?? 0));
-        abort_unless(in_array($role, ['firefighter', 'station admin', 'chief', 'provincial admin'], true), 403);
+        abort_unless(in_array($role, ['firefighter', 'stationadmin', 'chief', 'provincial admin'], true), 403);
 
         $stationId = null;
         if ($role !== 'provincial admin') {

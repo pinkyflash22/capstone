@@ -53,7 +53,7 @@ class FirefighterBarangayCooperationUiTest extends TestCase
         $this->assertContains('auth', $mitigationRoute->gatherMiddleware());
         $this->assertContains('role:firefighter', $mitigationRoute->gatherMiddleware());
         $this->assertNotNull($completionReviewRoute);
-        $this->assertContains('role:station admin,chief', $completionReviewRoute->gatherMiddleware());
+        $this->assertContains('role:stationadmin,chief', $completionReviewRoute->gatherMiddleware());
         $this->assertStringContainsString('reviewMitigationCompletion', file_get_contents(app_path('Http/Controllers/Chief/StationAdminController.php')));
         $this->assertStringContainsString("Rule::in(['barangay', 'stationwide', 'citywide'])", file_get_contents(app_path('Http/Controllers/Chief/StationAdminController.php')));
 

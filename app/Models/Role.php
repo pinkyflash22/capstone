@@ -25,7 +25,7 @@ class Role extends Model
             return self::query()
                 ->select(['role_id', 'role'])
                 ->get()
-                ->mapWithKeys(fn (self $role) => [$role->role_id => strtolower((string) $role->role)])
+                ->mapWithKeys(fn (self $role) => [$role->role_id => self::normalizeName($role->role)])
                 ->all();
         });
     }
@@ -42,5 +42,24 @@ class Role extends Model
     public static function flushDefinitionCache(): void
     {
         Cache::forget(self::ROLE_DEFINITION_CACHE_KEY);
+    }
+
+    public static function normalizeName(?string $role): ?string
+    {
+        if ($role === null) {
+            return null;
+        }
+
+        $role = strtolower(trim(preg_replace('/\s+/', ' ', $role)));
+
+        return match ($role) {
+            'stationadmin', 'station-admin' => 'stationadmin',
+            default => $role,
+        };
+    }
+
+    public function getRoleAttribute($value): ?string
+    {
+        return self::normalizeName($value);
     }
 }

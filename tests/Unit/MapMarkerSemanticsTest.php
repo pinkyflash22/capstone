@@ -19,7 +19,7 @@ class MapMarkerSemanticsTest extends TestCase
         $this->assertStringContainsString("fetch(getMarkerCreateEndpoint(), {", $mapScript);
         $this->assertStringContainsString('fetch(`/map/markers/${encodeURIComponent(savedMarkerId)}`', $mapScript);
         $this->assertStringContainsString("Route::post('/map/markers', [ManagedMarkerController::class, 'store'])", $routes);
-        $this->assertStringContainsString("role:admin,provincial admin,station admin,chief", $routes);
+        $this->assertStringContainsString("role:admin,provincial admin,stationadmin,chief", $routes);
         $this->assertStringContainsString("fetch('/map/marker-details/incidents'", $mapScript);
         $this->assertStringContainsString("fetch('/map/marker-details/stations'", $mapScript);
         $this->assertStringContainsString("fetch('/map/marker-details/hydrants'", $mapScript);

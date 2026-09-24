@@ -44,7 +44,7 @@ class LoginController extends Controller
         'barangay captain' => 'BRC',
         'barangay officer' => 'BRG',
         'barangay_officer' => 'BRG',
-        'station admin' => 'STA',
+        'stationadmin' => 'STA',
         'provincial admin' => 'PAD',
     ];
 
@@ -835,7 +835,6 @@ class LoginController extends Controller
             'firefighter' => 'Welcome back, Firefighter!',
             'citizen' => 'Welcome back!',
             'chief' => 'Welcome back Chief!',
-            'station admin' => 'Welcome back, Station Admin!',
             'stationadmin' => 'Welcome back, Station Admin!',
             'dispatcher' => 'Welcome back, Dispatcher!',
             'barangay' => 'Welcome back, Barangay Officer!',
@@ -851,7 +850,6 @@ class LoginController extends Controller
             'firefighter' => 'firefighter.dashboard',
             'citizen' => 'citizen.dashboard',
             'chief' => 'station-admin.dashboard',
-            'station admin' => 'station-admin.dashboard',
             'stationadmin' => 'station-admin.dashboard',
             'barangay' => 'barangay.dashboard',
             'barangay captain' => 'barangay.dashboard',

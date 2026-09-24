@@ -155,7 +155,7 @@ class MarkerFeedBuilder
                 ->first();
             $role = (string) ($visibility['role'] ?? '');
 
-            if (in_array($role, ['chief', 'chief station admin', 'station admin', 'firefighter'], true)) {
+            if (in_array($role, ['chief', 'stationadmin', 'firefighter'], true)) {
                 $incidentStationId = (int) ($incident?->station_id ?: $incident?->team?->station_id ?: 0);
                 if ($incidentStationId < 1 || ! in_array($incidentStationId, $visibility['station_ids'] ?? [], true)) {
                     return false;
@@ -203,7 +203,7 @@ class MarkerFeedBuilder
         $riskStationId = (int) ($riskArea->station_id ?? 0);
         $riskBarangayId = (int) ($riskArea->barangayHall?->barangay_id ?? 0);
 
-        if (in_array($role, ['chief', 'station admin', 'firefighter'], true)) {
+        if (in_array($role, ['chief', 'stationadmin', 'firefighter'], true)) {
             return ($riskStationId > 0 && in_array($riskStationId, $visibility['station_ids'] ?? [], true))
                 || ($riskBarangayId > 0 && in_array($riskBarangayId, $visibility['covered_barangay_ids'] ?? [], true));
         }

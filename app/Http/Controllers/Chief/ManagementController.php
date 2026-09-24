@@ -45,7 +45,7 @@ class ManagementController extends Controller
         'admin' => 'ADM',
         'firefighter' => 'BFP',
         'chief' => 'FMC',
-        'station admin' => 'STM',
+        'stationadmin' => 'STM',
         'dispatcher' => 'DSP',
         'paramedic' => 'PAR',
         'investigator' => 'INV',

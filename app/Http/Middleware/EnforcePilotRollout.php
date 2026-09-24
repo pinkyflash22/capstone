@@ -17,7 +17,7 @@ class EnforcePilotRollout
         }
 
         $role = Role::roleNameForId((int) $request->user()->role_id);
-        if (! in_array($role, ['firefighter', 'chief', 'station admin'], true)) {
+        if (! in_array($role, ['firefighter', 'chief', 'stationadmin'], true)) {
             return $next($request);
         }
 

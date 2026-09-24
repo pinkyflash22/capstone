@@ -58,7 +58,7 @@ if (app) {
 
     function hydrateForms() {
         const firefighters = state.data.officers.filter(officer => String(officer.role).toLowerCase() === 'firefighter');
-        const command = state.data.officers.filter(officer => ['chief', 'station admin', 'chief station admin'].includes(String(officer.role).toLowerCase()));
+        const command = state.data.officers.filter(officer => ['chief', 'stationadmin'].includes(String(officer.role).toLowerCase()));
         const teamSelect = $('#dutyShiftForm [name="team_id"]');
         teamSelect.innerHTML = state.data.teams.length
             ? state.data.teams.map(team => `<option value="${team.team_id}" title="${escapeHtml(team.schedule_reason || '')}">Team ${team.team_id} — ${escapeHtml(team.schedule_reason || 'Ready for shift planning.')}</option>`).join('')

@@ -5,7 +5,7 @@
     $pyroVoiceStationId = $pyroVoiceStationId ?? null;
     $pyroVoiceFallbackStations = collect($pyroVoiceFallbackStations ?? [])->values();
 
-    if (! $pyroVoiceStationId && in_array($pyroVoiceRole, ['station admin', 'chief', 'chief station admin'], true)) {
+    if (! $pyroVoiceStationId && in_array($pyroVoiceRole, ['stationadmin', 'chief'], true)) {
         $pyroVoiceStationId = \App\Models\StationOfficer::query()
             ->where('user_id', $pyroVoiceUser?->user_id)
             ->value('station_id');

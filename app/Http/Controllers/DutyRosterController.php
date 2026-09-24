@@ -434,7 +434,7 @@ class DutyRosterController extends Controller
         if ($stationDuty->isEmpty()) throw ValidationException::withMessages(['assignments' => 'Assign a station admin or chief to remain at the station.']);
         foreach ($stationDuty as $commandAssignment) {
             $commandRole = strtolower((string) $officers->get((int) $commandAssignment['station_officer_id'])?->user?->role?->role);
-            if (! in_array($commandRole, ['chief', 'station admin', 'chief station admin'], true)) throw ValidationException::withMessages(['assignments' => 'Station duty must be assigned only to a chief or station admin.']);
+            if (! in_array($commandRole, ['chief', 'stationadmin'], true)) throw ValidationException::withMessages(['assignments' => 'Station duty must be assigned only to a chief or station admin.']);
         }
 
         foreach ($assignments as $assignment) {
@@ -514,7 +514,7 @@ class DutyRosterController extends Controller
             return $stationId;
         }
 
-        abort_unless(in_array($role, ['chief', 'station admin', 'chief station admin'], true), 403);
+        abort_unless(in_array($role, ['chief', 'stationadmin'], true), 403);
         $stationId = StationOfficer::query()->where('user_id', Auth::id())->value('station_id');
         abort_unless($stationId, 403, 'Your account is not assigned to a station.');
         return (int) $stationId;

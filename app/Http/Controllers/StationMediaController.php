@@ -20,7 +20,7 @@ class StationMediaController extends Controller
             return true;
         }
 
-        if (!in_array($role, ['chief', 'station admin'], true)) {
+        if (!in_array($role, ['chief', 'stationadmin'], true)) {
             return false;
         }
 

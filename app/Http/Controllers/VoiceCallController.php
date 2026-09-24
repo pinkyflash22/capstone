@@ -1096,9 +1096,8 @@ class VoiceCallController extends Controller
     private function isStationResponder(User $user): bool
     {
         return in_array(Str::lower((string) $user->role?->role), [
-            'station admin',
+            'stationadmin',
             'chief',
-            'chief station admin',
             'provincial admin',
         ], true);
     }

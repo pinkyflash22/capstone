@@ -21,14 +21,28 @@ class CheckRole
             abort(403, 'Unauthorized access. User role not found.');
         }
         
-        $userRole = strtolower(trim((string) ($user->role->role ?? '')));
+        $userRole = $this->normalizeRole($user->role->role ?? null);
 
         foreach ($roles as $role) {
-            if (strtolower(trim((string) $role)) === $userRole) {
+            if ($this->normalizeRole($role) === $userRole) {
                 return $next($request);
             }
         }
 
         abort(403, 'Unauthorized apse.');
+    }
+
+    private function normalizeRole(?string $role): ?string
+    {
+        if ($role === null) {
+            return null;
+        }
+
+        $role = strtolower(trim(preg_replace('/\s+/', ' ', $role)));
+
+        return match ($role) {
+            'stationadmin', 'station-admin' => 'stationadmin',
+            default => $role,
+        };
     }
 }

@@ -2048,7 +2048,7 @@
                     ? (int) request('roster_station_id', $activeStations->first()?->station_id)
                     : (int) ($currentStation?->station_id ?? 0);
             @endphp
-            @if(in_array($dutyRosterRole, ['chief', 'station admin', 'chief station admin', 'provincial admin'], true))
+            @if(in_array($dutyRosterRole, ['chief', 'stationadmin', 'provincial admin'], true))
             <section class="duty-roster resource-tier resource-tier--roster" id="dutyRosterApp" aria-labelledby="dutyRosterTitle">
                 <div class="duty-roster__header">
                     <div>
@@ -2305,7 +2305,7 @@
                             <option value="firefighter">Firefighter</option>
                             <option value="chief">Chief</option>
                             <option value="provincial admin">Provincial Admin</option>
-                            <option value="station admin">Station Admin</option>
+                            <option value="stationadmin">Station Admin</option>
                             <option value="citizen">Citizen</option>
                             @foreach($roles->filter(fn ($role) => str_starts_with(strtolower($role->role), 'barangay')) as $barangayRole)
                                 <option value="{{ strtolower($barangayRole->role) }}">{{ ucfirst($barangayRole->role) }}</option>
@@ -2350,7 +2350,7 @@
                                         ($user->role->role ?? '') == 'admin' ? '#dc2626' : 
                                         (($user->role->role ?? '') == 'firefighter' ? '#3b82f6' : 
                                         (($user->role->role ?? '') == 'chief' ? '#8b5cf6' : 
-                                        (($user->role->role ?? '') == 'station admin' ? '#8b5cf6' : 
+                                        (($user->role->role ?? '') == 'stationadmin' ? '#8b5cf6' :
                                         (($user->role->role ?? '') == 'dispatcher' ? '#f59e0b' : 
                                         (($user->role->role ?? '') == 'paramedic' ? '#10b981' : '#6b7280'))))) 
                                     }}; color: white;">
@@ -4443,7 +4443,7 @@ function getEligibleEditTeamUsers(defaultSelections = {}, fallbackSelectedUsers 
             const roleName = String(user.role?.role || '').toLowerCase();
             const officerId = String(officer.station_officer_id || '');
             const isCurrentSelection = selectedIds.has(officerId);
-            const isEligibleRole = !['admin', 'chief', 'station admin', 'provincial admin'].includes(roleName);
+            const isEligibleRole = !['admin', 'chief', 'stationadmin', 'provincial admin'].includes(roleName);
             const isAvailable = String(officer.status || '').toLowerCase() === 'available';
 
             return Boolean(officerId) && isEligibleRole && (isAvailable || isCurrentSelection);
@@ -5613,7 +5613,7 @@ function validateTeamMembers(formData) {
 
             const selectedOption = roleSelect.options[roleSelect.selectedIndex];
             const roleName = (selectedOption?.dataset?.roleName || '').toLowerCase();
-            const needsRank = ['firefighter', 'chief', 'station admin'].includes(roleName);
+            const needsRank = ['firefighter', 'chief', 'stationadmin'].includes(roleName);
             const isBarangayOfficer = ['barangay officer', 'barangay_officer'].includes(roleName);
 
             rankGroup.style.display = needsRank ? '' : 'none';
@@ -6058,7 +6058,7 @@ function loadOfficersData() {
         const userData = officer.user || {};
         const officerId = officer.station_officer_id;
         const roleName = String(userData.role?.role || '').toLowerCase();
-        const excludedRoles = new Set(['admin', 'chief', 'station admin']);
+        const excludedRoles = new Set(['admin', 'chief', 'stationadmin']);
 
         if (excludedRoles.has(roleName)) {
             return;

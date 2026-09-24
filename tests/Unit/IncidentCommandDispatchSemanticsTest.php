@@ -13,7 +13,7 @@ class IncidentCommandDispatchSemanticsTest extends TestCase
         $map = file_get_contents(resource_path('js/map.js'));
         $firefighter = file_get_contents(resource_path('js/firefighter/dashboard-shell.js'));
 
-        $this->assertStringContainsString("role:station admin,chief,provincial admin", $routes);
+        $this->assertStringContainsString("role:stationadmin,chief,provincial admin", $routes);
         $this->assertStringContainsString("/incidents/{incident}/external-response", $routes);
         $this->assertStringNotContainsString("/incidents/{incident}/backup", $routes);
         $this->assertStringContainsString('openIncidentCommandPanel', $map);

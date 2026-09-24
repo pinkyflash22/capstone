@@ -33,7 +33,7 @@ use App\Http\Controllers\VoiceCallController;
 use App\Http\Controllers\FirefighterIncidentResponseController;
 use App\Http\Controllers\IncidentCommandDispatchController;
 
-//station admin
+//stationadmin
 use App\Http\Controllers\Chief\StationAdminController;
 use App\Http\Controllers\Barangay\BarangayDashboardController;
 use App\Http\Controllers\BarangayController;
@@ -770,7 +770,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/profile', [BarangayDashboardController::class, 'profile'])->name('profile');
         Route::put('/profile', [BarangayDashboardController::class, 'updateProfile'])->name('profile.update');
     });
-        // Route::middleware(['role:ADMIN,STATION ADMIN'])
+        // Route::middleware(['role:ADMIN,STATIONADMIN'])
         //     ->get('/management', function () {
         //         return view('management.dashboard');
         //     });

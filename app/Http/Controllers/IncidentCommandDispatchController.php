@@ -144,7 +144,7 @@ class IncidentCommandDispatchController extends Controller
         abort_unless($user, 401);
         $role = strtolower(trim((string) $user->role?->role));
         if (in_array($role, ['provincial admin', 'admin'], true)) return;
-        abort_unless(in_array($role, ['chief', 'station admin'], true), 403);
+        abort_unless(in_array($role, ['chief', 'stationadmin'], true), 403);
 
         $stationId = StationOfficer::query()->where('user_id', $user->user_id)->value('station_id');
         abort_unless($stationId && (int) $incident->station_id === (int) $stationId, 403, 'You can command only incidents assigned to your station.');

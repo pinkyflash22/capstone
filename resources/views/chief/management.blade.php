@@ -3312,7 +3312,7 @@
                 </div>
             </section>
 
-            @if($currentStation && in_array($currentRoleName, ['chief', 'station admin'], true))
+            @if($currentStation && in_array($currentRoleName, ['chief', 'stationadmin'], true))
                 <section class="station-media-panel" aria-label="Station profile and gallery">
                     <div class="station-media-tools">
                         <div class="station-media-card station-profile-card">

@@ -23,7 +23,7 @@ class BoundaryRouteSecurityTest extends TestCase
 
             $this->assertContains('web', $middleware);
             $this->assertContains('auth', $middleware);
-            $this->assertContains('role:station admin,chief', $middleware);
+            $this->assertContains('role:stationadmin,chief', $middleware);
         }
     }
 
@@ -34,7 +34,7 @@ class BoundaryRouteSecurityTest extends TestCase
             $middleware = $route->gatherMiddleware();
 
             $this->assertNotContains('auth', $middleware);
-            $this->assertNotContains('role:station admin,chief', $middleware);
+            $this->assertNotContains('role:stationadmin,chief', $middleware);
         }
     }
 

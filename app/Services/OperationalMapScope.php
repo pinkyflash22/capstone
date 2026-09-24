@@ -28,7 +28,7 @@ class OperationalMapScope
 
     public function isStationResponder(?User $user): bool
     {
-        return in_array($this->role($user), ['chief', 'station admin', 'chief station admin', 'firefighter'], true);
+        return in_array($this->role($user), ['chief', 'stationadmin', 'firefighter'], true);
     }
 
     public function stationIds(?User $user): Collection

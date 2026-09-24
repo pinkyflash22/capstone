@@ -17,13 +17,27 @@ class RoleMiddleware
         }
 
         $user = Auth::user();
-        $userRole = Role::roleNameForId((int) ($user->role_id ?? 0));
-        $allowedRoles = array_map(fn ($role) => strtolower((string) $role), $roles);
+        $userRole = $this->normalizeRole(Role::roleNameForId((int) ($user->role_id ?? 0)));
+        $allowedRoles = array_map(fn ($role) => $this->normalizeRole($role), $roles);
         
         if (!$userRole || !in_array($userRole, $allowedRoles, true)) {
             abort(403, 'Unauthorized Assess');
         }
 
         return $next($request);
+    }
+
+    private function normalizeRole(?string $role): ?string
+    {
+        if ($role === null) {
+            return null;
+        }
+
+        $role = strtolower(trim(preg_replace('/\s+/', ' ', $role)));
+
+        return match ($role) {
+            'stationadmin', 'station-admin' => 'stationadmin',
+            default => $role,
+        };
     }
 }

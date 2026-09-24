@@ -17,7 +17,7 @@ class BoundaryManagementScope
     {
         $role = strtolower(trim((string) ($user?->role?->role ?? '')));
 
-        if (! $user || ! in_array($role, ['chief', 'station admin'], true)) {
+        if (! $user || ! in_array($role, ['chief', 'stationadmin'], true)) {
             throw new AuthorizationException('Only station administrators and chiefs may manage barangay boundaries.');
         }
 

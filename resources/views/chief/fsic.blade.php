@@ -1996,7 +1996,7 @@
                     </div>
                     <div class="user-details">
                         <h4>{{ auth()->user()->first_name ?? 'John' }} {{ auth()->user()->last_name ?? 'Doe' }}</h4>
-                        <span><i class="fa-solid fa-circle"></i> {{ auth()->user()->role->role ?? 'Station Admin' }}</span>
+                        <span><i class="fa-solid fa-circle"></i> {{ auth()->user()->role->role ?? 'stationadmin' }}</span>
                         <span style="font-size: 11px; opacity: 0.6; margin-top: 2px;">
                             <i class="fa-regular fa-clock"></i> {{ now()->format('H:i · d M Y') }}
                         </span>
@@ -3870,7 +3870,7 @@
             const approverRole = String(approval?.approver_role || '').trim().toLowerCase();
             const rankAbbr = abbreviateFireRank(approval?.approver_rank);
 
-            if (approverRole === 'chief' || approverRole === 'station admin') {
+            if (approverRole === 'chief' || approverRole === 'stationadmin') {
                 const prefix = rankAbbr ? `FIRE MARSHAL / ${rankAbbr}` : 'FIRE MARSHAL';
                 return {
                     signName: `${prefix} ${approverName}`.trim(),

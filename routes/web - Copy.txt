@@ -58,7 +58,7 @@ Route::middleware(['auth','role:CITIZEN'])
     ->get('/citizen/dashboard', function () {
         return view('citizen.dashboard');
     });
-Route::middleware(['auth','role:ADMIN,STATION ADMIN'])
+Route::middleware(['auth','role:ADMIN,STATIONADMIN'])
     ->get('/management', function () {
         return view('management.dashboard');
     });

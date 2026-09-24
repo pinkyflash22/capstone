@@ -92,7 +92,7 @@ class RegisterController extends Controller
     {
         $this->normalizeRegistrationNames($request);
         $currentRole = strtolower(trim((string) Auth::user()?->role?->role));
-        $isManagedRegistration = Auth::check() && in_array($currentRole, ['provincial admin', 'admin', 'station admin', 'chief'], true);
+        $isManagedRegistration = Auth::check() && in_array($currentRole, ['provincial admin', 'admin', 'stationadmin', 'chief'], true);
         if (! $isManagedRegistration) {
             // Public registration is always a citizen registration. Privileged roles
             // are created only through authenticated management routes.
@@ -125,7 +125,7 @@ class RegisterController extends Controller
         try {
             $role = Role::findOrFail($validated['role_id']);
             $roleName = strtolower($role->role ?? '');
-            $bfpRoles = ['firefighter', 'chief', 'station admin'];
+            $bfpRoles = ['firefighter', 'chief', 'stationadmin'];
             $barangayOfficerRoles = ['barangay officer', 'barangay_officer'];
 
             if (in_array($roleName, $bfpRoles, true) && empty($validated['rank'])) {
@@ -655,7 +655,7 @@ $request->session()->put('pending_registration', [
     //                 case 'chief':
     //                     $redirectUrl = route('station-admin.dashboard');
     //                     break;
-    //                 case 'station admin':
+    //                 case 'stationadmin':
     //                     $redirectUrl = route('station-admin.dashboard');
     //                     break;
     //                 default:
@@ -831,7 +831,7 @@ public function verifyOTPAndRegister(Request $request)
                 case 'chief':
                     $redirectUrl = route('station-admin.dashboard');
                     break;
-                case 'station admin':
+                case 'stationadmin':
                     $redirectUrl = route('station-admin.dashboard');
                     break;
                 default:

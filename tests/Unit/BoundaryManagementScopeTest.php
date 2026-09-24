@@ -38,7 +38,7 @@ class BoundaryManagementScopeTest extends TestCase
 
     public function test_manager_can_resolve_the_station_for_active_assigned_coverage(): void
     {
-        $user = $this->manager(41, 'station admin');
+        $user = $this->manager(41, 'stationadmin');
         $this->assignOfficerAndCoverage(41, 7, 101, true);
 
         $this->assertSame(7, app(BoundaryManagementScope::class)->stationForBarangay($user, 101));
@@ -65,7 +65,7 @@ class BoundaryManagementScopeTest extends TestCase
 
     public function test_manager_can_claim_a_legacy_unowned_boundary_inside_active_coverage(): void
     {
-        $user = $this->manager(44, 'station admin');
+        $user = $this->manager(44, 'stationadmin');
         $this->assignOfficerAndCoverage(44, 11, 104, true);
         $boundary = new BoundaryLocation(['barangay_id' => 104, 'station_id' => null]);
 

@@ -24,7 +24,7 @@ class BarangayOfficerController extends Controller
         'captain' => 'Captain', 'kagawad' => 'Kagawad', 'secretary' => 'Secretary',
         'treasurer' => 'Treasurer', 'tanod' => 'Tanod', 'officer' => 'Officer',
     ];
-    private const PROTECTED_ROLES = ['firefighter', 'admin', 'provincial admin', 'station admin', 'chief'];
+    private const PROTECTED_ROLES = ['firefighter', 'admin', 'provincial admin', 'stationadmin', 'chief'];
 
     public function store(Request $request, BoundaryManagementScope $scope): JsonResponse
     {

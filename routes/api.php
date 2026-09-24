@@ -145,7 +145,7 @@ Route::middleware(['web', 'auth', 'role:provincial admin'])->prefix('/management
     Route::put('/equipment/{id}', [ManagementController::class, 'updateEquipment']);
     Route::delete('/{type}/{id}', [ManagementController::class, 'destroy']);
 });
-Route::middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])->prefix('/managements')->group(function () {
+Route::middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin'])->prefix('/managements')->group(function () {
     Route::get('/incidents', [App\Http\Controllers\Chief\ManagementController::class, 'getIncidents']);
     Route::get('/reports', [App\Http\Controllers\Chief\ManagementController::class, 'getReports']);
     Route::get('/personnel', [App\Http\Controllers\Chief\ManagementController::class, 'getPersonnel']);
@@ -177,14 +177,14 @@ Route::get('/incidents-for-spot', function() {
         ->get();
     
     return response()->json($incidents);
-})->middleware(['web', 'auth', 'role:station admin,chief,firefighter,provincial admin'])->name('api.incidents.for-spot');
+})->middleware(['web', 'auth', 'role:stationadmin,chief,firefighter,provincial admin'])->name('api.incidents.for-spot');
 
 //sms otp
 Route::post('/send-otp', [OTPController::class, 'sendOTP'])->middleware('throttle:3,5');
 Route::post('/verify-otp', [OTPController::class, 'verifyOTP'])->middleware('throttle:10,1');
 Route::post('/telnyx/webhook', TelnyxWebhookController::class)->middleware('throttle:120,1');
 
-Route::middleware(['web', 'auth', 'prevent.back.history', 'role:station admin,chief,provincial admin'])
+Route::middleware(['web', 'auth', 'prevent.back.history', 'role:stationadmin,chief,provincial admin'])
     ->prefix('station-admin')
     ->group(function () {
         Route::post('/predictions', [ChiefAnalyticController::class, 'runPredictionApi']);
@@ -246,7 +246,7 @@ Route::get('/markers/count', function () {
 })->middleware(['web', 'auth']);
 //reporting modules
 // Route::get('/spot-investigations', [SpotInvestigationReportController::class, 'getAllSpotInvestigations']);
-Route::middleware(['web', 'auth', 'role:station admin,chief,firefighter,provincial admin'])->group(function () {
+Route::middleware(['web', 'auth', 'role:stationadmin,chief,firefighter,provincial admin'])->group(function () {
     Route::get('/spot-investigations-available', [SpotInvestigationReportController::class, 'getAvailableSpotInvestigations']);
     Route::get('/progress-investigations-available', [FinalInvestigationReportController::class, 'getAvailableProgressInvestigations']);
     Route::post('/spot-investigation/draft-narrative', [SpotInvestigationReportController::class, 'draftNarrative'])->middleware('throttle:20,1');
@@ -273,12 +273,12 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/incident-type', [IncidentTypeController::class, 'index']);
     Route::get('/incidents/nearest-available-responder', [IncidentController::class, 'nearestAvailableResponder']);
 });
-Route::middleware(['web', 'auth', 'role:station admin,chief,firefighter,provincial admin'])->group(function () {
+Route::middleware(['web', 'auth', 'role:stationadmin,chief,firefighter,provincial admin'])->group(function () {
     Route::post('/incidents/{incident}/accept', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'respond']);
     Route::post('/incidents/{incident}/arrive', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'arrive']);
     Route::post('/incidents/{incident}/complete', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'complete']);
 });
-Route::middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])->group(function () {
+Route::middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin'])->group(function () {
     Route::put('/incidents/{incidentId}/false-alarm', [IncidentController::class, 'markFalseAlarm']);
     Route::put('/incidents/{incidentId}/{statusId}', [IncidentController::class, 'updateIncidentStatus']);
 });
@@ -301,17 +301,17 @@ Route::get('/marker-categories', [MarkerCategoryController::class, 'categories']
 
 Route::get('/markers', [MarkerController::class, 'index'])->middleware(['web', 'auth']);
 // Route::resource('markers',MarkerController::class);
-Route::post('/markers', [MarkerController::class, 'store'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
-Route::put('/markers', [MarkerController::class, 'update'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])->name('markers.update');
+Route::post('/markers', [MarkerController::class, 'store'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
+Route::put('/markers', [MarkerController::class, 'update'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin'])->name('markers.update');
 
-Route::get('/editTeam/{id}/{teamId}', [TeamController::class, 'index'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+Route::get('/editTeam/{id}/{teamId}', [TeamController::class, 'index'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 
 
-Route::get('/teams', [TeamController::class, 'fetchTeam'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+Route::get('/teams', [TeamController::class, 'fetchTeam'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 
-Route::put('/team/{id}', [TeamController::class, 'update'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+Route::put('/team/{id}', [TeamController::class, 'update'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 
-Route::put('/teams/{id}', [TeamController::class, 'updateStatus'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+Route::put('/teams/{id}', [TeamController::class, 'updateStatus'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 
 // Every authenticated map user can observe shared routes.
 Route::middleware(['web', 'auth'])->group(function () {
@@ -323,7 +323,7 @@ Route::middleware(['web', 'auth'])->group(function () {
 });
 
 // Only responder/management roles can create, move, stop, or delete a shared route.
-Route::middleware(['web', 'auth', 'role:admin,provincial admin,station admin,chief,firefighter'])->group(function () {
+Route::middleware(['web', 'auth', 'role:admin,provincial admin,stationadmin,chief,firefighter'])->group(function () {
     Route::post('/route/clear-active', [RouteController::class, 'clearActive']);
     Route::put('/route/{id}/status', [RouteController::class, 'updateStatus']);
     Route::post('/route', [RouteController::class, 'store']);
@@ -337,29 +337,29 @@ Route::middleware(['web', 'auth', 'role:admin,provincial admin,station admin,chi
 
 
 // Address API routes for station form
-Route::post('/full-addresses', [AdminController::class, 'storeFullAddress'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])->name('api.full-addresses');
-Route::delete('/markers/{id}', [MarkerController::class, 'destroy'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+Route::post('/full-addresses', [AdminController::class, 'storeFullAddress'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin'])->name('api.full-addresses');
+Route::delete('/markers/{id}', [MarkerController::class, 'destroy'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 Route::get('/markers/latest', [MarkerController::class, 'latest'])->middleware(['web', 'auth']); //latest markers
 // Route::get('/coordinate/latest', [CoordinateController::class, 'latest']); //latest markers 
 
 // Route::resource('coordinate', CoordinateController::class);
 Route::get('/station', [StationController::class, 'index'])
-    ->middleware(['web', 'auth', 'role:admin,station admin,chief,firefighter,provincial admin']);
+    ->middleware(['web', 'auth', 'role:admin,stationadmin,chief,firefighter,provincial admin']);
 Route::resource('station', StationController::class)
     ->except(['index'])
     ->middleware(['web', 'auth', 'role:provincial admin']);
 
 // Update marker
-Route::put('/markers/{markerId}', [MarkerController::class, 'update'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+Route::put('/markers/{markerId}', [MarkerController::class, 'update'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 
 Route::get('/station/marker/{markerId}', [StationController::class, 'getByMarker'])->middleware(['web', 'auth']);
-Route::put('/station/marker/{markerId}', [StationController::class, 'updateByMarker'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+Route::put('/station/marker/{markerId}', [StationController::class, 'updateByMarker'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 
 // Route::resource('personnels', PersonnelController::class);
 
-Route::resource('hydrant', HydrantController::class)->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+Route::resource('hydrant', HydrantController::class)->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 Route::get('/hydrant/marker/{markerId}', [HydrantController::class, 'getByMarker'])->middleware(['web', 'auth']);
-Route::put('/hydrant/marker/{markerId}', [HydrantController::class, 'updateByMarker'])->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+Route::put('/hydrant/marker/{markerId}', [HydrantController::class, 'updateByMarker'])->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 Route::get('/hydrant-types', [HydrantTypeController::class, 'index'])->middleware(['web', 'auth']);
 
 // Your existing routes...
@@ -381,7 +381,7 @@ Route::middleware(['web', 'auth'])->group(function () {
     Route::post('/boundaries/locate-point', [BoundaryLocationController::class, 'locatePoint']);
 });
 
-Route::middleware(['web', 'auth', 'role:station admin,chief'])->group(function () {
+Route::middleware(['web', 'auth', 'role:stationadmin,chief'])->group(function () {
     Route::put('/markers/{markerId}/location', [MarkerController::class, 'updateLocation']);
     Route::get('/boundaries/cities', [BoundaryLocationController::class, 'cityOptions']);
     Route::get('/boundaries/editor-context', [BoundaryLocationController::class, 'editorContext']);
@@ -392,7 +392,7 @@ Route::middleware(['web', 'auth', 'role:station admin,chief'])->group(function (
 });
 
 Route::post('/connection',[StationOfficerController::class, 'store'])
-    ->middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])->name('station-officer.store');
+    ->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin'])->name('station-officer.store');
 // Route::get('/station-officers/{id}',[StationOfficerController::class, 'store'])->name('station-officer.store');
 
 // Route::post('/icons', [IconController::class, 'store'])->name('admin.icon.store');
@@ -408,12 +408,12 @@ Route::prefix('personnel')->group(function () {
 
 Route::get('/incident/latest', [IncidentController::class, 'latest'])->middleware(['web', 'auth']);
 Route::post('/incidents/{incidentId}/auto-assign', [IncidentController::class, 'autoAssignIncident'])
-    ->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+    ->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 Route::post('/incidents/auto-assign-recent-unassigned', [IncidentController::class, 'autoAssignRecentUnassignedIncidents'])
-    ->middleware(['web', 'auth', 'role:station admin,chief,provincial admin']);
+    ->middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin']);
 // Route::post('/incidentReport', [IncidentReportController::class, 'store']);
 
-Route::middleware(['web', 'auth', 'role:station admin,chief,provincial admin'])
+Route::middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin'])
     ->put('/incident/{id}', [IncidentController::class, 'update']);
 // async function getPersonnels() { //javasctipt sample fetch
 //     const response = await fetch('/api/personnel');

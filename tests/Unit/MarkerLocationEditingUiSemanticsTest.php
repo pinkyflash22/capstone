@@ -25,6 +25,6 @@ class MarkerLocationEditingUiSemanticsTest extends TestCase
         $route = Route::getRoutes()->match(Request::create('/api/markers/42/location', 'PUT'));
         $middleware = $route->gatherMiddleware();
         $this->assertContains('auth', $middleware);
-        $this->assertContains('role:station admin,chief', $middleware);
+        $this->assertContains('role:stationadmin,chief', $middleware);
     }
 }

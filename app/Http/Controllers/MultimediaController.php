@@ -76,6 +76,6 @@ class MultimediaController extends Controller
     private function assertAuthorized(Request $request): void
     {
         $role = Role::roleNameForId((int) ($request->user()?->role_id ?? 0));
-        abort_unless(in_array($role, ['admin', 'provincial admin', 'station admin', 'chief', 'firefighter'], true), 403);
+        abort_unless(in_array($role, ['admin', 'provincial admin', 'stationadmin', 'chief', 'firefighter'], true), 403);
     }
 }

@@ -346,7 +346,7 @@ class IncidentAutoAssignmentService
                 ->filter(function ($user) {
                     $role = strtolower(trim((string) $user?->role?->role));
 
-                    return in_array($role, ['chief', 'station admin', 'chief station admin'], true);
+                    return in_array($role, ['chief', 'stationadmin'], true);
                 })
                 ->unique('user_id')
                 ->values();
@@ -416,7 +416,7 @@ class IncidentAutoAssignmentService
                 ->filter(function ($user) {
                     $role = strtolower(trim((string) $user?->role?->role));
 
-                    return in_array($role, ['chief', 'station admin', 'chief station admin'], true);
+                    return in_array($role, ['chief', 'stationadmin'], true);
                 })
                 ->reject(fn ($user) => $responderUserIds->contains((int) $user->user_id))
                 ->unique('user_id');

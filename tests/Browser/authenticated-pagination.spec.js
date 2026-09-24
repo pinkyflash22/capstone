@@ -12,7 +12,7 @@ const accounts = [
         response: '<main class="main-content"><div class="shell"><div class="list"><p data-e2e-page>Provincial page 2</p></div><div class="pagination"></div></div></main>',
     },
     {
-        label: 'station admin',
+        label: 'stationadmin',
         email: process.env.E2E_STATION_ADMIN_EMAIL || '',
         password: process.env.E2E_STATION_ADMIN_PASSWORD || '',
         landingPrefix: '/station-admin/',

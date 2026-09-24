@@ -321,14 +321,14 @@ function isChiefCommandMapContext() {
         || currentPath.startsWith('/station-admin/')
         || currentPath.startsWith('/admin/')
         || roleMeta === 'chief'
-        || roleMeta === 'station admin'
+        || roleMeta === 'stationadmin'
         || roleMeta === 'provincial admin'
         || roleMeta === 'admin';
 }
 
 function isDispatchCommandMapContext() {
     const roleMeta = String(document.querySelector('meta[name="user-role"]')?.getAttribute('content') || '').toLowerCase().trim();
-    return ['chief', 'station admin', 'provincial admin', 'admin'].includes(roleMeta);
+    return ['chief', 'stationadmin', 'provincial admin', 'admin'].includes(roleMeta);
 }
 
 function isChiefDashboardMapInstance() {
@@ -1142,8 +1142,8 @@ function showMissingAssignedStationWarning() {
         document.querySelector('meta[name="user-role"]')?.getAttribute('content') || ''
     ).trim().toLowerCase();
     const path = String(window.location?.pathname || '').toLowerCase();
-    const canConfigureStation = ['admin', 'provincial admin', 'chief', 'station admin'].includes(normalizedRole);
-    const configurationUrl = path.includes('/station-admin') || ['chief', 'station admin'].includes(normalizedRole)
+    const canConfigureStation = ['admin', 'provincial admin', 'chief', 'stationadmin'].includes(normalizedRole);
+    const configurationUrl = path.includes('/station-admin') || ['chief', 'stationadmin'].includes(normalizedRole)
         ? '/station-admin/management'
         : canConfigureStation
             ? '/admin/management'

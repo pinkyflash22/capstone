@@ -61,7 +61,7 @@ class UserLogController extends Controller
         $user = Auth::user();
         $roleName = strtolower($user?->role?->role ?? '');
 
-        abort_unless(in_array($roleName, ['chief', 'station admin'], true), 403);
+        abort_unless(in_array($roleName, ['chief', 'stationadmin'], true), 403);
 
         $perPage = (int) min(max($request->integer('limit', 10), 1), 50);
 
