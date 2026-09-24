@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260924-1';
+const CACHE_VERSION = 'pyrosense-pwa-v20260924-2';
 // Offline screen revision: 2026-09-11. Reinstall the updated shell while
 // retaining the existing caches for saved pages, maps, and reports.
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
@@ -8,6 +8,8 @@ const MEDIA_CACHE = `${CACHE_VERSION}-media`;
 const TILE_CACHE = `${CACHE_VERSION}-tiles`;
 const OFFLINE_URL = '/offline.html';
 const LANDING_URL = '/';
+const PAGE_HTML_CACHE_PREFIX = 'pyrosense-pwa:page-html:';
+const SHARED_PAGE_HTML_CACHE = `${PAGE_HTML_CACHE_PREFIX}last`;
 const PWA_START_URL = '/pwa/start';
 const PWA_QUICK_REPORT_URL = '/pwa/quick-report';
 const CITIZEN_MOBILE_HUB_URL = '/citizen/mobile-hub';
@@ -162,7 +164,7 @@ self.addEventListener('activate', (event) => {
                 DYNAMIC_CACHE,
                 MEDIA_CACHE,
                 TILE_CACHE
-            ].includes(key)) {
+            ].includes(key) && !key.startsWith(PAGE_HTML_CACHE_PREFIX)) {
                 return caches.delete(key);
             }
             return Promise.resolve();
@@ -353,6 +355,11 @@ async function handleNoCacheNavigationRequest(request) {
     try {
         return await fetch(request, { cache: 'no-store', credentials: 'same-origin' });
     } catch (error) {
+        const savedSnapshot = await matchOfflinePageSnapshot(requestUrl.pathname);
+        if (savedSnapshot) {
+            return savedSnapshot;
+        }
+
         if (['/login', '/auth', PWA_START_URL, PWA_QUICK_REPORT_URL].includes(requestUrl.pathname)) {
             const cachedAppPage = await matchOfflineAppPage(requestUrl.pathname);
             if (cachedAppPage) {
@@ -383,6 +390,11 @@ async function handleNavigationRequest(request) {
         }
             return response;
     } catch (error) {
+        const savedSnapshot = await matchOfflinePageSnapshot(requestUrl.pathname);
+        if (savedSnapshot) {
+            return savedSnapshot;
+        }
+
         if (
             requestUrl.pathname === LANDING_URL
             || requestUrl.pathname === PWA_START_URL
@@ -440,6 +452,45 @@ async function handleNavigationRequest(request) {
             headers: { 'Content-Type': 'text/plain' }
         });
     }
+}
+
+async function matchOfflinePageSnapshot(preferredPath = null) {
+    if (!preferredPath) {
+        return null;
+    }
+
+    const candidates = [
+        preferredPath,
+        preferredPath === LANDING_URL ? PWA_START_URL : null,
+        preferredPath === LANDING_URL ? CITIZEN_MOBILE_HUB_URL : null,
+        preferredPath === LANDING_URL ? CITIZEN_DASHBOARD_URL : null,
+        preferredPath.startsWith('/citizen/') ? CITIZEN_MOBILE_HUB_URL : null,
+        preferredPath.startsWith('/citizen/') ? CITIZEN_DASHBOARD_URL : null,
+        preferredPath.startsWith('/firefighter/') ? '/firefighter/dashboard' : null,
+        preferredPath.startsWith('/station-admin/') ? '/station-admin/dashboard' : null,
+        preferredPath.startsWith('/chief/') ? '/chief/dashboard' : null,
+        preferredPath.startsWith('/admin/') ? '/admin/dashboard' : null,
+        preferredPath.startsWith('/barangay/') ? '/barangay/dashboard' : null,
+        LANDING_URL,
+        PWA_START_URL,
+    ].filter(Boolean);
+
+    const cacheNames = [
+        SHARED_PAGE_HTML_CACHE,
+        ...(await caches.keys()).filter((key) => key.startsWith(PAGE_HTML_CACHE_PREFIX) && key !== SHARED_PAGE_HTML_CACHE),
+    ];
+
+    for (const cacheName of cacheNames) {
+        const cache = await caches.open(cacheName);
+        for (const path of candidates) {
+            const cached = await cache.match(path, { ignoreSearch: true });
+            if (cached) {
+                return cached;
+            }
+        }
+    }
+
+    return null;
 }
 
 async function matchOfflineAppPage(preferredPath = null) {

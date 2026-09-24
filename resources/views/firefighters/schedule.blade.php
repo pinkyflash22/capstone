@@ -1019,6 +1019,13 @@
                             <input id="scheduleStationLabel" type="text" value="{{ $stationName ?: 'Unassigned Station' }}" readonly>
                         </div>
                         <div class="schedule-form-field">
+                            <label for="scheduleEventScope">Schedule For</label>
+                            <select id="scheduleEventScope" name="event_scope">
+                                <option value="personal">Personal</option>
+                                <option value="station">Whole Station</option>
+                            </select>
+                        </div>
+                        <div class="schedule-form-field">
                             <label for="scheduleEventDate">Date</label>
                             <input id="scheduleEventDate" name="event_date" type="date" required>
                         </div>
@@ -1040,7 +1047,7 @@
                         <div class="schedule-form-field">
                             <label for="scheduleEndTime">End Time</label>
                             <select id="scheduleEndTime" name="end_time" required></select>
-                            <small id="scheduleTimeHelp" style="color:#64748b;font-size:0.78rem;">Only overlaps with your own personal schedules are blocked.</small>
+                            <small id="scheduleTimeHelp" style="color:#64748b;font-size:0.78rem;">Personal schedules block your own time; station schedules block station-wide time.</small>
                         </div>
                         <div class="schedule-form-field">
                             <label for="scheduleStatus">Status</label>
@@ -1056,7 +1063,7 @@
                         </div>
                         <div class="schedule-form-field full">
                             <label for="scheduleNotes">Notes</label>
-                            <textarea id="scheduleNotes" name="notes" rows="4" placeholder="Optional notes for your personal schedule"></textarea>
+                            <textarea id="scheduleNotes" name="notes" rows="4" placeholder="Optional notes for this schedule"></textarea>
                         </div>
                     </div>
                     <div class="schedule-modal-actions">
@@ -1099,6 +1106,7 @@
             const scheduleEventForm = document.getElementById('scheduleEventForm');
             const scheduleEventId = document.getElementById('scheduleEventId');
             const scheduleEventTitle = document.getElementById('scheduleEventTitle');
+            const scheduleEventScope = document.getElementById('scheduleEventScope');
             const scheduleEventDate = document.getElementById('scheduleEventDate');
             const scheduleEventType = document.getElementById('scheduleEventType');
             const scheduleStartTime = document.getElementById('scheduleStartTime');
@@ -1225,6 +1233,14 @@
                     .sort((a, b) => `${a.start_time}`.localeCompare(`${b.start_time}`));
             }
 
+            function getStationEventsForDate(dateKey, ignoreEventId = null) {
+                return scheduleEventsData
+                    .filter(event => event.source_type === 'official')
+                    .filter(event => ignoreEventId === null || Number(event.event_id) !== Number(ignoreEventId))
+                    .filter(event => event.event_date === dateKey)
+                    .sort((a, b) => `${a.start_time}`.localeCompare(`${b.start_time}`));
+            }
+
             function toHourNumber(timeValue) {
                 if (!timeValue || typeof timeValue !== 'string') return null;
 
@@ -1233,10 +1249,14 @@
                 return Number.isNaN(parsedHour) ? null : parsedHour;
             }
 
-            function getOccupiedHours(dateKey, ignoreEventId = null) {
+            function getOccupiedHours(dateKey, ignoreEventId = null, eventScope = 'personal') {
                 const occupiedHours = new Set();
 
-                getPersonalEventsForDate(dateKey, ignoreEventId).forEach(function (event) {
+                const scopedEvents = eventScope === 'station'
+                    ? getStationEventsForDate(dateKey, ignoreEventId)
+                    : getPersonalEventsForDate(dateKey, ignoreEventId);
+
+                scopedEvents.forEach(function (event) {
                     const startHour = toHourNumber(event.start_time);
                     const endHour = toHourNumber(event.end_time);
 
@@ -1253,7 +1273,8 @@
             }
 
             function getAvailableStartHours(dateKey) {
-                const occupiedHours = getOccupiedHours(dateKey, state.editingEventId);
+                const eventScope = scheduleEventScope?.value || 'personal';
+                const occupiedHours = getOccupiedHours(dateKey, state.editingEventId, eventScope);
                 const minimumStartHour = getMinimumStartHour(dateKey);
 
                 return hourlySlots.filter(function (slot) {
@@ -1265,7 +1286,8 @@
                 const startHour = toHourNumber(startTimeValue);
                 if (startHour === null) return [];
 
-                const occupiedHours = getOccupiedHours(dateKey, state.editingEventId);
+                const eventScope = scheduleEventScope?.value || 'personal';
+                const occupiedHours = getOccupiedHours(dateKey, state.editingEventId, eventScope);
                 const availableEnds = [];
 
                 for (let hour = startHour + 1; hour <= 23; hour += 1) {
@@ -1324,11 +1346,15 @@
                 scheduleEndTime.disabled = true;
 
                 if (!availableStarts.length) {
-                    scheduleTimeHelp.textContent = 'This day has no remaining free time blocks in your personal schedule.';
+                    scheduleTimeHelp.textContent = (scheduleEventScope?.value || 'personal') === 'station'
+                        ? 'This day has no remaining free station-wide time blocks.'
+                        : 'This day has no remaining free time blocks in your personal schedule.';
                     return;
                 }
 
-                scheduleTimeHelp.textContent = 'Only overlaps with your own personal schedules are blocked.';
+                scheduleTimeHelp.textContent = (scheduleEventScope?.value || 'personal') === 'station'
+                    ? 'Station-wide schedules are checked against other station-wide schedules.'
+                    : 'Personal schedules are checked against your own personal schedules.';
 
                 if (availableStarts.some(option => option.value === previousStartValue)) {
                     scheduleStartTime.value = previousStartValue;
@@ -1344,11 +1370,15 @@
                 scheduleEndTime.disabled = availableEnds.length === 0;
 
                 if (!availableEnds.length) {
-                    scheduleTimeHelp.textContent = 'Choose another start time. This would overlap one of your personal schedules.';
+                    scheduleTimeHelp.textContent = (scheduleEventScope?.value || 'personal') === 'station'
+                        ? 'Choose another start time. This would overlap another station-wide schedule.'
+                        : 'Choose another start time. This would overlap one of your personal schedules.';
                     return;
                 }
 
-                scheduleTimeHelp.textContent = 'Only overlaps with your own personal schedules are blocked.';
+                scheduleTimeHelp.textContent = (scheduleEventScope?.value || 'personal') === 'station'
+                    ? 'Station-wide schedules are checked against other station-wide schedules.'
+                    : 'Personal schedules are checked against your own personal schedules.';
 
                 if (preferredEndValue && availableEnds.some(option => option.value === preferredEndValue)) {
                     scheduleEndTime.value = preferredEndValue;
@@ -1528,13 +1558,14 @@
 
             function openScheduleModal(dateKey, eventData = null) {
                 if (dateKey < getTodayKey()) {
-                    showScheduleToast('You can only add or edit personal schedules for today or a future date.', true);
+                    showScheduleToast('You can only add or edit schedules for today or a future date.', true);
                     return;
                 }
 
                 state.editingEventId = eventData ? Number(eventData.event_id) : null;
                 scheduleEventId.value = eventData?.event_id || '';
                 scheduleEventTitle.value = eventData?.event || '';
+                scheduleEventScope.value = eventData?.event_scope || (eventData?.source_type === 'official' ? 'station' : 'personal');
                 scheduleEventType.value = eventData?.activity_type || 'operations';
                 scheduleStatus.value = eventData?.status || 'planned';
                 scheduleBarangay.value = eventData?.barangay || '';
@@ -1564,6 +1595,7 @@
                 scheduleEventForm.reset();
                 scheduleEventId.value = '';
                 scheduleEventTitle.value = '';
+                scheduleEventScope.value = 'personal';
                 scheduleEventType.value = 'operations';
                 scheduleStatus.value = 'planned';
                 scheduleBarangay.value = '';
@@ -1582,11 +1614,11 @@
                 const eventData = getEventById(eventId);
 
                 if (!eventData || !eventData.can_delete) {
-                    showScheduleToast('Only your own personal schedule can be deleted here.', true);
+                    showScheduleToast('Only editable personal or assigned-station schedules can be deleted here.', true);
                     return;
                 }
 
-                if (!window.confirm(`Delete "${eventData.event}" from your personal schedule?`)) {
+                if (!window.confirm(`Delete "${eventData.event}" from ${eventData.event_scope === 'station' ? 'the station schedule' : 'your personal schedule'}?`)) {
                     return;
                 }
 
@@ -1602,7 +1634,7 @@
                     const data = await response.json();
 
                     if (!response.ok || !data.success) {
-                        throw new Error(data.message || 'Failed to delete personal schedule.');
+                        throw new Error(data.message || 'Failed to delete schedule.');
                     }
 
                     removeEventFromSeed(eventId);
@@ -1614,7 +1646,7 @@
                     }
                     showScheduleToast('Schedule deleted.');
                 } catch (error) {
-                    showScheduleToast(error.message || 'Unable to delete personal schedule.', true);
+                    showScheduleToast(error.message || 'Unable to delete schedule.', true);
                 }
             }
 
@@ -1693,7 +1725,7 @@
                     if (eventData?.can_edit) {
                         openScheduleModal(eventData.event_date, eventData);
                     } else {
-                        showScheduleToast('Chief official schedules are read-only on this page.', true);
+                        showScheduleToast('This schedule is read-only on this page.', true);
                     }
                 }
 
@@ -1705,6 +1737,9 @@
             scheduleModalClose?.addEventListener('click', closeScheduleModal);
             scheduleCancelBtn?.addEventListener('click', closeScheduleModal);
             scheduleEventDate?.addEventListener('change', function () {
+                refreshTimeSelectors(scheduleEventDate.value || state.selectedDateKey);
+            });
+            scheduleEventScope?.addEventListener('change', function () {
                 refreshTimeSelectors(scheduleEventDate.value || state.selectedDateKey);
             });
             scheduleStartTime?.addEventListener('change', function () {
@@ -1750,7 +1785,7 @@
                     const data = await response.json();
 
                     if (!response.ok || !data.success) {
-                        throw new Error(data.message || 'Failed to save personal schedule.');
+                        throw new Error(data.message || 'Failed to save schedule.');
                     }
 
                     replaceEventInSeed(data.data);
@@ -1762,7 +1797,7 @@
                     closeScheduleModal();
                     showScheduleToast(isEditing ? 'Schedule updated.' : 'Schedule added.');
                 } catch (error) {
-                    showScheduleToast(error.message || 'Unable to save personal schedule.', true);
+                    showScheduleToast(error.message || 'Unable to save schedule.', true);
                 } finally {
                     scheduleSubmitBtn.disabled = false;
                     scheduleSubmitBtn.textContent = scheduleEventId.value ? 'Update Schedule' : 'Save Schedule';

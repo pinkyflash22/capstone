@@ -96,6 +96,8 @@ let citizenRouteDiscoveryPausedUntil = 0;
 let citizenMapPreviewPreviousFocus = null;
 let latestCitizenBoundaryRenderedCount = 0;
 let citizenBoundaryReloadTimer = null;
+let citizenBoundaryLoadInFlight = false;
+let citizenBoundaryNeedsLocationRetry = false;
 
 function citizenPageIsVisible() {
     return typeof document === 'undefined' || document.visibilityState === 'visible';
@@ -970,9 +972,11 @@ function getCitizenCurrentCoords() {
 async function fetchCitizenBoundaryFromCurrentLocation() {
     const coords = getCitizenCurrentCoords();
     if (!coords) {
+        citizenBoundaryNeedsLocationRetry = true;
         return [];
     }
 
+    citizenBoundaryNeedsLocationRetry = false;
     const response = await fetchCitizenLiveResponseOnce('citizen-boundary-locate', '/api/boundaries/locate-point', {
         method: 'POST',
         headers: {
@@ -998,6 +1002,12 @@ async function loadCitizenBoundaries() {
         console.warn('[CitizenBoundary] Map not ready, skipping boundary load');
         return;
     }
+
+    if (citizenBoundaryLoadInFlight) {
+        return;
+    }
+
+    citizenBoundaryLoadInFlight = true;
 
     if (!boundaryLayerGroup) {
         boundaryLayerGroup = L.layerGroup().addTo(window.usermap);
@@ -1088,13 +1098,15 @@ async function loadCitizenBoundaries() {
             boundaryLayerGroup.clearLayers();
             latestCitizenBoundaryRenderedCount = 0;
         }
+    } finally {
+        citizenBoundaryLoadInFlight = false;
     }
 }
 
 window.loadCitizenBoundaries = loadCitizenBoundaries;
 
 document.addEventListener('locationReady', () => {
-    if (latestCitizenBoundaryRenderedCount > 0 || citizenBoundaryReloadTimer) {
+    if ((latestCitizenBoundaryRenderedCount > 0 && !citizenBoundaryNeedsLocationRetry) || citizenBoundaryReloadTimer) {
         return;
     }
 

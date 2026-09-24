@@ -70,9 +70,12 @@ class FirefighterController extends Controller
     private const STATUS_DB_CONTROLLED = 'Controlled';
     private const STATUS_DB_CLOSED = 'Closed';
 
-    protected function serializeScheduleEvent(EventActivity $event, int $currentUserId): array
+    protected function serializeScheduleEvent(EventActivity $event, int $currentUserId, ?int $assignedStationId = null): array
     {
         $isPersonal = (int) ($event->user_id ?? 0) === $currentUserId;
+        $isAssignedStationEvent = ! $event->user_id
+            && $assignedStationId
+            && (int) $event->station_id === (int) $assignedStationId;
 
         return [
             'id' => $event->event_id,
@@ -97,9 +100,10 @@ class FirefighterController extends Controller
             'station_id' => $event->station_id,
             'user_id' => $event->user_id,
             'source_type' => $isPersonal ? 'personal' : 'official',
-            'source_label' => $isPersonal ? 'My Personal Schedule' : 'Chief Official Schedule',
-            'can_edit' => $isPersonal,
-            'can_delete' => $isPersonal,
+            'source_label' => $isPersonal ? 'My Personal Schedule' : 'Station Schedule',
+            'event_scope' => $isPersonal ? 'personal' : 'station',
+            'can_edit' => $isPersonal || $isAssignedStationEvent,
+            'can_delete' => $isPersonal || $isAssignedStationEvent,
             'is_personal' => $isPersonal,
         ];
     }
@@ -172,7 +176,7 @@ class FirefighterController extends Controller
         ];
     }
 
-    protected function validatePersonalSchedulePayload(Request $request): array
+    protected function validateSchedulePayload(Request $request): array
     {
         return $request->validate([
             'event' => ['required', 'string', 'max:255'],
@@ -183,6 +187,7 @@ class FirefighterController extends Controller
             'status' => ['nullable', Rule::in(['planned', 'confirmed', 'completed'])],
             'barangay' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
+            'event_scope' => ['nullable', Rule::in(['personal', 'station'])],
         ]);
     }
 
@@ -217,6 +222,20 @@ class FirefighterController extends Controller
     {
         return EventActivity::query()
             ->where('user_id', $userId)
+            ->whereDate('event_date', $validated['event_date'])
+            ->when($ignoreEventId, function ($query) use ($ignoreEventId) {
+                $query->where('event_id', '!=', $ignoreEventId);
+            })
+            ->where('start_time', '<', $validated['end_time'])
+            ->where('end_time', '>', $validated['start_time'])
+            ->exists();
+    }
+
+    protected function hasStationScheduleConflict(int $stationId, array $validated, ?int $ignoreEventId = null): bool
+    {
+        return EventActivity::query()
+            ->where('station_id', $stationId)
+            ->whereNull('user_id')
             ->whereDate('event_date', $validated['event_date'])
             ->when($ignoreEventId, function ($query) use ($ignoreEventId) {
                 $query->where('event_id', '!=', $ignoreEventId);
@@ -1863,17 +1882,25 @@ class FirefighterController extends Controller
             ], 422);
         }
 
-        $validated = $this->validatePersonalSchedulePayload($request);
+        $validated = $this->validateSchedulePayload($request);
+        $eventScope = $validated['event_scope'] ?? 'personal';
         $windowError = $this->assertPersonalScheduleWindow($validated);
 
         if ($windowError) {
             return $windowError;
         }
 
-        if ($this->hasPersonalScheduleConflict($userId, $validated)) {
+        if ($eventScope === 'personal' && $this->hasPersonalScheduleConflict($userId, $validated)) {
             return response()->json([
                 'success' => false,
                 'message' => 'This time overlaps one of your personal schedules.'
+            ], 422);
+        }
+
+        if ($eventScope === 'station' && $this->hasStationScheduleConflict((int) $stationId, $validated)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This time overlaps another station-wide schedule.'
             ], 422);
         }
 
@@ -1888,40 +1915,64 @@ class FirefighterController extends Controller
             'barangay' => $validated['barangay'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'station_id' => $stationId,
-            'user_id' => $userId,
+            'user_id' => $eventScope === 'personal' ? $userId : null,
         ]);
 
-        UserActivityLogger::log('created personal schedule event', $userId, $request);
+        UserActivityLogger::log('created '.$eventScope.' schedule event', $userId, $request);
 
         return response()->json([
             'success' => true,
-            'message' => 'Personal schedule saved successfully.',
-            'data' => $this->serializeScheduleEvent($event, $userId),
+            'message' => $eventScope === 'personal'
+                ? 'Personal schedule saved successfully.'
+                : 'Station-wide schedule saved successfully.',
+            'data' => $this->serializeScheduleEvent($event, $userId, (int) $stationId),
         ]);
     }
 
     public function updateScheduleEvent(Request $request, EventActivity $eventActivity)
     {
         $userId = Auth::user()->user_id;
+        $stationOfficer = $this->getStationOfficerForUserId($userId);
+        $stationId = $stationOfficer?->station_id;
 
-        if ((int) ($eventActivity->user_id ?? 0) !== $userId) {
+        if (! $stationId) {
             return response()->json([
                 'success' => false,
-                'message' => 'You can only edit your own personal schedule.'
+                'message' => 'No station is linked to your firefighter account.'
+            ], 422);
+        }
+
+        $isPersonalEvent = (int) ($eventActivity->user_id ?? 0) === $userId;
+        $isAssignedStationEvent = ! $eventActivity->user_id
+            && $stationId
+            && (int) $eventActivity->station_id === (int) $stationId;
+
+        if (! $isPersonalEvent && ! $isAssignedStationEvent) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only edit your own personal schedule or schedules for your assigned station.'
             ], 403);
         }
 
-        $validated = $this->validatePersonalSchedulePayload($request);
+        $validated = $this->validateSchedulePayload($request);
+        $eventScope = $validated['event_scope'] ?? ($isPersonalEvent ? 'personal' : 'station');
         $windowError = $this->assertPersonalScheduleWindow($validated);
 
         if ($windowError) {
             return $windowError;
         }
 
-        if ($this->hasPersonalScheduleConflict($userId, $validated, (int) $eventActivity->event_id)) {
+        if ($eventScope === 'personal' && $this->hasPersonalScheduleConflict($userId, $validated, (int) $eventActivity->event_id)) {
             return response()->json([
                 'success' => false,
                 'message' => 'This time overlaps one of your personal schedules.'
+            ], 422);
+        }
+
+        if ($eventScope === 'station' && $this->hasStationScheduleConflict((int) $stationId, $validated, (int) $eventActivity->event_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This time overlaps another station-wide schedule.'
             ], 422);
         }
 
@@ -1935,35 +1986,47 @@ class FirefighterController extends Controller
             'status' => $validated['status'] ?? 'planned',
             'barangay' => $validated['barangay'] ?? null,
             'notes' => $validated['notes'] ?? null,
+            'station_id' => $stationId,
+            'user_id' => $eventScope === 'personal' ? $userId : null,
         ]);
 
-        UserActivityLogger::log('updated personal schedule event', $userId, $request);
+        UserActivityLogger::log('updated '.$eventScope.' schedule event', $userId, $request);
 
         return response()->json([
             'success' => true,
-            'message' => 'Personal schedule updated successfully.',
-            'data' => $this->serializeScheduleEvent($eventActivity->fresh(), $userId),
+            'message' => $eventScope === 'personal'
+                ? 'Personal schedule updated successfully.'
+                : 'Station-wide schedule updated successfully.',
+            'data' => $this->serializeScheduleEvent($eventActivity->fresh(), $userId, (int) $stationId),
         ]);
     }
 
     public function destroyScheduleEvent(Request $request, EventActivity $eventActivity)
     {
         $userId = Auth::user()->user_id;
+        $stationOfficer = $this->getStationOfficerForUserId($userId);
+        $stationId = $stationOfficer?->station_id;
+        $isPersonalEvent = (int) ($eventActivity->user_id ?? 0) === $userId;
+        $isAssignedStationEvent = ! $eventActivity->user_id
+            && $stationId
+            && (int) $eventActivity->station_id === (int) $stationId;
 
-        if ((int) ($eventActivity->user_id ?? 0) !== $userId) {
+        if (! $isPersonalEvent && ! $isAssignedStationEvent) {
             return response()->json([
                 'success' => false,
-                'message' => 'You can only delete your own personal schedule.'
+                'message' => 'You can only delete your own personal schedule or schedules for your assigned station.'
             ], 403);
         }
 
         $deletedEventId = $eventActivity->event_id;
         $eventActivity->delete();
-        UserActivityLogger::log('deleted personal schedule event', $userId, $request);
+        UserActivityLogger::log('deleted '.($isPersonalEvent ? 'personal' : 'station').' schedule event', $userId, $request);
 
         return response()->json([
             'success' => true,
-            'message' => 'Personal schedule deleted successfully.',
+            'message' => $isPersonalEvent
+                ? 'Personal schedule deleted successfully.'
+                : 'Station-wide schedule deleted successfully.',
             'data' => [
                 'event_id' => $deletedEventId,
             ],
@@ -2562,7 +2625,7 @@ public function getAssignedIncidents(string $id){
                 $query->orWhere('user_id', $userId);
             })
             ->orderBy('event_date')->orderBy('start_time')->get()
-            ->map(fn (EventActivity $event) => $this->serializeScheduleEvent($event, $userId));
+            ->map(fn (EventActivity $event) => $this->serializeScheduleEvent($event, $userId, $stationId ? (int) $stationId : null));
 
         $dutyEvents = collect();
 

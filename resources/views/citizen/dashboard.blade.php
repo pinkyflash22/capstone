@@ -4461,7 +4461,27 @@ initializeCitizenLocationIfGranted();
             marker: null,
             clickHandler: null,
         };
+        let citizenReportSubmitInFlight = false;
         window.__citizenReportDraftsReady = true;
+
+        function resetCitizenReportSubmissionState() {
+            citizenReportSubmitInFlight = false;
+            window.__citizenReportSubmitInFlight = false;
+
+            document.querySelectorAll('.js-citizen-report-action').forEach((button) => {
+                if (button.dataset.defaultLabel) {
+                    button.textContent = button.dataset.defaultLabel;
+                }
+                button.disabled = false;
+                button.style.opacity = '';
+                button.style.pointerEvents = '';
+                button.setAttribute('aria-disabled', 'false');
+            });
+
+            const loadingOverlay = document.getElementById('incidentReportLoadingOverlay');
+            loadingOverlay?.classList.add('hidden');
+            loadingOverlay?.classList.remove('flex');
+        }
 
         function getCitizenDistanceMeters(lat1, lng1, lat2, lng2) {
             const earthRadius = 6371000;
@@ -4846,8 +4866,7 @@ initializeCitizenLocationIfGranted();
                 return;
             }
 
-            document.getElementById('incidentReportLoadingOverlay')?.classList.add('hidden');
-            document.getElementById('incidentReportLoadingOverlay')?.classList.remove('flex');
+            resetCitizenReportSubmissionState();
             modal.classList.remove('hidden');
             modal.classList.add('flex');
             modal.style.display = 'flex';
@@ -4878,6 +4897,9 @@ initializeCitizenLocationIfGranted();
                 const concernOpen = !document.getElementById('concernReportModal')?.classList.contains('hidden');
                 if (!fireOpen && !concernOpen) {
                     stopCitizenReportLocationRefresh();
+                }
+                if (!citizenReportSubmitInFlight && !window.__citizenReportSubmitInFlight) {
+                    resetCitizenReportSubmissionState();
                 }
             }
         }
@@ -4996,6 +5018,7 @@ initializeCitizenLocationIfGranted();
         window.openConcernReportModal = openConcernReportModal;
         window.showCitizenModal = showCitizenModal;
         window.hideCitizenModal = hideCitizenModal;
+        window.resetCitizenReportSubmissionState = resetCitizenReportSubmissionState;
 
         document.querySelectorAll('[data-fire-modal-close], #closeFireModal').forEach(function(trigger) {
             trigger.addEventListener('click', function() {
@@ -5558,6 +5581,14 @@ async function submitCitizenQuickReport(reportKind) {
     };
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
+    if (citizenReportSubmitInFlight || window.__citizenReportSubmitInFlight) {
+        showIncidentToast?.('Your report is already being submitted. Please wait a moment.', true, 3200);
+        return;
+    }
+
+    citizenReportSubmitInFlight = true;
+    window.__citizenReportSubmitInFlight = true;
+
     if (typeof window.PyroLocation?.getQuickLocationFix !== 'function') {
         if (reportKind === 'fire') {
             showIncidentToast?.('Location service is still loading. Choose the fire location on the map.', true);
@@ -5565,6 +5596,7 @@ async function submitCitizenQuickReport(reportKind) {
         } else {
             showIncidentToast?.('Location service is still loading. Please try again.', true);
         }
+        resetCitizenReportSubmissionState();
         return;
     }
 
@@ -5586,7 +5618,10 @@ async function submitCitizenQuickReport(reportKind) {
     } else if (reportKind === 'fire') {
         showIncidentToast?.('Checking your current location...', false, 2200);
         freshLocationFix = await resolveCitizenFireReportLocation(showIncidentToast);
-        if (!freshLocationFix) return;
+        if (!freshLocationFix) {
+            resetCitizenReportSubmissionState();
+            return;
+        }
 
         applyCitizenFireLocationFix(freshLocationFix);
         const accuracy = Math.round(Number(freshLocationFix.accuracy));
@@ -5619,6 +5654,7 @@ async function submitCitizenQuickReport(reportKind) {
         );
     } catch (error) {
         showIncidentToast?.(error.message || 'Unable to get an accurate current location.', true, 5200);
+        resetCitizenReportSubmissionState();
         return;
     }
     }
@@ -5626,16 +5662,19 @@ async function submitCitizenQuickReport(reportKind) {
     // A manually selected fire point remains valid even when GPS is unavailable.
     if (!hasManualFireLocation && !citizenHasUsableCoords()) {
         showIncidentToast?.('Getting your location. Please wait and try again.', true);
+        resetCitizenReportSubmissionState();
         return;
     }
 
     if (reportKind === 'fire' && citizenFireDraft.mode === 'picked' && (citizenFireDraft.selectedLat === null || citizenFireDraft.selectedLng === null)) {
         startCitizenFireMapPick();
+        resetCitizenReportSubmissionState();
         return;
     }
 
     if (reportKind === 'concern' && citizenHazardDraft.mode === 'picked' && (citizenHazardDraft.selectedLat === null || citizenHazardDraft.selectedLng === null)) {
         startCitizenHazardMapPick();
+        resetCitizenReportSubmissionState();
         return;
     }
 
@@ -5647,6 +5686,7 @@ async function submitCitizenQuickReport(reportKind) {
         setConcernPhotoUploadStatus(concernPhotoState.message, concernPhotoState.tone);
         setCitizenConcernSubmitAvailability(false);
         showIncidentToast?.(concernPhotoState.message, true);
+        resetCitizenReportSubmissionState();
         return;
     }
 
@@ -5721,6 +5761,7 @@ async function submitCitizenQuickReport(reportKind) {
     if (window.pyroPwa?.isOffline?.()) {
         if (reportKind === 'concern' && concernPhotoState.files.length > 0) {
             showIncidentToast?.('Photo uploads for risk or hazard reports require an internet connection.', true, 4200);
+            resetCitizenReportSubmissionState();
             return;
         }
 
@@ -5731,6 +5772,7 @@ async function submitCitizenQuickReport(reportKind) {
         }
         hideCitizenModal(document.getElementById(reportKind === 'fire' ? 'fireIncidentModal' : 'concernReportModal'));
         showIncidentToast?.(`${reportLabels[reportKind] || 'Report'} saved offline. Pending sync.`, false, 4200);
+        resetCitizenReportSubmissionState();
         return;
     }
 
@@ -5910,10 +5952,13 @@ async function submitCitizenQuickReport(reportKind) {
         });
         loadingOverlay?.classList.add('hidden');
         loadingOverlay?.classList.remove('flex');
+        citizenReportSubmitInFlight = false;
+        window.__citizenReportSubmitInFlight = false;
     }
 }
 
 document.querySelectorAll('.js-citizen-report-action').forEach((button) => {
+    button.dataset.defaultLabel = button.textContent;
     button.addEventListener('click', function(e) {
         e.preventDefault();
         submitCitizenQuickReport(this.dataset.reportKind || 'fire');

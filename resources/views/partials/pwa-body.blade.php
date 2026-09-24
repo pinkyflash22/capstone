@@ -470,6 +470,7 @@
         const STATUS_KEY = `${STORAGE_PREFIX}:status:${ACCOUNT_SCOPE}`;
         const PAGE_SNAPSHOT_KEY = `${STORAGE_PREFIX}:page-snapshots:${ACCOUNT_SCOPE}`;
         const PAGE_HTML_CACHE = `${STORAGE_PREFIX}:page-html:${ACCOUNT_SCOPE || 'guest'}`;
+        const SHARED_PAGE_HTML_CACHE = `${STORAGE_PREFIX}:page-html:last`;
         const OFFLINE_RETURN_KEY = `${STORAGE_PREFIX}:offline-return:${ACCOUNT_SCOPE}`;
         const SW_URL = `/sw.js?v={{ $pwaServiceWorkerVersion }}`;
         const AUTH_URL = @json(url('/auth'));
@@ -864,6 +865,7 @@
                 }
 
                 const cache = await caches.open(PAGE_HTML_CACHE);
+                const sharedCache = await caches.open(SHARED_PAGE_HTML_CACHE);
                 const html = `<!doctype html>\n${document.documentElement.outerHTML}`;
                 const response = new Response(html, {
                     headers: {
@@ -872,7 +874,15 @@
                     },
                 });
 
-                await cache.put(new Request(path, { credentials: 'same-origin' }), response);
+                const request = new Request(path, { credentials: 'same-origin' });
+                await cache.put(request, response.clone());
+                await sharedCache.put(request, response.clone());
+
+                if (!/^\/(?:auth|login|logout|register|forgot-password|reset-password)(?:\/.*)?$/i.test(path)) {
+                    await sharedCache.put(new Request('/', { credentials: 'same-origin' }), response.clone());
+                    await sharedCache.put(new Request('/pwa/start', { credentials: 'same-origin' }), response.clone());
+                    await sharedCache.put(new Request('/pwa/quick-report', { credentials: 'same-origin' }), response.clone());
+                }
             } catch (error) {
                 console.warn('[PyroSense PWA] Failed to cache offline page snapshot:', error);
             }
