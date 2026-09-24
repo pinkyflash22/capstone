@@ -21,10 +21,10 @@ class CheckRole
             abort(403, 'Unauthorized access. User role not found.');
         }
         
-        $userRole = strtolower($user->role->role ?? '');
+        $userRole = strtolower(trim((string) ($user->role->role ?? '')));
 
         foreach ($roles as $role) {
-            if (strtolower($role) === $userRole) {
+            if (strtolower(trim((string) $role)) === $userRole) {
                 return $next($request);
             }
         }

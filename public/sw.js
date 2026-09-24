@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'pyrosense-pwa-v20260913-1';
+const CACHE_VERSION = 'pyrosense-pwa-v20260924-1';
 // Offline screen revision: 2026-09-11. Reinstall the updated shell while
 // retaining the existing caches for saved pages, maps, and reports.
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
@@ -16,6 +16,7 @@ const OFFLINE_APP_FALLBACK_URLS = [
     CITIZEN_MOBILE_HUB_URL,
     CITIZEN_DASHBOARD_URL,
     '/firefighter/dashboard',
+    '/station-admin/dashboard',
     '/chief/dashboard',
     '/admin/dashboard',
     '/barangay/dashboard',
@@ -272,6 +273,7 @@ self.addEventListener('fetch', (event) => {
         url.pathname.startsWith('/api/')
         || url.pathname.startsWith('/citizen/dashboard-data')
         || url.pathname.startsWith('/firefighter/')
+        || url.pathname.startsWith('/station-admin/')
         || url.pathname.startsWith('/admin/')
         || url.pathname.startsWith('/chief/')
         || url.pathname.startsWith('/barangay/')

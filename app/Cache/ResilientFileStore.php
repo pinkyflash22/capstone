@@ -14,6 +14,8 @@ class ResilientFileStore extends FileStore
      */
     public function put($key, $value, $seconds)
     {
+        $this->repairDirectoryFor($key);
+
         try {
             return parent::put($key, $value, $seconds);
         } catch (Throwable) {
@@ -35,6 +37,8 @@ class ResilientFileStore extends FileStore
      */
     public function add($key, $value, $seconds)
     {
+        $this->repairDirectoryFor($key);
+
         try {
             return parent::add($key, $value, $seconds);
         } catch (Throwable) {
@@ -52,6 +56,10 @@ class ResilientFileStore extends FileStore
 
     protected function repairDirectoryFor(string $key): void
     {
+        if (! is_dir($this->getDirectory())) {
+            @mkdir($this->getDirectory(), 0777, true);
+        }
+
         $directory = dirname($this->path($key));
 
         if (! is_dir($directory)) {
@@ -66,6 +74,8 @@ class ResilientFileStore extends FileStore
     {
         Log::warning('File cache write was skipped after directory repair failed.', [
             'cache_directory' => $this->getDirectory(),
+            'cache_directory_exists' => is_dir($this->getDirectory()),
+            'cache_directory_writable' => is_writable($this->getDirectory()),
             'error' => $exception->getMessage(),
         ]);
     }

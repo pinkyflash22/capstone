@@ -13,9 +13,9 @@ class RedirectIfAuthenticated
         if (Auth::check()) {
             $user = Auth::user();
             $id = Auth::user()->user_id;
-            $userRole = $user->role->role;
+            $userRole = strtolower(trim((string) $user->role->role));
 
-            if (strtolower((string) $userRole) === 'anonymous') {
+            if ($userRole === 'anonymous') {
                 return $next($request);
             }
 
@@ -28,6 +28,7 @@ class RedirectIfAuthenticated
                 case 'admin':
                     return redirect()->route('admin.dashboard');
                 case 'station admin':
+                case 'stationadmin':
                     return redirect()->route('station-admin.dashboard');
                 case 'chief':
                     return redirect()->route('station-admin.dashboard');

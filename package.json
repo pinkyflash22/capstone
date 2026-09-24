@@ -35,6 +35,8 @@
     "license": "ISC",
     "dependencies": {
         "@openrouter/sdk": "^0.9.11",
-        "agora-rtc-sdk-ng": "^4.24.7"
+        "agora-rtc-sdk-ng": "^4.24.7",
+        "http": "^0.0.1-security",
+        "node-fetch": "^3.3.2"
     }
 }
