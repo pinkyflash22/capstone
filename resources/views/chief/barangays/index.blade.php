@@ -272,6 +272,171 @@
             flex-wrap: wrap;
         }
 
+        .barangay-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            gap: 18px;
+            padding: 18px;
+            overflow: visible;
+        }
+
+        .barangay-tile {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 18px;
+            background: #fff;
+            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07);
+            overflow: hidden;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+
+        .barangay-tile:hover {
+            transform: translateY(-2px);
+            border-color: #fed7aa;
+            box-shadow: 0 22px 44px rgba(15, 23, 42, 0.1);
+        }
+
+        .barangay-tile__open {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .barangay-tile__media {
+            position: relative;
+            height: 168px;
+            overflow: hidden;
+            background: linear-gradient(135deg, #f8fafc 0%, #fff7ed 100%);
+        }
+
+        .barangay-tile__media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .barangay-tile__media.is-empty::after,
+        .barangay-tile__fallback {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            color: #c2410c;
+            font-size: 42px;
+            background:
+                linear-gradient(135deg, rgba(255, 247, 237, 0.94), rgba(248, 250, 252, 0.94)),
+                repeating-linear-gradient(45deg, rgba(194, 65, 12, 0.08) 0 1px, transparent 1px 18px);
+        }
+
+        .barangay-tile__media.is-empty::after {
+            content: "\f5a0";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+        }
+
+        .barangay-tile__badge {
+            position: absolute;
+            left: 12px;
+            bottom: 12px;
+            display: inline-flex;
+            align-items: center;
+            min-height: 28px;
+            padding: 0 10px;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.78);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 900;
+        }
+
+        .barangay-tile__body {
+            display: grid;
+            gap: 10px;
+            padding: 16px 16px 14px;
+        }
+
+        .barangay-tile__heading {
+            min-width: 0;
+        }
+
+        .barangay-tile__kicker {
+            color: #c2410c;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .barangay-tile__heading h2 {
+            margin: 3px 0 0;
+            color: #0f1d44;
+            font-size: 20px;
+            font-weight: 900;
+            line-height: 1.12;
+            overflow-wrap: anywhere;
+        }
+
+        .barangay-tile__location,
+        .barangay-tile__coordinates {
+            display: grid;
+            grid-template-columns: 18px minmax(0, 1fr);
+            gap: 8px;
+            align-items: start;
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .barangay-tile__location i,
+        .barangay-tile__coordinates i {
+            color: #c2410c;
+            margin-top: 2px;
+        }
+
+        .barangay-tile__records {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 2px;
+        }
+
+        .barangay-tile__records span {
+            min-width: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            background: #f8fafc;
+            padding: 8px 9px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .barangay-tile__records strong {
+            display: block;
+            color: #0f1d44;
+            font-size: 16px;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 3px;
+        }
+
+        .barangay-tile__actions {
+            justify-content: space-between;
+            gap: 8px;
+            padding: 0 16px 16px;
+        }
+
         .barangay-notice-layer {
             position: fixed;
             top: 22px;
@@ -363,11 +528,13 @@
             padding: 42px 20px;
             text-align: center;
             color: #64748b;
+            grid-column: 1 / -1;
         }
 
         .barangay-pagination {
             padding: 18px 20px;
             border-top: 1px solid #edf2f7;
+            grid-column: 1 / -1;
         }
 
         .barangay-modal-backdrop {
@@ -761,6 +928,53 @@
                 box-shadow: none;
                 border-radius: 18px;
                 overflow: visible;
+            }
+
+            .barangay-card-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+                padding: 0;
+            }
+
+            .barangay-tile {
+                border-radius: 16px;
+            }
+
+            .barangay-tile__media {
+                height: 132px;
+            }
+
+            .barangay-tile__body {
+                padding: 12px;
+                gap: 8px;
+            }
+
+            .barangay-tile__heading h2 {
+                font-size: 17px;
+            }
+
+            .barangay-tile__location,
+            .barangay-tile__coordinates {
+                font-size: 12px;
+            }
+
+            .barangay-tile__records {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 6px;
+            }
+
+            .barangay-tile__records span {
+                padding: 7px 6px;
+                font-size: 9px;
+                text-align: center;
+            }
+
+            .barangay-tile__records strong {
+                font-size: 14px;
+            }
+
+            .barangay-tile__actions {
+                padding: 0 12px 12px;
             }
 
             .barangay-list-header {
@@ -1180,15 +1394,36 @@
                 </button>
             </header>
 
-            <section class="barangay-card" aria-label="Barangay list">
-                <div class="barangay-list-header">
-                    <span>Barangay</span>
-                    <span>City / Province</span>
-                    <span>Actions</span>
-                </div>
-
+            <section class="barangay-card barangay-card-grid" aria-label="Barangay cards">
                 @forelse ($barangays as $barangay)
                     @php
+                        $markerImage = trim((string) ($barangay->hall?->marker?->image ?? ''));
+                        $barangayImageUrl = null;
+
+                        if ($markerImage !== '') {
+                            if (preg_match('/^(https?:)?\/\//i', $markerImage) || str_starts_with($markerImage, '/storage/')) {
+                                $barangayImageUrl = $markerImage;
+                            } else {
+                                $barangayImageUrl = asset('storage/' . ltrim($markerImage, '/'));
+                            }
+                        }
+
+                        $cityProvince = collect([
+                            $barangay->city?->city_name,
+                            $barangay->city?->province?->province_name,
+                        ])->filter()->join(', ') ?: 'No city assigned';
+                        $coordinates = $barangay->hall?->marker?->lat !== null && $barangay->hall?->marker?->lng !== null
+                            ? $barangay->hall->marker->lat . ', ' . $barangay->hall->marker->lng
+                            : 'Coordinates not set';
+                        $locationLine = $barangay->hall?->address?->street
+                            ? $barangay->hall->address->street . ', ' . $cityProvince
+                            : $cityProvince;
+                        $primaryRecords = [
+                            ['label' => 'Addresses', 'count' => (int) ($barangay->full_addresses_count ?? 0)],
+                            ['label' => 'Boundaries', 'count' => (int) ($barangay->boundary_locations_count ?? 0)],
+                            ['label' => 'Stations', 'count' => (int) ($barangay->stations_count ?? 0)],
+                            ['label' => 'Risks', 'count' => (int) ($barangay->risk_areas_count ?? 0)],
+                        ];
                         $deleteSummary = json_encode([
                             ['label' => 'Addresses', 'count' => (int) ($barangay->full_addresses_count ?? 0)],
                             ['label' => 'Boundary Records', 'count' => (int) ($barangay->boundary_locations_count ?? 0)],
@@ -1204,18 +1439,45 @@
                             ['label' => 'Recommendation Suggestions', 'count' => (int) ($barangay->ai_recommendation_suggestions_count ?? 0)],
                         ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
                     @endphp
-                    <article class="barangay-row">
-                        <div class="barangay-row__identity">
-                            <p class="barangay-mobile-label">Barangay</p>
-                            <p class="barangay-name">{{ $barangay->barangay_name }}</p>
-                            <p class="barangay-muted">{{ $barangay->city?->city_name ?? 'No city assigned' }}{{ $barangay->city?->province?->province_name ? ', ' . $barangay->city->province->province_name : '' }}</p>
-                        </div>
-                        <div class="barangay-row__place">
-                            <p class="barangay-mobile-label">City</p>
-                            <p class="barangay-name">{{ $barangay->city?->city_name ?? 'No city assigned' }}</p>
-                            <p class="barangay-muted">{{ $barangay->city?->province?->province_name ?? 'No province assigned' }}</p>
-                        </div>
-                        <div class="barangay-actions">
+                    <article class="barangay-tile">
+                        <button
+                            type="button"
+                            class="barangay-tile__open"
+                            data-barangay-details-trigger
+                            data-details-url="{{ route('station-admin.barangays.show', $barangay) }}"
+                            aria-label="Open records for {{ $barangay->barangay_name }}"
+                        >
+                            <div class="barangay-tile__media">
+                                @if ($barangayImageUrl)
+                                    <img src="{{ $barangayImageUrl }}" alt="{{ $barangay->barangay_name }} barangay photo" loading="lazy" onerror="this.remove(); this.closest('.barangay-tile__media').classList.add('is-empty');">
+                                @else
+                                    <div class="barangay-tile__fallback" aria-hidden="true">
+                                        <i class="fa-solid fa-map-location-dot"></i>
+                                    </div>
+                                @endif
+                                <span class="barangay-tile__badge">{{ $barangay->hall?->hall_name ? 'Hall linked' : 'No hall yet' }}</span>
+                            </div>
+                            <div class="barangay-tile__body">
+                                <div class="barangay-tile__heading">
+                                    <span class="barangay-tile__kicker">Barangay</span>
+                                    <h2>{{ $barangay->barangay_name }}</h2>
+                                </div>
+                                <div class="barangay-tile__location">
+                                    <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                                    <span>{{ $locationLine }}</span>
+                                </div>
+                                <div class="barangay-tile__coordinates">
+                                    <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
+                                    <span>{{ $coordinates }}</span>
+                                </div>
+                                <div class="barangay-tile__records" aria-label="Connected record counts">
+                                    @foreach ($primaryRecords as $record)
+                                        <span><strong>{{ $record['count'] }}</strong>{{ $record['label'] }}</span>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </button>
+                        <div class="barangay-actions barangay-tile__actions">
                             <button
                                 type="button"
                                 class="barangay-icon-button"
@@ -1583,6 +1845,45 @@
                 `;
             };
 
+            const renderAdditionalBarangaySections = (payload) => [
+                renderDetailsSection('Barangay Officers', payload?.barangay_officers, (officer) => `
+                    <div class="barangay-details-item">
+                        <div class="barangay-details-item__title">${escapeHtml(officer.name || 'Assigned officer')}</div>
+                        <div class="barangay-details-item__meta">${escapeHtml(officer.position || 'Barangay officer')} &middot; ${escapeHtml(officer.status || 'Unknown')}</div>
+                    </div>
+                `),
+                renderDetailsSection('Mitigation Actions', payload?.mitigation_actions, (action) => `
+                    <div class="barangay-details-item">
+                        <div class="barangay-details-item__title">${escapeHtml(action.title || 'Mitigation action')}</div>
+                        <div class="barangay-details-item__meta">${escapeHtml(action.priority || 'Normal')} priority &middot; ${escapeHtml(action.status || 'Unknown')} &middot; ${escapeHtml(action.target_date || 'No target date')}</div>
+                    </div>
+                `),
+                renderDetailsSection('Action Plan Checklists', payload?.action_plan_checklists, (checklist) => `
+                    <div class="barangay-details-item">
+                        <div class="barangay-details-item__title">${escapeHtml(checklist.title || 'Action plan')}</div>
+                        <div class="barangay-details-item__meta">${escapeHtml(checklist.priority || 'Normal')} priority &middot; ${escapeHtml(checklist.status || 'Unknown')} &middot; ${escapeHtml(checklist.target_date || 'No target date')}</div>
+                    </div>
+                `),
+                renderDetailsSection('Recommendations', payload?.recommendations, (recommendation) => `
+                    <div class="barangay-details-item">
+                        <div class="barangay-details-item__title">${escapeHtml(recommendation.title || 'Recommendation')}</div>
+                        <div class="barangay-details-item__meta">${escapeHtml(recommendation.status || 'Suggested')} &middot; ${escapeHtml(recommendation.updated_at_human || 'Unknown')}</div>
+                    </div>
+                `),
+                renderDetailsSection('Addresses', payload?.addresses, (address) => `
+                    <div class="barangay-details-item">
+                        <div class="barangay-details-item__title">${escapeHtml(address.street || 'Unnamed address')}</div>
+                        <div class="barangay-details-item__meta">${escapeHtml(address.residents ?? 0)} resident record${Number(address.residents || 0) === 1 ? '' : 's'}</div>
+                    </div>
+                `),
+                renderDetailsSection('Fire Records', payload?.fire_records, (record) => `
+                    <div class="barangay-details-item">
+                        <div class="barangay-details-item__title">${escapeHtml(record.date || 'Unknown')}</div>
+                        <div class="barangay-details-item__meta">${escapeHtml(record.classification || 'Fire record')} &middot; ${escapeHtml(record.cause || 'Unknown cause')} &middot; ${escapeHtml(record.count || 1)} incident${Number(record.count || 1) === 1 ? '' : 's'}</div>
+                    </div>
+                `),
+            ].join('');
+
             const escapeHtml = (value) => String(value ?? '')
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
@@ -1642,6 +1943,7 @@
                         </div>
                     `)}
                 `;
+                detailsModalBody.insertAdjacentHTML('beforeend', renderAdditionalBarangaySections(payload));
             };
 
             if (dropdownButton && dropdownMenu) {

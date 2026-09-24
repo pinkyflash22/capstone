@@ -32,6 +32,15 @@ class IncidentResponderSnapshotService
             return null;
         }
 
+        return $this->captureTeamForIncident($incident, $team);
+    }
+
+    public function captureTeamForIncident(Incident $incident, Team $team): ?IncidentResponse
+    {
+        if (! $incident->incident_id) {
+            return null;
+        }
+
         $officerIds = collect(self::TEAM_MEMBER_COLUMNS)
             ->map(fn (string $column) => $team->getAttribute($column))
             ->filter(fn ($id) => filled($id))

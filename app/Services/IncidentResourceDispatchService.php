@@ -452,6 +452,7 @@ class IncidentResourceDispatchService
             'distance_meters' => $distanceMeters, 'estimated_arrival_at' => now()->addMinutes($etaMinutes), 'dispatched_at' => now(),
         ]);
         $this->markTeamResponding($team);
+        app(IncidentResponderSnapshotService::class)->captureTeamForIncident($incident, $team);
         return $unit;
     }
 

@@ -21,7 +21,11 @@ class BarangayController extends Controller
     public function index()
     {
         $chiefCity = $this->isStationAdminRoute() ? $this->getStationAdminCity() : null;
-        $barangays = Barangay::with('city.province')
+        $barangays = Barangay::with([
+                'city.province',
+                'hall.marker',
+                'hall.address',
+            ])
             ->withCount([
                 'boundaryLocations',
                 'stations',
@@ -122,6 +126,11 @@ class BarangayController extends Controller
             'boundaryLocations',
             'historicalFireIncidents',
             'stations.address.barangay.city',
+            'barangayOfficers.user',
+            'mitigationActions',
+            'aiActionPlanChecklists',
+            'aiRecommendationSuggestions',
+            'fireRecords',
         ]);
 
         $residentCount = $barangay->fullAddresses
@@ -211,6 +220,59 @@ class BarangayController extends Controller
                                 'damage' => $historicalIncident->estimated_damage !== null
                                     ? 'PHP ' . number_format((float) $historicalIncident->estimated_damage, 2)
                                     : 'Not recorded',
+                            ])->values(),
+                        'barangay_officers' => $barangay->barangayOfficers
+                            ->sortBy('position')
+                            ->map(fn ($officer) => [
+                                'name' => trim(collect([
+                                    $officer->user?->first_name,
+                                    $officer->user?->middle_name,
+                                    $officer->user?->last_name,
+                                ])->filter()->implode(' ')) ?: 'Officer #' . $officer->barangay_officer_id,
+                                'position' => $officer->position ?? 'Barangay officer',
+                                'status' => $officer->status ?? 'Unknown',
+                            ])->values(),
+                        'mitigation_actions' => $barangay->mitigationActions
+                            ->sortByDesc('updated_at')
+                            ->take(8)
+                            ->map(fn ($action) => [
+                                'title' => $action->title ?? 'Mitigation action',
+                                'priority' => $action->priority_level ?? 'Normal',
+                                'status' => $action->status ?? 'Unknown',
+                                'target_date' => optional($action->target_date)->format('M d, Y') ?? 'No target date',
+                            ])->values(),
+                        'action_plan_checklists' => $barangay->aiActionPlanChecklists
+                            ->sortByDesc('updated_at')
+                            ->take(8)
+                            ->map(fn ($checklist) => [
+                                'title' => $checklist->plan_title ?? $checklist->source_title ?? 'Action plan',
+                                'priority' => $checklist->priority_level ?? 'Normal',
+                                'status' => $checklist->status ?? 'Unknown',
+                                'target_date' => optional($checklist->target_date)->format('M d, Y') ?? 'No target date',
+                            ])->values(),
+                        'recommendations' => $barangay->aiRecommendationSuggestions
+                            ->sortByDesc('updated_at')
+                            ->take(8)
+                            ->map(fn ($suggestion) => [
+                                'title' => $suggestion->title ?? $suggestion->recommendation_title ?? 'Recommendation',
+                                'status' => $suggestion->status ?? 'Suggested',
+                                'updated_at_human' => optional($suggestion->updated_at)->diffForHumans() ?? 'Unknown',
+                            ])->values(),
+                        'addresses' => $barangay->fullAddresses
+                            ->sortBy('street')
+                            ->take(8)
+                            ->map(fn ($address) => [
+                                'street' => $address->street ?? 'Unnamed address',
+                                'residents' => $address->users?->count() ?? 0,
+                            ])->values(),
+                        'fire_records' => $barangay->fireRecords
+                            ->sortByDesc('incident_date')
+                            ->take(8)
+                            ->map(fn ($record) => [
+                                'date' => optional($record->incident_date)->format('M d, Y') ?? 'Unknown',
+                                'classification' => $record->fire_classification ?? 'Fire record',
+                                'cause' => $record->fire_cause ?? 'Unknown cause',
+                                'count' => $record->incident_count ?? 1,
                             ])->values(),
                     ],
                 ]);

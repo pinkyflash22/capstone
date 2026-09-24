@@ -276,6 +276,7 @@ Route::middleware(['web', 'auth'])->group(function () {
 Route::middleware(['web', 'auth', 'role:stationadmin,chief,firefighter,provincial admin'])->group(function () {
     Route::post('/incidents/{incident}/accept', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'respond']);
     Route::post('/incidents/{incident}/arrive', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'arrive']);
+    Route::post('/incidents/{incident}/backup', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'requestBackup']);
     Route::post('/incidents/{incident}/complete', [App\Http\Controllers\FirefighterIncidentResponseController::class, 'complete']);
 });
 Route::middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin'])->group(function () {

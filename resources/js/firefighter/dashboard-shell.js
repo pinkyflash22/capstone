@@ -878,6 +878,8 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         let statusText = 'REPORTED';
         let actionButton = '';
         let falseAlarmButton = '';
+        let backupButton = '';
+        let commandCallButton = '';
         
         if (statusId == 1) {
             statusClass = 'status-reported';
@@ -898,12 +900,32 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
                     <i class="fas fa-location-dot"></i><span>Arrived</span>
                 </button>
             `;
+            backupButton = `
+                <button type="button" class="request-backup-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--backup" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-headset"></i><span>Call Backup</span>
+                </button>
+            `;
+            commandCallButton = `
+                <button type="button" class="call-command-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--call" data-incident-id="${incident.incident_id}" data-voice-incident-id="${incident.incident_id}" data-status="${statusId}" aria-label="Call station command for incident ${incident.incident_id}">
+                    <i class="fas fa-phone"></i><span>Call Command</span>
+                </button>
+            `;
         } else if (statusId == 3) {
             statusClass = 'status-resolved';
             statusText = 'ON SCENE';
             actionButton = `
                 <button type="button" class="complete-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
                     <i class="fas fa-check-circle"></i><span>Complete</span>
+                </button>
+            `;
+            backupButton = `
+                <button type="button" class="request-backup-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--backup" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-headset"></i><span>Call Backup</span>
+                </button>
+            `;
+            commandCallButton = `
+                <button type="button" class="call-command-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--call" data-incident-id="${incident.incident_id}" data-voice-incident-id="${incident.incident_id}" data-status="${statusId}" aria-label="Call station command for incident ${incident.incident_id}">
+                    <i class="fas fa-phone"></i><span>Call Command</span>
                 </button>
             `;
         } else if (statusId == 4) {
@@ -991,6 +1013,8 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
                 <section class="ff-assigned-incident-row__units" data-response-units-for="${incident.incident_id}" aria-label="Response units for ${escapeHtml(incidentTitle)}" hidden></section>
                 <div class="ff-assigned-incident-row__actions">
                     ${actionButton}
+                    ${backupButton}
+                    ${commandCallButton}
                     ${falseAlarmButton}
                 </div>
             </article>
@@ -1025,6 +1049,25 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             const incidentId = btn.dataset.incidentId;
             const currentStatus = parseInt(btn.dataset.status);
             await completeIncident(incidentId, currentStatus, btn);
+        });
+    });
+
+    document.querySelectorAll('.request-backup-incident').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const incidentId = btn.dataset.incidentId;
+            const currentStatus = parseInt(btn.dataset.status);
+            await requestIncidentBackup(incidentId, currentStatus, btn);
+        });
+    });
+
+    document.querySelectorAll('.call-command-incident').forEach(btn => {
+        btn.addEventListener('click', async (event) => {
+            event.preventDefault();
+            if (typeof window.pyroStartVoiceCall !== 'function') {
+                showToast('Station voice calling is not ready yet', 'error');
+                return;
+            }
+            await window.pyroStartVoiceCall(btn, event);
         });
     });
     
@@ -1343,6 +1386,47 @@ async function arriveAtIncident(incidentId, currentStatusId, triggerButton = nul
         restoreIncidentActionPendingState(incidentId, pendingState);
         console.error('Error confirming incident arrival:', error);
         showToast(error.message || 'Failed to confirm arrival', 'error');
+    }
+}
+
+async function requestIncidentBackup(incidentId, currentStatusId, triggerButton = null) {
+    if (![2, 3].includes(Number(currentStatusId))) {
+        showToast('Backup can only be called during an active response', 'error');
+        return;
+    }
+
+    if (!confirm('Call an available backup team and apparatus for this incident?')) return;
+
+    const pendingState = setIncidentActionPendingState(incidentId, {
+        buttonLabel: 'Calling backup...',
+        badgeLabel: 'CALLING BACKUP...'
+    });
+
+    try {
+        const response = await fetch(`/firefighter/incidents/${incidentId}/backup`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'No backup team is available right now.');
+        }
+
+        showToast(result.message || 'Backup team dispatched.', 'success');
+        await Promise.all([
+            fetchAssignedIncidents(true),
+            refreshFirefighterLiveMap()
+        ]);
+        await refreshActiveResponseUnits(window.assignedIncidentsData || []);
+    } catch (error) {
+        restoreIncidentActionPendingState(incidentId, pendingState);
+        console.error('Error requesting incident backup:', error);
+        showToast(error.message || 'Failed to call backup', 'error');
     }
 }
 
@@ -1748,6 +1832,7 @@ function showFalseAlarmConfirmationToast() {
         const normalized = String(message || '').toLowerCase();
         const conciseMessage = type === 'success'
             ? (normalized.includes('false alarm') ? 'False alarm recorded.'
+                : normalized.includes('backup') ? 'Backup dispatched.'
                 : normalized.includes('respond') ? 'Response started.'
                 : normalized.includes('controlled') ? 'Incident marked controlled.'
                 : normalized.includes('closed') ? 'Case closed.'

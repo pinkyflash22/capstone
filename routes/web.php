@@ -653,6 +653,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/response-units/{unit}/apparatus-location', [App\Http\Controllers\ApparatusLocationController::class, 'update'])->name('response-units.apparatus-location');
         Route::post('/incidents/{incident}/respond', [FirefighterIncidentResponseController::class, 'respond'])->name('incidents.respond');
         Route::post('/incidents/{incident}/arrive', [FirefighterIncidentResponseController::class, 'arrive'])->name('incidents.arrive');
+        Route::post('/incidents/{incident}/backup', [FirefighterIncidentResponseController::class, 'requestBackup'])->name('incidents.backup');
         Route::post('/incidents/{incident}/complete', [FirefighterIncidentResponseController::class, 'complete'])->name('incidents.complete');
         Route::post('/incidents/{incident}/false-alarm', [FirefighterIncidentResponseController::class, 'falseAlarm'])->name('incidents.false-alarm');
         Route::post('/incidents/{incident}/close', [FirefighterIncidentResponseController::class, 'close'])->name('incidents.close');

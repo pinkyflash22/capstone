@@ -1155,7 +1155,7 @@
             display: flex;
             align-items: center;
             gap: 0.42rem;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             justify-content: flex-end;
             align-self: center;
             padding-left: 0.4rem;
@@ -1203,6 +1203,18 @@
             border: 1px solid rgba(248, 113, 113, 0.28);
             background: linear-gradient(180deg, #fff5f5 0%, #fff 100%);
             color: #dc2626;
+        }
+
+        .ff-assigned-incident-row__action--backup {
+            border-color: #f59e0b;
+            background: #f59e0b;
+            color: #fff;
+        }
+
+        .ff-assigned-incident-row__action--call {
+            border-color: #2563eb;
+            background: #2563eb;
+            color: #fff;
         }
 
         .ff-assigned-incident-row__action--muted {
@@ -2864,6 +2876,8 @@
         let statusText = 'REPORTED';
         let actionButton = '';
         let falseAlarmButton = '';
+        let backupButton = '';
+        let commandCallButton = '';
         
         if (statusId == 1) {
             statusClass = 'status-reported';
@@ -2881,12 +2895,32 @@
                     <i class="fas fa-truck-fast"></i><span>En Route</span>
                 </button>
             `;
+            backupButton = `
+                <button type="button" class="request-backup-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--backup" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-headset"></i><span>Call Backup</span>
+                </button>
+            `;
+            commandCallButton = `
+                <button type="button" class="call-command-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--call" data-incident-id="${incident.incident_id}" data-voice-incident-id="${incident.incident_id}" data-status="${statusId}" aria-label="Call station command for incident ${incident.incident_id}">
+                    <i class="fas fa-phone"></i><span>Call Command</span>
+                </button>
+            `;
         } else if (statusId == 3) {
             statusClass = 'status-resolved';
             statusText = 'ON SCENE';
             actionButton = `
                 <button type="button" class="complete-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--primary" data-incident-id="${incident.incident_id}" data-status="${statusId}">
                     <i class="fas fa-check-circle"></i><span>Complete</span>
+                </button>
+            `;
+            backupButton = `
+                <button type="button" class="request-backup-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--backup" data-incident-id="${incident.incident_id}" data-status="${statusId}">
+                    <i class="fas fa-headset"></i><span>Call Backup</span>
+                </button>
+            `;
+            commandCallButton = `
+                <button type="button" class="call-command-incident ff-assigned-incident-row__action ff-assigned-incident-row__action--call" data-incident-id="${incident.incident_id}" data-voice-incident-id="${incident.incident_id}" data-status="${statusId}" aria-label="Call station command for incident ${incident.incident_id}">
+                    <i class="fas fa-phone"></i><span>Call Command</span>
                 </button>
             `;
         } else if (statusId == 4) {
@@ -2967,6 +3001,8 @@
                 </button>
                 <div class="ff-assigned-incident-row__actions">
                     ${actionButton}
+                    ${backupButton}
+                    ${commandCallButton}
                     ${falseAlarmButton}
                 </div>
             </article>
@@ -3001,6 +3037,25 @@
             const incidentId = btn.dataset.incidentId;
             const currentStatus = parseInt(btn.dataset.status);
             await completeIncident(incidentId, currentStatus, btn);
+        });
+    });
+
+    document.querySelectorAll('.request-backup-incident').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const incidentId = btn.dataset.incidentId;
+            const currentStatus = parseInt(btn.dataset.status);
+            await requestIncidentBackup(incidentId, currentStatus, btn);
+        });
+    });
+
+    document.querySelectorAll('.call-command-incident').forEach(btn => {
+        btn.addEventListener('click', async (event) => {
+            event.preventDefault();
+            if (typeof window.pyroStartVoiceCall !== 'function') {
+                showToast('Station voice calling is not ready yet', 'error');
+                return;
+            }
+            await window.pyroStartVoiceCall(btn, event);
         });
     });
     
@@ -3289,6 +3344,49 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
             restoreIncidentActionPendingState(incidentId, pendingState);
             showToast('Failed to update incident status', 'error');
         }
+    }
+}
+
+async function requestIncidentBackup(incidentId, currentStatusId, triggerButton = null) {
+    if (![2, 3].includes(Number(currentStatusId))) {
+        showToast('Backup can only be called during an active response', 'error');
+        return;
+    }
+
+    if (!confirm('Call an available backup team and apparatus for this incident?')) return;
+
+    const pendingState = setIncidentActionPendingState(incidentId, {
+        buttonLabel: 'Calling backup...',
+        badgeLabel: 'CALLING BACKUP...'
+    });
+
+    try {
+        const response = await fetch(`/firefighter/incidents/${incidentId}/backup`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || 'No backup team is available right now.');
+        }
+
+        showToast(result.message || 'Backup team dispatched.', 'success');
+        await Promise.all([
+            fetchAssignedIncidents(true),
+            refreshFirefighterLiveMap()
+        ]);
+        if (typeof refreshActiveResponseUnits === 'function') {
+            await refreshActiveResponseUnits(window.assignedIncidentsData || []);
+        }
+    } catch (error) {
+        restoreIncidentActionPendingState(incidentId, pendingState);
+        console.error('Error requesting incident backup:', error);
+        showToast(error.message || 'Failed to call backup', 'error');
     }
 }
 

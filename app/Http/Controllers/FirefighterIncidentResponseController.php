@@ -77,6 +77,8 @@ class FirefighterIncidentResponseController extends Controller
     {
         $unit = $resources->requestBackup($incident, (int) Auth::id());
         $source = $unit->dispatch_source === 'same_station' ? 'your station' : ($unit->station?->station_name ?: 'the nearest available station');
+        UserActivityLogger::log("requested backup run {$unit->run_number} for incident #{$incident->incident_id}", Auth::id(), request());
+
         return response()->json([
             'success' => true,
             'message' => "Backup run {$unit->run_number} dispatched from {$source}.",
