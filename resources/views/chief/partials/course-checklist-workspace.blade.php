@@ -243,7 +243,12 @@
         </div>
 
         @if ($checklists->hasPages())
-            <div class="checklist-pagination">{{ $checklists->onEachSide(1)->links() }}</div>
+            @include('chief.partials.pagination', [
+                'paginator' => $checklists,
+                'ariaLabel' => 'Checklist pagination',
+                'summaryLabel' => 'checklists',
+                'class' => 'checklist-pagination',
+            ])
         @endif
     </section>
 </div>

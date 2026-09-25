@@ -274,48 +274,45 @@
 
         .barangay-card-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-            gap: 18px;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 24px;
             padding: 18px;
             overflow: visible;
         }
 
         .barangay-tile {
             position: relative;
-            display: flex;
-            flex-direction: column;
             min-width: 0;
-            border: 1px solid rgba(226, 232, 240, 0.95);
-            border-radius: 18px;
-            background: #fff;
-            box-shadow: 0 16px 36px rgba(15, 23, 42, 0.07);
+            min-height: 390px;
+            border: 0;
+            border-radius: 22px;
+            background: #0f172a;
+            box-shadow: 0 24px 42px rgba(15, 23, 42, 0.18);
             overflow: hidden;
-            transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+            isolation: isolate;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
         }
 
         .barangay-tile:hover {
-            transform: translateY(-2px);
-            border-color: #fed7aa;
-            box-shadow: 0 22px 44px rgba(15, 23, 42, 0.1);
+            transform: translateY(-4px);
+            box-shadow: 0 32px 54px rgba(15, 23, 42, 0.24);
         }
 
         .barangay-tile__open {
-            display: flex;
-            flex-direction: column;
-            min-width: 0;
-            flex: 1;
+            position: absolute;
+            inset: 0;
+            z-index: 2;
             padding: 0;
             border: 0;
             background: transparent;
-            text-align: left;
             cursor: pointer;
         }
 
         .barangay-tile__media {
-            position: relative;
-            height: 168px;
-            overflow: hidden;
-            background: linear-gradient(135deg, #f8fafc 0%, #fff7ed 100%);
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background: linear-gradient(135deg, #dbeafe 0%, #fef3c7 55%, #fee2e2 100%);
         }
 
         .barangay-tile__media img {
@@ -331,11 +328,11 @@
             inset: 0;
             display: grid;
             place-items: center;
-            color: #c2410c;
+            color: rgba(255, 255, 255, 0.86);
             font-size: 42px;
             background:
-                linear-gradient(135deg, rgba(255, 247, 237, 0.94), rgba(248, 250, 252, 0.94)),
-                repeating-linear-gradient(45deg, rgba(194, 65, 12, 0.08) 0 1px, transparent 1px 18px);
+                linear-gradient(145deg, rgba(22, 101, 52, 0.75), rgba(15, 23, 42, 0.46)),
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.09) 0 1px, transparent 1px 18px);
         }
 
         .barangay-tile__media.is-empty::after {
@@ -344,25 +341,56 @@
             font-weight: 900;
         }
 
+        .barangay-tile::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            background:
+                linear-gradient(180deg, rgba(15, 23, 42, 0.04) 0%, rgba(15, 23, 42, 0.1) 36%, rgba(15, 23, 42, 0.72) 100%),
+                linear-gradient(90deg, rgba(15, 23, 42, 0.22), rgba(15, 23, 42, 0));
+            pointer-events: none;
+        }
+
+        .barangay-visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
         .barangay-tile__badge {
             position: absolute;
-            left: 12px;
-            bottom: 12px;
+            left: 18px;
+            top: 18px;
+            z-index: 3;
             display: inline-flex;
             align-items: center;
             min-height: 28px;
             padding: 0 10px;
             border-radius: 999px;
-            background: rgba(15, 23, 42, 0.78);
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(10px);
             color: #fff;
             font-size: 11px;
             font-weight: 900;
         }
 
         .barangay-tile__body {
+            position: absolute;
+            left: 18px;
+            right: 18px;
+            bottom: 18px;
+            z-index: 3;
             display: grid;
-            gap: 10px;
-            padding: 16px 16px 14px;
+            gap: 9px;
+            color: #fff;
+            pointer-events: none;
         }
 
         .barangay-tile__heading {
@@ -370,7 +398,7 @@
         }
 
         .barangay-tile__kicker {
-            color: #c2410c;
+            color: rgba(255, 255, 255, 0.78);
             font-size: 10px;
             font-weight: 900;
             letter-spacing: 0.1em;
@@ -379,11 +407,12 @@
 
         .barangay-tile__heading h2 {
             margin: 3px 0 0;
-            color: #0f1d44;
-            font-size: 20px;
+            color: #fff;
+            font-size: 25px;
             font-weight: 900;
             line-height: 1.12;
             overflow-wrap: anywhere;
+            text-shadow: 0 2px 14px rgba(15, 23, 42, 0.35);
         }
 
         .barangay-tile__location,
@@ -392,49 +421,78 @@
             grid-template-columns: 18px minmax(0, 1fr);
             gap: 8px;
             align-items: start;
-            color: #475569;
+            color: rgba(255, 255, 255, 0.86);
             font-size: 13px;
             line-height: 1.35;
         }
 
         .barangay-tile__location i,
         .barangay-tile__coordinates i {
-            color: #c2410c;
+            color: rgba(255, 255, 255, 0.92);
             margin-top: 2px;
+        }
+
+        .barangay-tile__meta {
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.35;
         }
 
         .barangay-tile__records {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 8px;
-            margin-top: 2px;
+            display: none;
         }
 
-        .barangay-tile__records span {
-            min-width: 0;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            background: #f8fafc;
-            padding: 8px 9px;
-            color: #64748b;
-            font-size: 11px;
-            font-weight: 800;
-            line-height: 1.2;
-        }
-
-        .barangay-tile__records strong {
-            display: block;
-            color: #0f1d44;
-            font-size: 16px;
-            font-weight: 900;
-            line-height: 1;
-            margin-bottom: 3px;
-        }
-
-        .barangay-tile__actions {
+        .barangay-tile__edit {
+            position: relative;
+            z-index: 4;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
             justify-content: space-between;
-            gap: 8px;
-            padding: 0 16px 16px;
+            gap: 12px;
+            width: 100%;
+            min-height: 52px;
+            margin-top: 8px;
+            padding: 0 17px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 15px;
+            background: rgba(15, 23, 42, 0.36);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 850;
+            backdrop-filter: blur(16px);
+            cursor: pointer;
+            transition: background 0.18s ease, transform 0.18s ease;
+        }
+
+        .barangay-tile__edit:hover {
+            background: rgba(15, 23, 42, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .barangay-tile__delete {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 4;
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 999px;
+            background: rgba(15, 23, 42, 0.42);
+            color: #fff;
+            backdrop-filter: blur(12px);
+            cursor: pointer;
+            transition: background 0.18s ease, transform 0.18s ease;
+        }
+
+        .barangay-tile__delete:hover {
+            background: rgba(220, 38, 38, 0.82);
+            transform: scale(1.04);
         }
 
         .barangay-notice-layer {
@@ -528,12 +586,6 @@
             padding: 42px 20px;
             text-align: center;
             color: #64748b;
-            grid-column: 1 / -1;
-        }
-
-        .barangay-pagination {
-            padding: 18px 20px;
-            border-top: 1px solid #edf2f7;
             grid-column: 1 / -1;
         }
 
@@ -638,6 +690,53 @@
             font-weight: 700;
             background: #fff;
             outline: none;
+        }
+
+        .barangay-input--file {
+            display: flex;
+            align-items: center;
+            padding: 12px 14px;
+            height: auto;
+            line-height: 1.3;
+        }
+
+        .barangay-field-note {
+            margin-top: 7px;
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .barangay-image-preview {
+            display: none;
+            margin-top: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            overflow: hidden;
+            background: #f8fafc;
+        }
+
+        .barangay-image-preview.is-visible {
+            display: block;
+        }
+
+        .barangay-image-preview__frame {
+            aspect-ratio: 16 / 9;
+            background: linear-gradient(135deg, #f8fafc, #fff7ed);
+        }
+
+        .barangay-image-preview__frame img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .barangay-image-preview__caption {
+            padding: 9px 12px;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 800;
         }
 
         .barangay-readonly {
@@ -938,6 +1037,7 @@
 
             .barangay-tile {
                 border-radius: 16px;
+                min-height: 340px;
             }
 
             .barangay-tile__media {
@@ -1081,10 +1181,6 @@
             .barangay-empty {
                 padding: 28px 14px;
                 font-size: 12px;
-            }
-
-            .barangay-pagination {
-                padding: 14px 12px;
             }
 
             .barangay-modal-backdrop {
@@ -1418,12 +1514,11 @@
                         $locationLine = $barangay->hall?->address?->street
                             ? $barangay->hall->address->street . ', ' . $cityProvince
                             : $cityProvince;
-                        $primaryRecords = [
-                            ['label' => 'Addresses', 'count' => (int) ($barangay->full_addresses_count ?? 0)],
-                            ['label' => 'Boundaries', 'count' => (int) ($barangay->boundary_locations_count ?? 0)],
-                            ['label' => 'Stations', 'count' => (int) ($barangay->stations_count ?? 0)],
-                            ['label' => 'Risks', 'count' => (int) ($barangay->risk_areas_count ?? 0)],
-                        ];
+                        $recordSummary = collect([
+                            ((int) ($barangay->boundary_locations_count ?? 0)) . ' Boundaries',
+                            ((int) ($barangay->stations_count ?? 0)) . ' Stations',
+                            ((int) ($barangay->risk_areas_count ?? 0)) . ' Risks',
+                        ])->join(' / ');
                         $deleteSummary = json_encode([
                             ['label' => 'Addresses', 'count' => (int) ($barangay->full_addresses_count ?? 0)],
                             ['label' => 'Boundary Records', 'count' => (int) ($barangay->boundary_locations_count ?? 0)],
@@ -1447,69 +1542,54 @@
                             data-details-url="{{ route('station-admin.barangays.show', $barangay) }}"
                             aria-label="Open records for {{ $barangay->barangay_name }}"
                         >
-                            <div class="barangay-tile__media">
-                                @if ($barangayImageUrl)
-                                    <img src="{{ $barangayImageUrl }}" alt="{{ $barangay->barangay_name }} barangay photo" loading="lazy" onerror="this.remove(); this.closest('.barangay-tile__media').classList.add('is-empty');">
-                                @else
-                                    <div class="barangay-tile__fallback" aria-hidden="true">
-                                        <i class="fa-solid fa-map-location-dot"></i>
-                                    </div>
-                                @endif
-                                <span class="barangay-tile__badge">{{ $barangay->hall?->hall_name ? 'Hall linked' : 'No hall yet' }}</span>
-                            </div>
-                            <div class="barangay-tile__body">
-                                <div class="barangay-tile__heading">
-                                    <span class="barangay-tile__kicker">Barangay</span>
-                                    <h2>{{ $barangay->barangay_name }}</h2>
-                                </div>
-                                <div class="barangay-tile__location">
-                                    <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
-                                    <span>{{ $locationLine }}</span>
-                                </div>
-                                <div class="barangay-tile__coordinates">
-                                    <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
-                                    <span>{{ $coordinates }}</span>
-                                </div>
-                                <div class="barangay-tile__records" aria-label="Connected record counts">
-                                    @foreach ($primaryRecords as $record)
-                                        <span><strong>{{ $record['count'] }}</strong>{{ $record['label'] }}</span>
-                                    @endforeach
-                                </div>
-                            </div>
+                            <span class="barangay-visually-hidden">Open records for {{ $barangay->barangay_name }}</span>
                         </button>
-                        <div class="barangay-actions barangay-tile__actions">
+                        <div class="barangay-tile__media">
+                            @if ($barangayImageUrl)
+                                <img src="{{ $barangayImageUrl }}" alt="{{ $barangay->barangay_name }} barangay photo" loading="lazy" onerror="this.remove(); this.closest('.barangay-tile__media').classList.add('is-empty');">
+                            @else
+                                <div class="barangay-tile__fallback" aria-hidden="true">
+                                    <i class="fa-solid fa-map-location-dot"></i>
+                                </div>
+                            @endif
+                        </div>
+                        <span class="barangay-tile__badge">{{ $barangay->hall?->hall_name ? 'Hall linked' : 'No hall yet' }}</span>
+                        <button
+                            type="button"
+                            class="barangay-tile__delete"
+                            data-barangay-delete-trigger
+                            data-delete-url="{{ route('station-admin.barangays.destroy', $barangay) }}"
+                            data-barangay-name="{{ $barangay->barangay_name }}"
+                            data-delete-summary="{{ $deleteSummary }}"
+                            aria-label="Delete {{ $barangay->barangay_name }}"
+                            title="Delete"
+                        >
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                        <div class="barangay-tile__body">
+                            <div class="barangay-tile__heading">
+                                <span class="barangay-tile__kicker">Barangay</span>
+                                <h2>{{ $barangay->barangay_name }}</h2>
+                            </div>
+                            <p class="barangay-tile__meta">{{ $recordSummary }}</p>
+                            <div class="barangay-tile__location">
+                                <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                                <span>{{ $locationLine }}</span>
+                            </div>
+                            <div class="barangay-tile__coordinates">
+                                <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
+                                <span>{{ $coordinates }}</span>
+                            </div>
                             <button
                                 type="button"
-                                class="barangay-icon-button"
-                                data-barangay-details-trigger
-                                data-details-url="{{ route('station-admin.barangays.show', $barangay) }}"
-                                aria-label="View barangay details"
-                                title="View details"
-                            >
-                                <i class="fa-solid fa-eye" aria-hidden="true"></i>
-                            </button>
-                            <button
-                                type="button"
-                                class="barangay-icon-button"
+                                class="barangay-tile__edit"
                                 data-barangay-edit-trigger
                                 data-barangay-id="{{ $barangay->barangay_id }}"
                                 data-barangay-name="{{ $barangay->barangay_name }}"
-                                aria-label="Edit barangay"
-                                title="Edit"
+                                aria-label="Edit {{ $barangay->barangay_name }}"
                             >
-                                <i class="fa-solid fa-pen" aria-hidden="true"></i>
-                            </button>
-                            <button
-                                type="button"
-                                class="barangay-icon-button barangay-icon-button--danger"
-                                data-barangay-delete-trigger
-                                data-delete-url="{{ route('station-admin.barangays.destroy', $barangay) }}"
-                                data-barangay-name="{{ $barangay->barangay_name }}"
-                                data-delete-summary="{{ $deleteSummary }}"
-                                aria-label="Delete barangay"
-                                title="Delete"
-                            >
-                                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                                <span>Edit</span>
+                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
                             </button>
                         </div>
                     </article>
@@ -1520,10 +1600,12 @@
                     </div>
                 @endforelse
 
-                @if ($barangays->hasPages())
-                    <div class="barangay-pagination">
-                        {{ $barangays->links() }}
-                    </div>
+                @if ($barangays->total() > 0)
+                    @include('chief.partials.pagination', [
+                        'paginator' => $barangays,
+                        'ariaLabel' => 'Barangay pagination',
+                        'summaryLabel' => 'barangays',
+                    ])
                 @endif
             </section>
         </div>
@@ -1605,7 +1687,7 @@
                 <div>
                     <div class="barangay-modal__eyebrow">Edit</div>
                     <h2 id="barangayEditModalTitle" class="barangay-modal__title">Edit</h2>
-                    <p class="barangay-modal__copy">Update the name.</p>
+                    <p class="barangay-modal__copy">Update the name and card image.</p>
                 </div>
                 <button type="button" class="barangay-modal__close" data-barangay-modal-close="barangayEditModal" aria-label="Close edit barangay modal">
                     <i class="fa-solid fa-xmark"></i>
@@ -1618,6 +1700,7 @@
                     action="{{ route('station-admin.barangays.update', ['barangay' => '__BARANGAY__']) }}"
                     data-action-template="{{ route('station-admin.barangays.update', ['barangay' => '__BARANGAY__']) }}"
                     data-loading-submit-form
+                    enctype="multipart/form-data"
                 >
                     @csrf
                     @method('PUT')
@@ -1643,6 +1726,29 @@
                         >
                         @if (old('_modal_mode') === 'edit')
                             @error('barangay_name')
+                                <p class="barangay-error">{{ $message }}</p>
+                            @enderror
+                        @endif
+                    </div>
+
+                    <div class="barangay-field">
+                        <label for="edit_barangay_card_image" class="barangay-label">Card image</label>
+                        <input
+                            id="edit_barangay_card_image"
+                            name="barangay_card_image"
+                            type="file"
+                            class="barangay-input barangay-input--file"
+                            accept="image/jpeg,image/png,image/webp"
+                        >
+                        <p class="barangay-field-note">JPG, PNG, or WebP up to 5 MB. This updates the barangay card photo.</p>
+                        <div id="barangayImagePreview" class="barangay-image-preview" aria-live="polite">
+                            <div class="barangay-image-preview__frame">
+                                <img id="barangayImagePreviewImg" src="" alt="Selected barangay card image preview">
+                            </div>
+                            <div id="barangayImagePreviewCaption" class="barangay-image-preview__caption">Preview before saving</div>
+                        </div>
+                        @if (old('_modal_mode') === 'edit')
+                            @error('barangay_card_image')
                                 <p class="barangay-error">{{ $message }}</p>
                             @enderror
                         @endif
@@ -1717,6 +1823,10 @@
             const detailsModalBody = document.getElementById('barangayDetailsModalBody');
             const editForm = document.getElementById('barangayEditForm');
             const editNameInput = document.getElementById('edit_barangay_name');
+            const editImageInput = document.getElementById('edit_barangay_card_image');
+            const editImagePreview = document.getElementById('barangayImagePreview');
+            const editImagePreviewImg = document.getElementById('barangayImagePreviewImg');
+            const editImagePreviewCaption = document.getElementById('barangayImagePreviewCaption');
             const editBarangayIdInput = document.getElementById('editing_barangay_id');
             const editFormActionTemplate = editForm?.dataset.actionTemplate || '';
             const deleteForm = document.getElementById('barangayDeleteForm');
@@ -1729,6 +1839,37 @@
             const forceDeleteRelatedInput = document.getElementById('force_delete_related');
             const pageNotice = document.getElementById('barangayPageNotice');
             const pageNoticeClose = document.getElementById('barangayPageNoticeClose');
+            let editImagePreviewUrl = null;
+
+            const clearEditImagePreview = () => {
+                if (editImagePreviewUrl) {
+                    URL.revokeObjectURL(editImagePreviewUrl);
+                    editImagePreviewUrl = null;
+                }
+
+                editImagePreviewImg?.removeAttribute('src');
+                if (editImagePreviewCaption) {
+                    editImagePreviewCaption.textContent = 'Preview before saving';
+                }
+                editImagePreview?.classList.remove('is-visible');
+            };
+
+            const showEditImagePreview = (file) => {
+                clearEditImagePreview();
+
+                if (!file || !file.type.startsWith('image/')) {
+                    return;
+                }
+
+                editImagePreviewUrl = URL.createObjectURL(file);
+                if (editImagePreviewImg) {
+                    editImagePreviewImg.src = editImagePreviewUrl;
+                }
+                if (editImagePreviewCaption) {
+                    editImagePreviewCaption.textContent = `${file.name} (${Math.ceil(file.size / 1024)} KB)`;
+                }
+                editImagePreview?.classList.add('is-visible');
+            };
 
             const openModal = (modal) => {
                 if (!modal) {
@@ -1754,6 +1895,9 @@
 
                 modal.classList.remove('active');
                 modal.setAttribute('aria-hidden', 'true');
+                if (modal === editModal) {
+                    clearEditImagePreview();
+                }
                 if (!document.querySelector('.barangay-modal-backdrop.active') && !document.getElementById('chiefLogoutConfirmModal')?.classList.contains('active')) {
                     document.body.classList.remove('menu-open');
                 }
@@ -2008,6 +2152,10 @@
                 });
             });
 
+            editImageInput?.addEventListener('change', () => {
+                showEditImagePreview(editImageInput.files?.[0] || null);
+            });
+
             document.querySelectorAll('[data-barangay-edit-trigger]').forEach((trigger) => {
                 trigger.addEventListener('click', () => {
                     const barangayId = trigger.getAttribute('data-barangay-id');
@@ -2018,6 +2166,10 @@
 
                     editForm.action = editFormActionTemplate.replace('__BARANGAY__', barangayId);
                     editNameInput.value = barangayName;
+                    if (editImageInput) {
+                        editImageInput.value = '';
+                    }
+                    clearEditImagePreview();
                     editBarangayIdInput.value = barangayId;
                     openModal(editModal);
                 });
@@ -2066,7 +2218,7 @@
                 openModal(createModal);
             }
 
-            if ({{ old('_modal_mode') === 'edit' && $errors->has('barangay_name') ? 'true' : 'false' }}) {
+            if ({{ old('_modal_mode') === 'edit' && ($errors->has('barangay_name') || $errors->has('barangay_card_image')) ? 'true' : 'false' }}) {
                 const editingBarangayId = '{{ old('editing_barangay_id') }}';
                 if (editForm && editFormActionTemplate && editingBarangayId) {
                     editForm.action = editFormActionTemplate.replace('__BARANGAY__', editingBarangayId);

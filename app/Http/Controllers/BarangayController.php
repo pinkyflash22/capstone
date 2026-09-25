@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rule;
 
 class BarangayController extends Controller
@@ -305,6 +306,7 @@ class BarangayController extends Controller
 
         $validated = $request->validate([
             'barangay_name' => 'required|string|max:255',
+            'barangay_card_image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'city_id' => $this->isStationAdminRoute()
                 ? ['nullable']
                 : [
@@ -317,7 +319,27 @@ class BarangayController extends Controller
             $validated['city_id'] = $this->getStationAdminCityId();
         }
 
-        $barangay->update($validated);
+        if ($request->hasFile('barangay_card_image')) {
+            $barangay->loadMissing('hall.marker');
+
+            if (! $barangay->hall?->marker) {
+                throw ValidationException::withMessages([
+                    'barangay_card_image' => 'Link this barangay to a hall marker before uploading a card image.',
+                ]);
+            }
+        }
+
+        DB::transaction(function () use ($barangay, $validated, $request) {
+            $barangay->update([
+                'barangay_name' => $validated['barangay_name'],
+                'city_id' => $validated['city_id'] ?? $barangay->city_id,
+            ]);
+
+            if ($request->hasFile('barangay_card_image')) {
+                $path = $request->file('barangay_card_image')->store('barangays', 'public');
+                $barangay->hall->marker->forceFill(['image' => $path])->save();
+            }
+        });
 
         return redirect()->route($this->scopedBarangayRoute('index'))
             ->with('success', 'Barangay updated successfully.');

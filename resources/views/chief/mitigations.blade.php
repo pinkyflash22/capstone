@@ -114,10 +114,6 @@
         .mitigation-workflow-note p { margin:3px 0 0; color:#b45309; font-size:.72rem; line-height:1.5; }
         .mitigation-upload-field input[type="file"] { padding:9px; background:#f8fafc; }
         .mitigation-upload-field input[type="file"]::file-selector-button { min-height:30px; margin-right:10px; padding:0 12px; border:0; border-radius:9px; color:#9a3412; background:#ffedd5; font-weight:800; cursor:pointer; }
-        .table-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 4px 0; color:#64748b; font-size:.82rem; }
-        .table-pagination nav { display:flex; gap:6px; flex-wrap:wrap; }
-        .table-pagination a, .table-pagination span { display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:34px; padding:0 10px; border:1px solid #e2e8f0; border-radius:10px; color:#475569; text-decoration:none; font-weight:800; background:#fff; }
-        .table-pagination .active span { color:#fff; background:#f97316; border-color:#f97316; }
         .mitigation-field textarea { min-height:96px; resize:vertical; }
         .filter-actions { display:flex; gap:10px; align-items:flex-end; justify-content:flex-end; }
         .attachments { display:flex; flex-direction:column; gap:8px; }
@@ -506,7 +502,6 @@
             .row-actions .row-btn { width: 32px; min-width: 32px; min-height: 32px; padding: 0; justify-content: center; border-radius: 10px; }
             .row-btn.primary-view { width: 32px; min-height: 32px; padding: 0; }
             .row-btn.primary-view span { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
-            .table-pagination { margin-top: 9px; padding: 11px; border: 1px solid #e2e8f0; border-radius: 15px; background: #fff; }
         }
 
         @media (max-width: 390px) {
@@ -520,6 +515,142 @@
     </style>
     @include('chief.partials.workflow-presentation')
     @include('chief.partials.mitigation-presentation')
+    <style>
+        .mitigation-stats-strip { margin: 0 0 14px; }
+        .mitigation-stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+        .mitigation-stat-card { min-height: 76px; padding: 13px 14px; border: 1px solid #E9E5DE; border-left-width: 3px; border-radius: 14px; background: #fff; box-shadow: none; }
+        .mitigation-stat-card--high { border-left-color: #B23A22; }
+        .mitigation-stat-card--approval { border-left-color: #A5680B; }
+        .mitigation-stat-card--progress { border-left-color: #3A6FB0; }
+        .mitigation-stat-card--complete { border-left-color: #1E7A4C; }
+        .mitigation-stat-card__label { color: #64748b; font-size: 11px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+        .mitigation-stat-card__value { margin-top: 7px; color: #0f172a; font-size: 24px; line-height: 1; font-weight: 900; }
+        .mitigation-attention { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px !important; }
+        .mitigation-attention .mitigation-attention-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 12px; border: 1px solid #d7dce5; border-radius: 999px; background: #fff; color: #5f6673; font-size: 12px; font-weight: 850; text-decoration: none; box-shadow: none; }
+        .mitigation-attention .mitigation-attention-chip.is-hot { border-color: #F0C7BA; background: #FBEAE4; color: #B23A22; }
+        .mitigation-attention .mitigation-attention-chip:hover { border-color: #cbd5e1; background: #f8fafc; }
+        .mitigation-attention .mitigation-attention-chip.is-hot:hover { border-color: #E8AD9C; background: #FBEAE4; }
+        .mitigation-register-table { border-collapse: separate; border-spacing: 0; }
+        .mitigation-register-table tbody tr { position: relative; box-shadow: none; }
+        .mitigation-register-table tbody tr td { border-bottom: 1px solid #E9E5DE; background: #fff; }
+        .mitigation-register-table tbody tr:last-child td { border-bottom: 1px solid #E9E5DE; }
+        .mitigation-register-table tbody tr:hover td { background: #fffaf5; }
+        .mitigation-register-table td[data-label="Plan"] { position: relative; padding-left: 19px; }
+        .mitigation-priority-bar { position: absolute; inset: 0 auto 0 0; width: 5px; background: #A5680B; }
+        .mitigation-priority-bar.is-high { background: #B23A22; }
+        .mitigation-priority-bar.is-medium { background: #A5680B; }
+        .mitigation-priority-bar.is-low { background: #1E7A4C; }
+        .register-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 11px; }
+        .register-tag { display: inline-flex; align-items: center; gap: 6px; min-height: 27px; padding: 0 10px; border-radius: 999px; font-size: 10px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; line-height: 1; }
+        .register-tag--category { border: 1px solid #d7dce5; background: #fff; color: #5f6673; }
+        .register-tag--ai { border: 1px solid #E4D8F6; background: #F3EEFB; color: #7A4FB8; }
+        .register-tag--revision { margin-left: 4px; border: 1px solid #F7D5C7; background: #FCEEE7; color: #B8461C; }
+        .register-tag--overdue { border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; }
+        .priority-pill { display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 11px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+        .priority-pill::before, .state-label::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: currentColor; flex: 0 0 7px; }
+        .priority-pill.is-high { background: #FBEAE4; color: #B23A22; }
+        .priority-pill.is-medium { background: #FBF0DD; color: #A5680B; }
+        .priority-pill.is-low { background: #E7F5EC; color: #1E7A4C; }
+        .state-label { display: inline-flex; align-items: center; gap: 7px; min-height: 24px; color: #6B6E76; font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+        .state-label.is-approved, .state-label.is-completed { color: #1E7A4C; }
+        .state-label.is-blocked { color: #B23A22; }
+        .owner-chip { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .owner-avatar { display: inline-flex; align-items: center; justify-content: center; width: 31px; height: 31px; border-radius: 999px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; font-size: 10px; font-weight: 900; letter-spacing: .04em; flex: 0 0 31px; }
+        .owner-avatar.is-empty { border-style: dashed; background: #fff; color: #94a3b8; }
+        .register-owner.is-unassigned { color: #8a9099; font-style: italic; font-weight: 700; }
+        .register-due { display: inline-flex; align-items: center; gap: 6px; }
+        .row-actions { align-items: center; justify-content: flex-end; }
+        .action-menu { position: relative; display: inline-flex; }
+        .action-menu summary { list-style: none; }
+        .action-menu summary::-webkit-details-marker { display: none; }
+        .action-menu__panel { position: absolute; right: 0; top: calc(100% + 7px); z-index: 25; min-width: 168px; padding: 6px; border: 1px solid #E9E5DE; border-radius: 12px; background: #fff; box-shadow: 0 16px 34px rgba(15, 23, 42, .12); }
+        .action-menu__item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #B23A22; font-size: 12px; font-weight: 800; text-align: left; cursor: pointer; }
+        .action-menu__item:hover { background: #FCEEE7; }
+        .mitigation-ai-saved .insight-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
+        .mitigation-ai-saved .ai-draft-card { display: flex !important; flex-direction: column; gap: 13px; min-width: 0; padding: 16px !important; border: 1px solid #E9E5DE; border-radius: 16px; background: #fff; box-shadow: none !important; }
+        .mitigation-ai-saved .ai-draft-card__head { display: flex !important; align-items: flex-start; justify-content: space-between; gap: 10px; min-width: 0; }
+        .mitigation-ai-saved .ai-draft-card__title { margin: 0; color: #0f172a; font-size: 18px; line-height: 1.18; font-weight: 800; letter-spacing: 0; }
+        .mitigation-ai-saved .ai-draft-card__subtitle { margin: 5px 0 0; color: #6b7280; font-size: 13px; line-height: 1.45; font-weight: 500; }
+        .mitigation-ai-saved .ai-draft-card__badges { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; flex: 0 0 auto; }
+        .ai-draft-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 9px; border-radius: 999px; font-size: 10px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+        .ai-draft-pill--risk.is-medium, .ai-draft-pill--risk.is-moderate { background: #FBF0DD; color: #A5680B; }
+        .ai-draft-pill--risk.is-low { background: #E7F5EC; color: #1E7A4C; }
+        .ai-draft-pill--risk.is-high, .ai-draft-pill--risk.is-critical { background: #FBEAE4; color: #B23A22; }
+        .ai-draft-pill--ai { background: #F3EEFB; color: #7A4FB8; }
+        .ai-draft-tag { display: inline-flex; align-items: center; width: fit-content; min-height: 25px; padding: 0 9px; border: 1px solid #d7dce5; border-radius: 999px; background: #fff; color: #5f6673; font-size: 10px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+        .mitigation-ai-saved .ai-draft-card__summary { display: block !important; margin: 0; color: #4b5563; font-size: 13px; line-height: 1.55; font-weight: 450; }
+        .mitigation-ai-saved .ai-draft-card__footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid #E9E5DE; }
+        .ai-draft-ready-chip { display: inline-flex; align-items: center; min-height: 26px; padding: 0 9px; border-radius: 999px; background: #F0EEEA; color: #4A4E58; font-size: 10px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+        .mitigation-ai-saved .ai-draft-card__actions { display: flex !important; align-items: center; gap: 8px; min-width: 0; }
+        .mitigation-ai-saved .ai-draft-action { width: auto !important; min-width: 0 !important; min-height: 36px !important; padding: 0 12px !important; border-radius: 10px !important; box-shadow: none !important; font-size: 12px; }
+        .mitigation-ai-saved .ai-draft-action span { position: static !important; width: auto !important; height: auto !important; margin: 0 !important; clip: auto !important; overflow: visible !important; white-space: nowrap !important; }
+        .mitigation-ai-saved .ai-draft-action--primary { background: #B23A22; color: #fff; }
+        .mitigation-ai-saved .ai-draft-action--secondary { border: 1px solid #E9E5DE; background: #fff; color: #4A4E58; }
+        .suggestion-scan-help { display: inline-flex; align-items: center; gap: 6px; width: fit-content; margin-top: 7px !important; padding: 5px 8px; border-radius: 999px; background: #f0fdf4; color: #166534; font-size: 11px !important; font-weight: 750; line-height: 1.25; }
+        .mitigation-ai-recommendations .insight-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
+        .mitigation-ai-recommendations .suggestion-card { display: flex !important; flex-direction: column; gap: 13px; min-width: 0; padding: 16px !important; border: 1px solid #E9E5DE; border-radius: 16px; background: #fff; box-shadow: none !important; }
+        .suggestion-card__head { display: flex !important; align-items: flex-start; justify-content: space-between; gap: 10px; min-width: 0; }
+        .suggestion-card__title { margin: 0; color: #0f172a; font-size: 18px; line-height: 1.18; font-weight: 800; letter-spacing: 0; }
+        .suggestion-card__subtitle { margin: 5px 0 0; color: #6b7280; font-size: 13px; line-height: 1.45; font-weight: 500; }
+        .suggestion-card__badges { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 7px; flex: 0 0 auto; }
+        .suggestion-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 0 9px; border-radius: 999px; font-size: 10px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+        .suggestion-pill--risk.is-low { background: #E7F5EC; color: #1E7A4C; }
+        .suggestion-pill--risk.is-medium, .suggestion-pill--risk.is-moderate { background: #FBF0DD; color: #A5680B; }
+        .suggestion-pill--risk.is-high, .suggestion-pill--risk.is-critical { background: #FBEAE4; color: #B23A22; }
+        .suggestion-pill--type { background: #EAF1FB; color: #3A6FB0; }
+        .suggestion-card__category { display: inline-flex; align-items: center; width: fit-content; min-height: 25px; padding: 0 9px; border: 1px solid #d7dce5; border-radius: 999px; background: #fff; color: #5f6673; font-size: 10px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+        .suggestion-card__summary { display: block !important; margin: 0; color: #4b5563; font-size: 13px; line-height: 1.55; font-weight: 450; }
+        .suggestion-card__footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 10px; border-top: 1px solid #E9E5DE; }
+        .suggestion-card__actions { display: flex !important; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; margin-left: auto; }
+        .suggestion-action { width: auto !important; min-width: 0 !important; min-height: 36px !important; padding: 0 12px !important; border-radius: 10px !important; box-shadow: none !important; font-size: 12px; }
+        .suggestion-action span { position: static !important; width: auto !important; height: auto !important; margin: 0 !important; clip: auto !important; overflow: visible !important; white-space: nowrap !important; }
+        .suggestion-action--view { width: 36px !important; padding: 0 !important; justify-content: center; border: 1px solid #E9E5DE; background: #fff; color: #4A4E58; }
+        .suggestion-action--view span { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; }
+        .suggestion-action--dismiss { border: 1px solid #F1B9A9; background: #fff; color: #B23A22; }
+        .suggestion-action--dismiss:hover { background: #FBEAE4; }
+        .suggestion-action--add { border: 1px solid #E4602C; background: #E4602C; color: #fff; }
+        @media (max-width: 767px), (display-mode: standalone) and (max-width: 1024px) {
+            .mitigation-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .mitigation-stat-card { min-height: 68px; padding: 12px; border-radius: 13px; }
+            .mitigation-stat-card__label { font-size: 10px; }
+            .mitigation-stat-card__value { font-size: 21px; }
+            .mitigation-attention { display: flex; overflow: visible; }
+            .mitigation-attention .mitigation-attention-chip { min-height: 34px; width: auto !important; min-width: 0; padding: 0 11px !important; }
+            .mitigation-attention .mitigation-attention-chip span { position: static !important; width: auto !important; height: auto !important; margin: 0 !important; clip: auto !important; overflow: visible !important; white-space: nowrap !important; }
+            .mitigation-register .table-wrap { background: #fff; border: 0; }
+            .mitigation-register-table tbody { display: block; padding: 0; }
+            .mitigation-register-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; padding: 0; border: 0; border-radius: 0; background: #fff; box-shadow: none; }
+            .mitigation-register-table tbody td { display: block; width: 100% !important; padding: 10px 14px; border-bottom: 0; }
+            .mitigation-register-table tbody tr { border-bottom: 1px solid #E9E5DE; }
+            .mitigation-register-table tbody tr:last-child { border-bottom: 1px solid #E9E5DE; }
+            .mitigation-register-table td[data-label="Plan"] { padding-left: 20px; }
+            .mitigation-register-table td[data-label="Priority / Stage"],
+            .mitigation-register-table td[data-label="Owner / Target"],
+            .mitigation-register-table td[data-label="Actions"] { grid-column: auto; align-self: stretch; text-align: left; }
+            .mitigation-register-table td[data-label="Actions"] { padding-top: 0; border-top: 0; }
+            .mitigation-register-table .register-col-location,
+            .mitigation-register-table .register-col-source { display: none !important; }
+            .row-actions { justify-content: flex-start; }
+            .mitigation-register-table .row-actions > :not(.primary-view) { display: inline-flex !important; }
+            .row-btn.primary-view span { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+            .action-menu__panel { right: auto; left: 0; }
+            .mitigation-ai-saved .insight-list { grid-template-columns: minmax(0, 1fr) !important; }
+            .mitigation-ai-saved .ai-draft-card__head,
+            .mitigation-ai-saved .ai-draft-card__footer { align-items: stretch; flex-direction: column; }
+            .mitigation-ai-saved .ai-draft-card__badges { justify-content: flex-start; }
+            .mitigation-ai-saved .ai-draft-card__actions { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+            .mitigation-ai-saved .ai-draft-action { justify-content: center; }
+            .mitigation-ai-recommendations .insight-list { grid-template-columns: minmax(0, 1fr) !important; }
+            .suggestion-card__head,
+            .suggestion-card__footer { align-items: stretch; flex-direction: column; }
+            .suggestion-card__badges { justify-content: flex-start; }
+            .suggestion-card__actions { display: grid !important; grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1.25fr); width: 100%; }
+            .suggestion-action { justify-content: center; }
+        }
+        @media (max-width: 520px) {
+            .mitigation-stats-grid { grid-template-columns: minmax(0, 1fr); }
+        }
+    </style>
 </head>
 <body class="chief-dashboard-page">
     @include('chief.partials.sidebar', ['active' => 'mitigations'])
@@ -580,31 +711,23 @@
                         </span>
                     </nav>
 
-                    <section class="mitigation-banner chief-theme-hero">
-                        <div>
-                            <span class="chief-theme-hero__eyebrow">
-                                <i class="fa-solid fa-shield-halved"></i>
-                                Mitigation Control
-                            </span>
-                            <h2 class="mitigation-banner__title chief-theme-hero__title">Turn forecasts into preventive action.</h2>
-                            <p class="mitigation-banner__copy chief-theme-hero__copy">Review plans, assign responsibility, and track prevention work across {{ $managedBarangays->count() }} barangays.</p>
-                        </div>
-                        <div class="mitigation-banner__meta chief-theme-summary-grid">
-                            <div class="mitigation-banner__meta-card">
-                                <div class="mitigation-banner__meta-label">High Priority</div>
-                                <div class="mitigation-banner__meta-value">{{ $summary['high_priority'] }}</div>
+                    <section class="mitigation-stats-strip" aria-label="Mitigation summary">
+                        <div class="mitigation-stats-grid">
+                            <div class="mitigation-stat-card mitigation-stat-card--high">
+                                <div class="mitigation-stat-card__label">High Priority</div>
+                                <div class="mitigation-stat-card__value">{{ $summary['high_priority'] }}</div>
                             </div>
-                            <div class="mitigation-banner__meta-card">
-                                <div class="mitigation-banner__meta-label">Awaiting Approval</div>
-                                <div class="mitigation-banner__meta-value">{{ $summary['awaiting_approval'] }}</div>
+                            <div class="mitigation-stat-card mitigation-stat-card--approval">
+                                <div class="mitigation-stat-card__label">Awaiting Approval</div>
+                                <div class="mitigation-stat-card__value">{{ $summary['awaiting_approval'] }}</div>
                             </div>
-                            <div class="mitigation-banner__meta-card">
-                                <div class="mitigation-banner__meta-label">In Progress</div>
-                                <div class="mitigation-banner__meta-value">{{ $summary['in_progress'] }}</div>
+                            <div class="mitigation-stat-card mitigation-stat-card--progress">
+                                <div class="mitigation-stat-card__label">In Progress</div>
+                                <div class="mitigation-stat-card__value">{{ $summary['in_progress'] }}</div>
                             </div>
-                            <div class="mitigation-banner__meta-card">
-                                <div class="mitigation-banner__meta-label">Completed</div>
-                                <div class="mitigation-banner__meta-value">{{ $summary['completed'] }}</div>
+                            <div class="mitigation-stat-card mitigation-stat-card--complete">
+                                <div class="mitigation-stat-card__label">Completed</div>
+                                <div class="mitigation-stat-card__value">{{ $summary['completed'] }}</div>
                             </div>
                         </div>
                     </section>
@@ -647,6 +770,26 @@
                                             $riskLevel = strtolower((string) ($linkedAnalysis?->risk_level ?? $linkedChecklist?->priority_level ?? $action->priority_level ?? 'medium'));
                                             $sourceLabel = $mitigationSourceOptions[$action->source_type] ?? ucfirst(str_replace('_', ' ', (string) $action->source_type));
                                             $categoryLabel = $mitigationCategoryOptions[$action->category] ?? ucfirst(str_replace('_', ' ', (string) $action->category));
+                                            $draftEvidence = (array) data_get($linkedChecklist?->ai_payload, 'evidence_summary', []);
+                                            $draftLocationHeading = $action->barangay?->barangay_name ?? data_get($draftEvidence, 'barangay_name', 'Unknown barangay');
+                                            $draftCondition = trim((string) data_get($draftEvidence, 'leading_condition', 'fire-prevention readiness'));
+                                            $draftSubtitleBase = ucfirst(strtolower(str_replace(['_', '-'], ' ', $draftCondition)));
+                                            $draftSubtitle = str_contains(strtolower($draftSubtitleBase), 'review') ? $draftSubtitleBase : "{$draftSubtitleBase} review";
+                                            $draftRiskTone = match ($riskLevel) {
+                                                'critical', 'high' => 'high',
+                                                'low' => 'low',
+                                                default => 'medium',
+                                            };
+                                            $draftProbability = data_get($draftEvidence, 'probability_percent');
+                                            $draftVerifiedRiskCount = (int) data_get($draftEvidence, 'verified_risk_count', 0);
+                                            $draftVerifiedHazardCount = (int) data_get($draftEvidence, 'verified_hazard_count', 0);
+                                            $draftHistoricalIncidentCount = (int) data_get($draftEvidence, 'historical_incident_count', 0);
+                                            $draftCurrentMonthFireCount = (int) data_get($draftEvidence, 'current_month_fire_incidents', 0);
+                                            $draftSummary = (is_numeric($draftProbability) ? rtrim(rtrim(number_format((float) $draftProbability, 1), '0'), '.') . '% fire probability' : 'Fire probability pending')
+                                                . " from {$draftVerifiedRiskCount} verified " . \Illuminate\Support\Str::plural('risk', $draftVerifiedRiskCount)
+                                                . ", {$draftVerifiedHazardCount} verified " . \Illuminate\Support\Str::plural('hazard', $draftVerifiedHazardCount)
+                                                . ", {$draftHistoricalIncidentCount} historical " . \Illuminate\Support\Str::plural('incident', $draftHistoricalIncidentCount)
+                                                . ", {$draftCurrentMonthFireCount} completed " . \Illuminate\Support\Str::plural('fire', $draftCurrentMonthFireCount) . ' this month.';
                                             $draftTasks = collect($linkedChecklist?->items ?? [])->map(function ($item) {
                                                 return [
                                                     'text' => $item->item_text,
@@ -715,23 +858,24 @@
                                                 'approval_date_label' => optional($action->approved_at)->format('M d, Y h:i A'),
                                             ];
                                         @endphp
-                                        <article class="insight-card">
-                                            <div class="insight-card__top">
-                                                <div class="insight-card__eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> AI mitigation draft</div>
-                                                <span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span>
+                                        <article class="insight-card ai-draft-card">
+                                            <div class="ai-draft-card__head">
+                                                <div>
+                                                    <h4 class="ai-draft-card__title text-lg font-extrabold">{{ $draftLocationHeading }}</h4>
+                                                    <p class="ai-draft-card__subtitle">{{ $draftSubtitle }}</p>
+                                                </div>
+                                                <div class="ai-draft-card__badges">
+                                                    <span class="ai-draft-pill ai-draft-pill--risk is-{{ $draftRiskTone }}">{{ strtoupper($riskLevel) }} risk</span>
+                                                    <span class="ai-draft-pill ai-draft-pill--ai"><i class="fa-solid fa-wand-magic-sparkles"></i> AI draft</span>
+                                                </div>
                                             </div>
-                                            <h4 class="insight-card__title">{{ $action->title }}</h4>
-                                            <div class="insight-card__meta">
-                                                <span><i class="fa-solid fa-location-dot"></i> {{ $action->barangay?->barangay_name ?? 'Unknown barangay' }}</span>
-                                                <span>&middot;</span><span>{{ $categoryLabel }}</span>
-                                                <span>&middot;</span><span>{{ strtoupper($riskLevel) }} risk</span>
-                                            </div>
-                                            <p class="insight-card__summary">{{ \Illuminate\Support\Str::limit($action->description, 180) }}</p>
-                                            <div class="insight-card__footer">
-                                                <span class="tag draft">Ready to review</span>
-                                                <div class="insight-card__actions">
-                                                    <button type="button" class="hero-btn insight-action" title="Review draft" aria-label="Review draft" data-open-details-modal data-payload='@json($draftPayload)'><i class="fa-solid fa-eye"></i><span>Review</span></button>
-                                                    <a href="{{ route('station-admin.mitigations') }}#mitigation-row-{{ $action->mitigation_action_id }}" class="filter-btn secondary insight-action" title="Locate in register" aria-label="Locate in register"><i class="fa-solid fa-table-list"></i><span>Locate</span></a>
+                                            <span class="ai-draft-tag">{{ $categoryLabel }}</span>
+                                            <p class="ai-draft-card__summary">{{ $draftSummary }}</p>
+                                            <div class="ai-draft-card__footer">
+                                                <span class="ai-draft-ready-chip">Ready to review</span>
+                                                <div class="ai-draft-card__actions">
+                                                    <button type="button" class="hero-btn insight-action ai-draft-action ai-draft-action--primary" title="Review draft" aria-label="Review draft" data-open-details-modal data-payload='@json($draftPayload)'><i class="fa-solid fa-eye"></i><span>Review</span></button>
+                                                    <a href="{{ route('station-admin.mitigations') }}#mitigation-row-{{ $action->mitigation_action_id }}" class="filter-btn secondary insight-action ai-draft-action ai-draft-action--secondary" title="Open plan" aria-label="Open plan"><i class="fa-solid fa-table-list"></i><span>Open plan</span></a>
                                                 </div>
                                             </div>
                                         </article>
@@ -745,7 +889,7 @@
                                 <div>
                                     <h3>Checklist Suggestions</h3>
                                     <p>Rule-based risk suggestions not yet added to the register.</p>
-                                    <p class="suggestion-scan-help">Opening this page does not generate or rewrite records. A scan only adds new suggestions and preserves existing progress.</p>
+                                    <p class="suggestion-scan-help"><i class="fa-solid fa-check" aria-hidden="true"></i><span>Opening this page does not generate or rewrite records. A scan only adds new suggestions and preserves existing progress.</span></p>
                                 </div>
                                 @if(!empty($canRefreshMitigationSuggestions))
                                     <form method="POST" action="{{ request()->routeIs('admin.*') ? route('admin.mitigations.suggestions.refresh') : route('station-admin.mitigations.suggestions.refresh') }}" class="suggestion-scan-form" data-suggestion-scan-form>
@@ -765,6 +909,26 @@
                                             $draftFactors = collect($draftPayload['contributing_factors'] ?? [])->take(4)->map(fn ($factor) => ucwords(str_replace('_', ' ', (string) $factor)))->values();
                                             $riskLevel = strtolower((string) ($draftPayload['risk_level'] ?? $draftChecklist->priority_level ?? 'medium'));
                                             $categoryLabel = $mitigationCategoryOptions[\Illuminate\Support\Str::snake((string) ($draftPayload['recommended_category'] ?? 'other'))] ?? ucfirst(str_replace('_', ' ', (string) ($draftPayload['recommended_category'] ?? 'other')));
+                                            $suggestionLocationHeading = $draftChecklist->barangay?->barangay_name
+                                                ?? data_get($draftPayload, 'predicted_area.name')
+                                                ?? $draftChecklist->riskArea?->marker?->title
+                                                ?? 'Unknown barangay';
+                                            $suggestionSubtitle = $categoryLabel . ' review';
+                                            $suggestionRiskTone = match ($riskLevel) {
+                                                'critical', 'high' => 'high',
+                                                'low' => 'low',
+                                                default => 'medium',
+                                            };
+                                            $suggestionProbability = data_get($draftPayload, 'risk_score');
+                                            $suggestionRiskCount = (int) data_get($draftPayload, 'predicted_area.metrics.risks', 0);
+                                            $suggestionHazardCount = (int) data_get($draftPayload, 'predicted_area.metrics.hazards', 0);
+                                            $suggestionHistoricalCount = (int) data_get($draftPayload, 'predicted_area.metrics.historical_incidents', 0);
+                                            $suggestionCompletedFires = 0;
+                                            $suggestionSummary = (is_numeric($suggestionProbability) ? rtrim(rtrim(number_format((float) $suggestionProbability, 1), '0'), '.') . '% fire probability' : 'Fire probability pending')
+                                                . " from {$suggestionRiskCount} verified " . \Illuminate\Support\Str::plural('risk', $suggestionRiskCount)
+                                                . ", {$suggestionHazardCount} verified " . \Illuminate\Support\Str::plural('hazard', $suggestionHazardCount)
+                                                . ", {$suggestionHistoricalCount} historical " . \Illuminate\Support\Str::plural('incident', $suggestionHistoricalCount)
+                                                . ", {$suggestionCompletedFires} completed " . \Illuminate\Support\Str::plural('fire', $suggestionCompletedFires) . ' this month.';
                                             $suggestionTasks = collect($draftChecklist->items ?? [])->map(fn ($item) => ['text' => $item->item_text, 'status' => $item->status])->values()->all();
                                             $suggestionReviewPayload = [
                                                 'title' => $draftChecklist->plan_title,
@@ -788,23 +952,24 @@
                                                 'attachments' => [],
                                             ];
                                         @endphp
-                                        <article class="insight-card">
-                                            <div class="insight-card__top">
-                                                <div class="insight-card__eyebrow"><i class="fa-solid fa-list-check"></i> Checklist suggestion</div>
-                                                <span class="tag {{ $draftChecklist->priority_level }}">{{ strtoupper($draftChecklist->priority_level) }}</span>
+                                        <article class="insight-card suggestion-card">
+                                            <div class="suggestion-card__head">
+                                                <div>
+                                                    <h4 class="suggestion-card__title text-lg font-extrabold">{{ $suggestionLocationHeading }}</h4>
+                                                    <p class="suggestion-card__subtitle">{{ $suggestionSubtitle }}</p>
+                                                </div>
+                                                <div class="suggestion-card__badges">
+                                                    <span class="suggestion-pill suggestion-pill--risk is-{{ $suggestionRiskTone }}">{{ strtoupper($riskLevel) }} risk</span>
+                                                    <span class="suggestion-pill suggestion-pill--type"><i class="fa-solid fa-list-check"></i> Suggested</span>
+                                                </div>
                                             </div>
-                                            <h4 class="insight-card__title">{{ $draftChecklist->plan_title }}</h4>
-                                            <div class="insight-card__meta">
-                                                <span><i class="fa-solid fa-location-dot"></i> {{ $draftChecklist->barangay?->barangay_name ?? 'Unknown barangay' }}</span>
-                                                <span>&middot;</span><span>{{ $categoryLabel }}</span>
-                                                <span>&middot;</span><span>{{ strtoupper($riskLevel) }} risk</span>
-                                            </div>
-                                            <p class="insight-card__summary">{{ \Illuminate\Support\Str::limit($draftChecklist->plan_description, 180) }}</p>
-                                            <div class="insight-card__footer">
-                                                <button type="button" class="filter-btn secondary insight-action" title="Review suggestion" aria-label="Review suggestion" data-open-details-modal data-payload='@json($suggestionReviewPayload)'><i class="fa-solid fa-eye"></i><span>Review</span></button>
-                                                <div class="insight-card__actions">
-                                                    <a href="{{ route('station-admin.mitigations', ['draft_ai_action_plan_checklist_id' => $draftChecklist->ai_action_plan_checklist_id]) }}" class="hero-btn insight-action" title="Create mitigation plan from checklist" aria-label="Create mitigation plan from checklist"><i class="fa-solid fa-wand-magic-sparkles"></i><span>Create Mitigation Plan</span></a>
-                                                    <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.reject', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">@csrf<button type="submit" class="filter-btn secondary insight-action" style="color:#b91c1c;border-color:#fecaca;background:#fff5f5" title="Reject suggestion" aria-label="Reject suggestion"><i class="fa-solid fa-ban"></i><span>Reject</span></button></form>
+                                            <span class="suggestion-card__category">{{ $categoryLabel }}</span>
+                                            <p class="suggestion-card__summary">{{ $suggestionSummary }}</p>
+                                            <div class="suggestion-card__footer">
+                                                <div class="suggestion-card__actions">
+                                                    <button type="button" class="filter-btn secondary insight-action suggestion-action suggestion-action--view" title="View details" aria-label="View details" data-open-details-modal data-payload='@json($suggestionReviewPayload)'><i class="fa-solid fa-eye"></i><span>View details</span></button>
+                                                    <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.reject', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">@csrf<button type="submit" class="filter-btn secondary insight-action suggestion-action suggestion-action--dismiss" title="Dismiss suggestion" aria-label="Dismiss suggestion"><i class="fa-solid fa-ban"></i><span>Dismiss</span></button></form>
+                                                    <a href="{{ route('station-admin.mitigations', ['draft_ai_action_plan_checklist_id' => $draftChecklist->ai_action_plan_checklist_id]) }}" class="hero-btn insight-action suggestion-action suggestion-action--add" title="Add to register" aria-label="Add to register"><i class="fa-solid fa-list-check"></i><span>Add to register</span></a>
                                                 </div>
                                             </div>
                                         </article>
@@ -813,12 +978,12 @@
                             @endif
                         </section>
 
-                        <nav class="chip-row mitigation-attention" aria-label="Mitigation attention views" style="margin:0 0 14px;">
-                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'overdue' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'overdue']) }}" title="Overdue: {{ $summary['overdue'] }}" aria-label="Show overdue mitigations: {{ $summary['overdue'] }}"><i class="fa-solid fa-clock"></i><span>Overdue {{ $summary['overdue'] }}</span></a>
-                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'blocked' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'blocked']) }}" title="Blocked: {{ $summary['blocked'] }}" aria-label="Show blocked mitigations: {{ $summary['blocked'] }}"><i class="fa-solid fa-road-barrier"></i><span>Blocked {{ $summary['blocked'] }}</span></a>
-                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'awaiting_review' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'awaiting_review']) }}" title="Needs review" aria-label="Show mitigations needing review"><i class="fa-solid fa-user-check"></i><span>Needs review</span></a>
-                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'missing_owner' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'missing_owner']) }}" title="No owner: {{ $summary['missing_owner'] }}" aria-label="Show mitigations without an owner: {{ $summary['missing_owner'] }}"><i class="fa-solid fa-user-slash"></i><span>No owner {{ $summary['missing_owner'] }}</span></a>
-                            <a class="filter-btn mobile-icon-action {{ ($filters['attention'] ?? '') === 'follow_up' ? 'primary' : 'secondary' }}" href="{{ route('station-admin.mitigations', ['attention' => 'follow_up']) }}" title="Follow-up: {{ $summary['follow_up'] }}" aria-label="Show mitigations requiring follow-up: {{ $summary['follow_up'] }}"><i class="fa-solid fa-rotate"></i><span>Follow-up {{ $summary['follow_up'] }}</span></a>
+                        <nav class="mitigation-attention" aria-label="Mitigation attention views">
+                            <a class="mitigation-attention-chip {{ (int) $summary['overdue'] > 0 ? 'is-hot' : '' }}" href="{{ route('station-admin.mitigations', ['attention' => 'overdue']) }}" title="Overdue: {{ $summary['overdue'] }}" aria-label="Show overdue mitigations: {{ $summary['overdue'] }}"><i class="fa-solid fa-clock"></i><span>Overdue {{ $summary['overdue'] }}</span></a>
+                            <a class="mitigation-attention-chip {{ (int) $summary['blocked'] > 0 ? 'is-hot' : '' }}" href="{{ route('station-admin.mitigations', ['attention' => 'blocked']) }}" title="Blocked: {{ $summary['blocked'] }}" aria-label="Show blocked mitigations: {{ $summary['blocked'] }}"><i class="fa-solid fa-road-barrier"></i><span>Blocked {{ $summary['blocked'] }}</span></a>
+                            <a class="mitigation-attention-chip {{ (int) $summary['awaiting_approval'] > 0 ? 'is-hot' : '' }}" href="{{ route('station-admin.mitigations', ['attention' => 'awaiting_review']) }}" title="Needs review" aria-label="Show mitigations needing review"><i class="fa-solid fa-user-check"></i><span>Needs review</span></a>
+                            <a class="mitigation-attention-chip {{ (int) $summary['missing_owner'] > 0 ? 'is-hot' : '' }}" href="{{ route('station-admin.mitigations', ['attention' => 'missing_owner']) }}" title="No owner: {{ $summary['missing_owner'] }}" aria-label="Show mitigations without an owner: {{ $summary['missing_owner'] }}"><i class="fa-solid fa-user-slash"></i><span>No owner {{ $summary['missing_owner'] }}</span></a>
+                            <a class="mitigation-attention-chip {{ (int) $summary['follow_up'] > 0 ? 'is-hot' : '' }}" href="{{ route('station-admin.mitigations', ['attention' => 'follow_up']) }}" title="Follow-up: {{ $summary['follow_up'] }}" aria-label="Show mitigations requiring follow-up: {{ $summary['follow_up'] }}"><i class="fa-solid fa-rotate"></i><span>Follow-up {{ $summary['follow_up'] }}</span></a>
                         </nav>
 
                         <section class="panel mitigation-register">
@@ -1039,19 +1204,43 @@
                                                         'checklist_url' => $action->ai_action_plan_checklist_id ? route('station-admin.course-checklists', ['checklist' => $action->ai_action_plan_checklist_id]) : null,
                                                     ];
                                                     $isOverdue = $action->target_date && $action->target_date->lt(today()) && ! in_array($action->status, ['completed', 'cancelled'], true);
+                                                    $priorityKey = strtolower((string) ($action->priority_level ?: 'medium'));
+                                                    $priorityTone = match ($priorityKey) {
+                                                        'critical', 'high' => 'high',
+                                                        'low' => 'low',
+                                                        default => 'medium',
+                                                    };
+                                                    $locationHeading = $action->scope_type === 'citywide'
+                                                        ? (($action->barangay?->city?->city_name ?? 'City') . ' citywide')
+                                                        : ($action->scope_type === 'stationwide' ? 'Stationwide coverage' : ($action->barangay?->barangay_name ?? 'Unknown barangay'));
+                                                    $planSubtitle = trim((string) $action->title);
+                                                    foreach (array_filter([$locationHeading, $action->barangay?->barangay_name, $action->riskArea?->marker?->title]) as $locationText) {
+                                                        $planSubtitle = trim(preg_replace('/^\s*' . preg_quote($locationText, '/') . '\s*(?:[-–—:|]\s*)?/iu', '', $planSubtitle) ?? $planSubtitle);
+                                                    }
+                                                    $planSubtitle = $planSubtitle !== '' ? $planSubtitle : ($action->description ?: 'Mitigation plan');
+                                                    $ownerName = $action->responsibleUser?->full_name ?? $action->responsibleTeam?->team_name;
+                                                    $ownerInitials = collect(preg_split('/\s+/', trim((string) $ownerName)) ?: [])
+                                                        ->filter()
+                                                        ->take(2)
+                                                        ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
+                                                        ->implode('');
+                                                    $ownerInitials = $ownerInitials ?: 'UN';
                                                 @endphp
-                                                <tr id="mitigation-row-{{ $action->mitigation_action_id }}">
+                                                <tr id="mitigation-row-{{ $action->mitigation_action_id }}" class="mitigation-register-row mitigation-register-row--{{ $priorityTone }}">
                                                     <td data-label="Plan">
-                                                        <div class="register-plan"><div class="title">{{ $action->title }}</div>
-                                                        <div class="register-plan__location"><i class="fa-solid fa-location-dot"></i><span>{{ $action->scope_type === 'citywide' ? (($action->barangay?->city?->city_name ?? 'City') . ' citywide') : ($action->scope_type === 'stationwide' ? 'Stationwide coverage' : ($action->barangay?->barangay_name ?? 'Unknown barangay')) }}{{ $action->riskArea?->marker?->title ? ' · ' . $action->riskArea->marker->title : '' }}</span></div></div>
-                                                        <div class="chip-row" style="margin-top:7px;">
-                                                            <span class="chip">{{ $categoryLabel }}</span>
-                                                            <span class="tag {{ $sourceType }}">{{ $sourceLabel }}</span>
+                                                        <span class="mitigation-priority-bar is-{{ $priorityTone }}" aria-hidden="true"></span>
+                                                        <div class="register-plan">
+                                                            <div class="text-base font-extrabold leading-tight text-slate-950">{{ $locationHeading }}</div>
+                                                            <div class="mt-1 text-sm leading-snug text-slate-500">{{ $planSubtitle }}</div>
+                                                        </div>
+                                                        <div class="register-tags">
+                                                            <span class="register-tag register-tag--category">{{ $categoryLabel }}</span>
+                                                            <span class="register-tag {{ $sourceType === 'ai_action_plan' ? 'register-tag--ai' : 'register-tag--category' }}">{{ $sourceLabel }}</span>
                                                             @if($isOverdue)
-                                                                <span class="chip overdue"><i class="fa-solid fa-triangle-exclamation"></i> Overdue</span>
+                                                                <span class="register-tag register-tag--overdue"><i class="fa-solid fa-triangle-exclamation"></i> Overdue</span>
                                                             @endif
                                                             @if($action->requires_revision_review)
-                                                                <span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Review revision {{ $action->analysis_revision }}</span>
+                                                                <span class="register-tag register-tag--revision"><i class="fa-solid fa-flag"></i> Review revision {{ $action->analysis_revision }}</span>
                                                             @endif
                                                         </div>
                                                     </td>
@@ -1059,10 +1248,15 @@
                                                         <div class="title" style="font-size:.86rem;">{{ $action->scope_type === 'citywide' ? (($action->barangay?->city?->city_name ?? 'City') . ' · Citywide') : ($action->scope_type === 'stationwide' ? 'Stationwide coverage' : ($action->barangay?->barangay_name ?? 'Unknown barangay')) }}</div>
                                                         <div class="note">{{ $action->riskArea?->marker?->title ?? 'No linked location marker' }}</div>
                                                     </td>
-                                                    <td data-label="Priority / Stage"><div class="chip-row"><span class="tag {{ $action->priority_level }}">{{ strtoupper($action->priority_level) }}</span><span class="tag {{ $action->status }}">{{ strtoupper($statusLabel) }}</span>@if($action->completion_approval_status === 'pending')<span class="chip overdue"><i class="fa-solid fa-user-check"></i> Completion review</span>@endif</div></td>
+                                                    <td data-label="Priority / Stage"><div class="chip-row"><span class="priority-pill is-{{ $priorityTone }}">{{ strtoupper($action->priority_level) }}</span><span class="state-label is-{{ $action->status }}">{{ strtoupper($statusLabel) }}</span>@if($action->completion_approval_status === 'pending')<span class="register-tag register-tag--revision"><i class="fa-solid fa-user-check"></i> Completion review</span>@endif</div></td>
                                                     <td data-label="Owner / Target">
-                                                        <div class="register-meta"><div class="register-owner">{{ $action->responsibleUser?->full_name ?? ($action->responsibleTeam?->team_name ?? 'Unassigned') }}</div>
-                                                        <div class="register-due"><i class="fa-regular fa-calendar"></i> {{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</div></div>
+                                                        <div class="register-meta">
+                                                            <div class="owner-chip">
+                                                                <span class="owner-avatar {{ $ownerName ? '' : 'is-empty' }}">{{ $ownerName ? $ownerInitials : '' }}</span>
+                                                                <div class="register-owner {{ $ownerName ? '' : 'is-unassigned' }}">{{ $ownerName ?? 'Unassigned' }}</div>
+                                                            </div>
+                                                            <div class="register-due"><i class="fa-regular fa-calendar"></i> {{ $action->target_date?->format('M d, Y') ?? 'No target date' }}</div>
+                                                        </div>
                                                     </td>
                                                     <td data-label="Source" class="register-col-source">
                                                         <div class="chip-row">
@@ -1080,7 +1274,12 @@
                                                                 <form method="POST" action="{{ route('station-admin.mitigations.completion-review', $action->getKey()) }}" style="display:inline">@csrf<input type="hidden" name="decision" value="approved"><button type="submit" class="row-btn view" title="Approve completion" aria-label="Approve completion"><i class="fa-solid fa-check"></i></button></form>
                                                                 <form method="POST" action="{{ route('station-admin.mitigations.completion-review', $action->getKey()) }}" style="display:inline" onsubmit="const reason=window.prompt('Why is this completion being returned?');if(!reason||!reason.trim())return false;this.elements.decision_notes.value=reason.trim();">@csrf<input type="hidden" name="decision" value="rejected"><input type="hidden" name="decision_notes" value=""><button type="submit" class="row-btn delete" title="Return for further work" aria-label="Return for further work"><i class="fa-solid fa-rotate-left"></i></button></form>
                                                             @endif
-                                                            <button type="button" class="row-btn delete" title="Delete action" aria-label="Delete action" data-open-delete-modal data-id="{{ $action->mitigation_action_id }}" data-title="{{ $action->title }}"><i class="fa-solid fa-trash"></i></button>
+                                                            <details class="action-menu">
+                                                                <summary class="row-btn" title="More actions" aria-label="More actions"><i class="fa-solid fa-ellipsis"></i></summary>
+                                                                <div class="action-menu__panel">
+                                                                    <button type="button" class="action-menu__item" data-open-delete-modal data-id="{{ $action->mitigation_action_id }}" data-title="{{ $action->title }}"><i class="fa-solid fa-trash"></i><span>Delete plan</span></button>
+                                                                </div>
+                                                            </details>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -1088,10 +1287,11 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <div class="table-pagination">
-                                    <span>Showing {{ $mitigationActions->firstItem() }}–{{ $mitigationActions->lastItem() }} of {{ $mitigationActions->total() }}</span>
-                                    {{ $mitigationActions->onEachSide(1)->links() }}
-                                </div>
+                                @include('chief.partials.pagination', [
+                                    'paginator' => $mitigationActions,
+                                    'ariaLabel' => 'Mitigation register pagination',
+                                    'summaryLabel' => 'results',
+                                ])
                             @endif
                             </div>
                         </section>
@@ -1289,6 +1489,30 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#039;');
+
+            const priorityTone = (priority) => {
+                const normalized = String(priority || 'medium').toLowerCase();
+                if (normalized === 'critical' || normalized === 'high') return 'high';
+                if (normalized === 'low') return 'low';
+                return 'medium';
+            };
+
+            const removeLeadingLocation = (title, ...locations) => {
+                let cleaned = String(title || '').trim();
+                locations.filter(Boolean).forEach((location) => {
+                    const escaped = String(location).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    cleaned = cleaned.replace(new RegExp(`^\\s*${escaped}\\s*(?:[-–—:|]\\s*)?`, 'iu'), '').trim();
+                });
+                return cleaned || 'Mitigation plan';
+            };
+
+            const initialsFor = (name) => String(name || '')
+                .trim()
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) => part.charAt(0).toUpperCase())
+                .join('') || 'UN';
 
             const renderBadge = (label, className) => `<span class="tag ${escapeHtml(className)}">${escapeHtml(label)}</span>`;
 
@@ -1815,14 +2039,48 @@
                     const meta = result.meta || {};
                     const pageUrl = new URL(url, window.location.origin);
                     const pageLink = (page) => { const link = new URL(pageUrl); link.searchParams.set('page', page); return link.href; };
+                    const renderPager = () => {
+                        const currentPage = Number(meta.current_page || 1);
+                        const lastPage = Number(meta.last_page || 1);
+                        const total = Number(meta.total || 0);
+                        const perPage = Number(meta.per_page || 10);
+                        const from = total > 0 ? ((currentPage - 1) * perPage) + 1 : 0;
+                        const to = rows.length ? from + rows.length - 1 : 0;
+                        const pages = Array.from({ length: lastPage }, (_, index) => index + 1)
+                            .filter((page) => page === 1 || page === lastPage || Math.abs(page - currentPage) <= 1);
+                        let previousPage = null;
+                        const pageLinks = pages.map((page) => {
+                            const ellipsis = previousPage && page - previousPage > 1
+                                ? '<span class="chief-pagination__ellipsis" aria-hidden="true">…</span>'
+                                : '';
+                            previousPage = page;
+                            const pageButton = page === currentPage
+                                ? `<span class="chief-pagination__current" aria-current="page">${escapeHtml(page)}</span>`
+                                : `<a class="chief-pagination__link" href="${escapeHtml(pageLink(page))}" aria-label="Go to page ${escapeHtml(page)}">${escapeHtml(page)}</a>`;
+                            return `${ellipsis}${pageButton}`;
+                        }).join('');
+                        const previousLink = currentPage <= 1
+                            ? '<span class="chief-pagination__disabled" aria-disabled="true" aria-label="Previous page">‹</span>'
+                            : `<a class="chief-pagination__link" href="${escapeHtml(pageLink(currentPage - 1))}" rel="prev" aria-label="Previous page">‹</a>`;
+                        const nextLink = currentPage >= lastPage
+                            ? '<span class="chief-pagination__disabled" aria-disabled="true" aria-label="Next page">›</span>'
+                            : `<a class="chief-pagination__link" href="${escapeHtml(pageLink(currentPage + 1))}" rel="next" aria-label="Next page">›</a>`;
+
+                        return `<nav class="chief-pagination" aria-label="Mitigation register pagination"><div class="chief-pagination__summary">Showing <strong>${escapeHtml(from)}–${escapeHtml(to)}</strong> of <strong>${escapeHtml(total)}</strong> results</div><div class="chief-pagination__controls">${previousLink}${pageLinks}${nextLink}</div></nav>`;
+                    };
                     table.innerHTML = rows.length ? `
                         <div class="table-wrap"><table class="mitigation-register-table"><thead><tr><th class="register-plan-col">Plan and coverage</th><th class="register-status-col">Status</th><th class="register-owner-col">Owner and due date</th><th class="register-actions-col">Open</th></tr></thead><tbody>
                         ${rows.map((item) => {
                             const editPayload = {...item, target_date:item.target_date_value};
-                            return `<tr id="mitigation-row-${escapeHtml(item.id)}"><td data-label="Plan"><div class="register-plan"><div class="title">${escapeHtml(item.title || 'Untitled')}</div><div class="register-plan__location"><i class="fa-solid fa-location-dot"></i><span>${escapeHtml(item.barangay || 'Unknown barangay')}${item.location ? ` · ${escapeHtml(item.location)}` : ''}</span></div></div><div class="chip-row" style="margin-top:7px;"><span class="chip">${escapeHtml(item.category || 'other')}</span><span class="tag ${escapeHtml(item.source || 'manual')}">${escapeHtml(item.source || 'manual')}</span>${item.requires_revision_review ? `<span class="chip overdue"><i class="fa-solid fa-code-compare"></i> Revision ${escapeHtml(item.analysis_revision || '')}</span>` : ''}</div></td><td data-label="Status"><div class="chip-row"><span class="tag ${escapeHtml(item.priority || 'medium')}">${escapeHtml(item.priority || 'medium')}</span><span class="tag ${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></div></td><td data-label="Owner / Target"><div class="register-meta"><div class="register-owner">${escapeHtml(item.responsible || 'Unassigned')}</div><div class="register-due"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.target_date || 'No target date')}</div></div></td><td data-label="Actions"><div class="row-actions"><a class="row-btn view primary-view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation" aria-label="Open mitigation"><i class="fa-solid fa-eye"></i><span>View</span></a><button type="button" class="row-btn edit" data-open-edit-modal data-payload="${escapeHtml(JSON.stringify(editPayload))}" title="Edit mitigation" aria-label="Edit mitigation"><i class="fa-solid fa-pen"></i></button><button type="button" class="row-btn delete" data-open-delete-modal data-id="${escapeHtml(item.id)}" data-title="${escapeHtml(item.title || 'this mitigation')}" title="Delete mitigation" aria-label="Delete mitigation"><i class="fa-solid fa-trash"></i></button></div></td></tr>`;
+                            const tone = priorityTone(item.priority);
+                            const locationHeading = item.barangay || 'Unknown barangay';
+                            const planSubtitle = removeLeadingLocation(item.title || 'Untitled', locationHeading, item.location);
+                            const isAiActionPlan = String(item.source || '').toLowerCase().replace(/\s+/g, '_') === 'ai_action_plan';
+                            const ownerName = item.responsible || '';
+                            return `<tr id="mitigation-row-${escapeHtml(item.id)}" class="mitigation-register-row mitigation-register-row--${escapeHtml(tone)}"><td data-label="Plan"><span class="mitigation-priority-bar is-${escapeHtml(tone)}" aria-hidden="true"></span><div class="register-plan"><div class="text-base font-extrabold leading-tight text-slate-950">${escapeHtml(locationHeading)}</div><div class="mt-1 text-sm leading-snug text-slate-500">${escapeHtml(planSubtitle)}</div></div><div class="register-tags"><span class="register-tag register-tag--category">${escapeHtml(item.category || 'other')}</span><span class="register-tag ${isAiActionPlan ? 'register-tag--ai' : 'register-tag--category'}">${escapeHtml(item.source || 'manual')}</span>${item.requires_revision_review ? `<span class="register-tag register-tag--revision"><i class="fa-solid fa-flag"></i> Review revision ${escapeHtml(item.analysis_revision || '')}</span>` : ''}</div></td><td data-label="Status"><div class="chip-row"><span class="priority-pill is-${escapeHtml(tone)}">${escapeHtml(item.priority || 'medium')}</span><span class="state-label is-${escapeHtml(item.status || 'draft')}">${escapeHtml(item.status || 'draft')}</span></div></td><td data-label="Owner / Target"><div class="register-meta"><div class="owner-chip"><span class="owner-avatar ${ownerName ? '' : 'is-empty'}">${ownerName ? escapeHtml(initialsFor(ownerName)) : ''}</span><div class="register-owner ${ownerName ? '' : 'is-unassigned'}">${escapeHtml(ownerName || 'Unassigned')}</div></div><div class="register-due"><i class="fa-regular fa-calendar"></i> ${escapeHtml(item.target_date || 'No target date')}</div></div></td><td data-label="Actions"><div class="row-actions"><a class="row-btn view primary-view" href="{{ route('station-admin.mitigations') }}?mitigation_action_id=${encodeURIComponent(item.id)}#mitigation-row-${encodeURIComponent(item.id)}" title="Open mitigation" aria-label="Open mitigation"><i class="fa-solid fa-eye"></i><span>View</span></a><button type="button" class="row-btn edit" data-open-edit-modal data-payload="${escapeHtml(JSON.stringify(editPayload))}" title="Edit mitigation" aria-label="Edit mitigation"><i class="fa-solid fa-pen"></i></button><details class="action-menu"><summary class="row-btn" title="More actions" aria-label="More actions"><i class="fa-solid fa-ellipsis"></i></summary><div class="action-menu__panel"><button type="button" class="action-menu__item" data-open-delete-modal data-id="${escapeHtml(item.id)}" data-title="${escapeHtml(item.title || 'this mitigation')}"><i class="fa-solid fa-trash"></i><span>Delete plan</span></button></div></details></div></td></tr>`;
                         }).join('')}
                         </tbody></table></div>
-                        <div class="table-pagination"><span>${escapeHtml(String(meta.total || 0))} record(s)</span><nav>${meta.current_page > 1 ? `<a href="${escapeHtml(pageLink(meta.current_page - 1))}"><i class="fa-solid fa-chevron-left"></i></a>` : ''}<span>${escapeHtml(String(meta.current_page || 1))} / ${escapeHtml(String(meta.last_page || 1))}</span>${meta.current_page < meta.last_page ? `<a href="${escapeHtml(pageLink(meta.current_page + 1))}"><i class="fa-solid fa-chevron-right"></i></a>` : ''}</nav></div>` : '<div class="empty"><i class="fa-solid fa-filter-circle-xmark"></i> No matching mitigation plans.</div>';
+                        ${renderPager()}` : '<div class="empty"><i class="fa-solid fa-filter-circle-xmark"></i> No matching mitigation plans.</div>';
                     table.style.opacity = '1';
                     table.setAttribute('aria-busy', 'false');
                     window.history.replaceState({}, '', url);
@@ -1861,7 +2119,7 @@
                 }, 300);
             });
             document.addEventListener('click', (event) => {
-                const link = event.target.closest('#mitigationTableData .table-pagination a');
+                const link = event.target.closest('#mitigationTableData .chief-pagination a');
                 if (!link) return;
                 event.preventDefault();
                 loadMitigationTable(link.href);

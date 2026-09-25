@@ -2460,7 +2460,12 @@ class StationAdminController extends Controller
                 'responsible_team_id' => $action->responsible_team_id,
                 'responsible_user_id' => $action->responsible_user_id,
             ])->items(),
-            'meta' => ['current_page' => $actions->currentPage(), 'last_page' => $actions->lastPage(), 'total' => $actions->total()],
+            'meta' => [
+                'current_page' => $actions->currentPage(),
+                'last_page' => $actions->lastPage(),
+                'per_page' => $actions->perPage(),
+                'total' => $actions->total(),
+            ],
         ]);
     }
 

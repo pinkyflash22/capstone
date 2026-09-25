@@ -70,7 +70,14 @@
                 @else<td data-label="Address">{{ $row['exact_address'] }}</td><td data-label="Cause">{{ $row['cause_of_fire'] }}</td><td data-label="Total damage">₱{{ number_format($row['total_damage'],0) }}</td><td data-label="Completed">{{ ($row['completed_at']??$row['created_at'])?->format('M d, Y g:i A')??'Not recorded' }}</td>@endif
                 <td data-label="Actions"><div class="report-row-actions"><button type="button" class="report-icon-button" data-report-action="view" data-report='@json($row, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)' aria-label="View report" title="View"><i class="fa-regular fa-eye"></i></button><button type="button" class="report-icon-button" data-report-action="edit" data-report='@json($row, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)' aria-label="Edit report" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button><button type="button" class="report-icon-button report-icon-button--danger" data-report-action="delete" data-report='@json($row, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_AMP|JSON_HEX_QUOT)' aria-label="Delete report" title="Delete"><i class="fa-regular fa-trash-can"></i></button></div></td>
             </tr>@endforeach</tbody></table></div>@endif
-            @if($reportRows->hasPages())<div class="report-pagination">{{ $reportRows->onEachSide(1)->links() }}</div>@endif
+            @if($reportRows->hasPages())
+                @include('chief.partials.pagination', [
+                    'paginator' => $reportRows,
+                    'ariaLabel' => 'Report records pagination',
+                    'summaryLabel' => 'records',
+                    'class' => 'report-pagination',
+                ])
+            @endif
             <div class="report-note"><i class="fa-solid fa-circle-info"></i>Totals use all station records. Print and CSV actions export the currently displayed filtered page.</div>
         </section>
     </div>

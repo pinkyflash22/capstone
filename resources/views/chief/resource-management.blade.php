@@ -1918,7 +1918,12 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="resource-pagination">{{ $boundaryPage->onEachSide(1)->links() }}</div>
+                @include('chief.partials.pagination', [
+                    'paginator' => $boundaryPage,
+                    'ariaLabel' => 'Boundary pagination',
+                    'summaryLabel' => 'boundaries',
+                    'class' => 'resource-pagination',
+                ])
             </section>
 
             <div class="search-filter-bar resource-order-tools">
@@ -2036,7 +2041,12 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="resource-pagination">{{ $personnelPage->onEachSide(1)->links() }}</div>
+                @include('chief.partials.pagination', [
+                    'paginator' => $personnelPage,
+                    'ariaLabel' => 'Personnel pagination',
+                    'summaryLabel' => 'personnel',
+                    'class' => 'resource-pagination',
+                ])
             </div>
 
             {{-- Shift and rest-day scheduling is disabled. Team availability is managed directly. --}}
@@ -2260,7 +2270,12 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="resource-pagination">{{ $teamsPage->onEachSide(1)->links() }}</div>
+                @include('chief.partials.pagination', [
+                    'paginator' => $teamsPage,
+                    'ariaLabel' => 'Team pagination',
+                    'summaryLabel' => 'teams',
+                    'class' => 'resource-pagination',
+                ])
             </div>
 
            
@@ -2290,7 +2305,12 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="resource-pagination">{{ $barangayOfficersPage->onEachSide(1)->links() }}</div>
+                @include('chief.partials.pagination', [
+                    'paginator' => $barangayOfficersPage,
+                    'ariaLabel' => 'Barangay officer pagination',
+                    'summaryLabel' => 'officers',
+                    'class' => 'resource-pagination',
+                ])
             </div>
             @endif
 
@@ -2379,7 +2399,12 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="resource-pagination">{{ $usersPage->onEachSide(1)->links() }}</div>
+                @include('chief.partials.pagination', [
+                    'paginator' => $usersPage,
+                    'ariaLabel' => 'User pagination',
+                    'summaryLabel' => 'users',
+                    'class' => 'resource-pagination',
+                ])
             </div>
 
              <!-- Equipment Inventory Table -->
@@ -2451,7 +2476,12 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="resource-pagination">{{ $equipmentPage->onEachSide(1)->links() }}</div>
+                @include('chief.partials.pagination', [
+                    'paginator' => $equipmentPage,
+                    'ariaLabel' => 'Equipment pagination',
+                    'summaryLabel' => 'equipment',
+                    'class' => 'resource-pagination',
+                ])
             </div>
 
             <div class="station-grid resource-tier resource-tier--apparatus resource-table-compact" id="apparatusResourceSection">
@@ -2486,7 +2516,12 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="resource-pagination">{{ $apparatusPage->onEachSide(1)->links() }}</div>
+                @include('chief.partials.pagination', [
+                    'paginator' => $apparatusPage,
+                    'ariaLabel' => 'Apparatus pagination',
+                    'summaryLabel' => 'apparatus',
+                    'class' => 'resource-pagination',
+                ])
             </div>
 
 
