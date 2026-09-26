@@ -8,6 +8,8 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <title>PyroSense · Management</title>
     <style>
@@ -1220,6 +1222,63 @@
         .form-textarea:focus {
             border-color: rgba(217, 119, 6, 0.4);
             box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+        }
+
+        .coordinate-picker {
+            display: grid;
+            gap: 10px;
+        }
+
+        .coordinate-picker__toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding: 10px 12px;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            border-radius: 14px;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+
+        .coordinate-picker__readout {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .coordinate-picker__button {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 999px;
+            background: #fff;
+            color: #9a3412;
+            padding: 8px 12px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .coordinate-picker__map {
+            height: 280px;
+            min-height: 240px;
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            overflow: hidden;
+            background: #eef2f7;
+            z-index: 1;
+        }
+
+        .coordinate-picker__hint {
+            margin: 0;
+            color: #64748b;
+            font-size: 0.78rem;
+            line-height: 1.45;
         }
 
         .detail-container .status-badge-large,
@@ -2958,6 +3017,101 @@
             box-shadow: 0 -8px 22px rgba(15, 23, 42, 0.06);
         }
 
+        .incident-edit-tabs {
+            position: sticky;
+            top: -14px;
+            z-index: 3;
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 4px 0 0;
+            margin: 0 0 16px;
+            background: rgba(255, 255, 255, 0.97);
+            border-bottom: 1px solid #E9E5DE;
+        }
+
+        .incident-edit-tab {
+            flex: 0 0 auto;
+            border: 0;
+            border-bottom: 2px solid transparent;
+            background: transparent;
+            color: #6B6E76;
+            cursor: pointer;
+            font-weight: 800;
+            font-size: 0.78rem;
+            line-height: 1.2;
+            padding: 0 2px 10px;
+        }
+
+        .incident-edit-tab.is-active {
+            color: #E4602C;
+            border-bottom-color: #E4602C;
+        }
+
+        .incident-edit-pane[hidden] {
+            display: none;
+        }
+
+        .incident-edit-step {
+            margin-right: auto;
+            color: #6B6E76;
+            font-size: 0.78rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .form-label .optional-label {
+            margin-left: 6px;
+            color: #B7B4AC;
+            font-size: 0.72rem;
+            font-style: italic;
+            font-weight: 600;
+            text-transform: none;
+        }
+
+        .readonly-reference {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            min-height: 44px;
+            padding: 0 12px;
+            border: 1px solid #E9E5DE;
+            border-radius: 12px;
+            background: #FAF8F5;
+            color: #6B6E76;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        }
+
+        .readonly-reference input {
+            flex: 1 1 auto;
+            min-width: 0;
+            border: 0;
+            background: transparent;
+            color: inherit;
+            font: inherit;
+            outline: none;
+        }
+
+        .incident-gps-preview {
+            margin-top: 8px;
+            padding: 8px 10px;
+            border: 1px dashed #E9E5DE;
+            border-radius: 10px;
+            background: #FAF8F5;
+            color: #8A8D96;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .notes-helper {
+            margin: 6px 0 0;
+            color: #8A8D96;
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+
         .management-delete-prompt {
             display: grid;
             grid-template-columns: 42px minmax(0, 1fr);
@@ -3124,6 +3278,79 @@
                 border-radius: 22px 22px 0 0;
             }
         }
+
+        #viewModal .incident-detail-top-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        #viewModal .incident-detail-top-grid .quick-stat-card {
+            min-height: 112px;
+        }
+
+        #viewModal .info-card .card-title {
+            background: #FAF8F5;
+            border-bottom: 1px solid #E9E5DE;
+        }
+
+        #viewModal .incident-detail-description {
+            display: grid;
+            gap: 10px;
+        }
+
+        #viewModal .incident-detail-tech {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 11px;
+            color: #8A8D96;
+            background: #FAF8F5;
+            border: 1px dashed #E9E5DE;
+            border-radius: 8px;
+            padding: 8px 10px;
+            line-height: 1.5;
+        }
+
+        #viewModal .historical-detail-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 16px;
+        }
+
+        #viewModal .historical-detail-grid .info-row {
+            border: 1px solid rgba(233, 229, 222, 0.9);
+            border-radius: 12px;
+            padding: 10px 12px;
+            background: #fff;
+        }
+
+        #viewModal .historical-detail-grid .info-row--wide {
+            grid-column: 1 / -1;
+        }
+
+        #viewModal .empty-field {
+            color: #B7B4AC;
+            font-style: italic;
+        }
+
+        #viewModal .empty-responders {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: #64748b;
+        }
+
+        @media (max-width: 760px) {
+            #viewModal .incident-detail-top-grid,
+            #viewModal .historical-detail-grid {
+                grid-template-columns: 1fr;
+            }
+
+            #viewModal .historical-detail-grid .info-row--wide {
+                grid-column: auto;
+            }
+        }
         </style>
     @vite(['resources/css/chief/dashboard.css', 'resources/css/app.css', 'resources/css/admin/announcements.css', 'resources/css/admin/management.css'])
     @vite(['resources/css/admin/resource-management.css'])
@@ -3191,7 +3418,7 @@
                 <a href="{{ route('station-admin.fsic') }}" class="nav-item flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-xl transition group" data-section="alerts">
                             <i class="fa-solid fa-bell w-5 text-gray-400 group-hover:text-orange-600"></i>
                             <span class="flex-1">Requests</span>
-                            <span class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">{{ $activeAlerts ?? 2 }}</span>
+                            <span class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-1 rounded-full">{{ ($activeAlerts ?? 0) > 9 ? '9+' : ($activeAlerts ?? 0) }}</span>
                         </a>
                 <a href="{{ route('station-admin.announcements') }}" class="nav-item"><i class="fa-solid fa-bullhorn"></i><span>Announcements</span></a>
                 <a href="{{ route('station-admin.management') }}" class="nav-item active"><i class="fa-solid fa-map-location-dot"></i><span>Management</span></a>
@@ -3285,12 +3512,6 @@
                         {{ $currentStation?->station_code ? 'Code: '.$currentStation->station_code.' • ' : '' }}
                         {{ $currentStationMarker?->title ?? 'No mapped station location available yet.' }}
                     </p>
-                    <div class="chief-theme-badges">
-                        <span class="chief-theme-badge"><i class="fa-solid fa-phone"></i> {{ $currentStation?->contact_number ?? 'No contact number' }}</span>
-                        <span class="chief-theme-badge"><i class="fa-solid fa-envelope"></i> {{ $currentStation?->email ?? 'No email registered' }}</span>
-                        <span class="chief-theme-badge"><i class="fa-solid fa-location-dot"></i> {{ collect([$currentStation?->address?->street, $currentStation?->address?->barangay?->barangay_name, $currentStation?->address?->barangay?->city?->city_name])->filter()->join(', ') ?: 'Station address not configured' }}</span>
-                        <span class="chief-theme-badge"><i class="fa-solid fa-users"></i> {{ $personnel->count() }} personnel records loaded</span>
-                    </div>
                 </div>
                 <div class="chief-theme-summary-grid">
                     <article class="chief-theme-summary-card">
@@ -3464,6 +3685,10 @@
                     <i class="fa-solid fa-fire"></i>
                     Incidents
                 </button>
+                <button class="tab-btn" data-tab="historical_records">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    Historical Records
+                </button>
                 <button class="tab-btn" data-tab="reports">
                     <i class="fa-solid fa-file-lines"></i>
                     Reports
@@ -3499,6 +3724,17 @@
                         <span class="management-summary-label">Reports</span>
                         <strong class="management-summary-value" id="totalReports">{{ $reports->count() ?? 0 }}</strong>
                         <small class="management-summary-meta" id="pendingReports">0 filed</small>
+                    </div>
+                </div>
+
+                <div class="management-summary-card">
+                    <div class="management-summary-icon">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                    </div>
+                    <div class="management-summary-copy">
+                        <span class="management-summary-label">Historical Records</span>
+                        <strong class="management-summary-value" id="totalHistoricalRecords">0</strong>
+                        <small class="management-summary-meta" id="verifiedHistoricalRecords">0 verified</small>
                     </div>
                 </div>
 
@@ -3549,6 +3785,14 @@
                             <option value="today">Today</option>
                             <option value="week">This Week</option>
                             <option value="month">This Month</option>
+                        </select>
+                    </div>
+                    <div class="mobile-filter-slot mobile-filter-slot--barangay" id="barangayFilterSlot" title="Filter by barangay" style="display:none;">
+                        <span class="mobile-filter-icon" aria-hidden="true">
+                            <i class="fa-solid fa-location-dot"></i>
+                        </span>
+                        <select class="filter-select" id="barangayFilter" aria-label="Filter historical records by barangay">
+                            <option value="">All Barangays</option>
                         </select>
                     </div>
                     <button class="btn-filter" id="refreshBtn" title="Refresh">
@@ -3604,6 +3848,7 @@
                             window.stationDb = @json($stations);
                             window.currentStationData = @json($currentStation);
                             window.managedBarangays = @json($managedBarangays ?? []);
+                            window.managementTeams = @json($managementTeams ?? []);
                             window.csrfToken = '{{ csrf_token() }}';
                         </script>
                             <tbody id="tableBody">
@@ -3647,6 +3892,7 @@
                 <!-- Content will be populated by JavaScript -->
             </div>
             <div class="modal-footer">
+                <button class="btn-primary" id="viewEditIncidentBtn" type="button" style="display:none;background:#E4602C;">Edit incident</button>
                 <button class="btn-outline" onclick="management.closeModal('viewModal')">Close</button>
             </div>
         </div>
@@ -3701,6 +3947,7 @@
                 </form>
             </div>
             <div class="modal-footer">
+                <span class="incident-edit-step" id="incidentEditStepIndicator" style="display:none;">Step 1 of 4 &middot; Details</span>
                 <button class="btn-outline" id="cancelFormBtn">Cancel</button>
                 <button class="btn-primary" id="saveFormBtn">Save Changes</button>
             </div>

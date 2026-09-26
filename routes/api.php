@@ -147,6 +147,7 @@ Route::middleware(['web', 'auth', 'role:provincial admin'])->prefix('/management
 });
 Route::middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin'])->prefix('/managements')->group(function () {
     Route::get('/incidents', [App\Http\Controllers\Chief\ManagementController::class, 'getIncidents']);
+    Route::get('/historical-records', [App\Http\Controllers\Chief\ManagementController::class, 'getHistoricalFireIncidents']);
     Route::get('/reports', [App\Http\Controllers\Chief\ManagementController::class, 'getReports']);
     Route::get('/personnel', [App\Http\Controllers\Chief\ManagementController::class, 'getPersonnel']);
 
@@ -158,6 +159,8 @@ Route::middleware(['web', 'auth', 'role:stationadmin,chief,provincial admin'])->
 
 
     Route::get('/equipment', [App\Http\Controllers\Chief\ManagementController::class, 'getEquipment']);
+    Route::put('/historical-records/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updateHistoricalFireRecord']);
+    Route::delete('/historical-records/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'destroyHistoricalFireRecord']);
     Route::put('/incidents/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updateIncident']);
     Route::put('/personnel/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updatePersonnel']);
     Route::put('/equipment/{id}', [App\Http\Controllers\Chief\ManagementController::class, 'updateEquipment']);

@@ -103,6 +103,12 @@ class Incident extends Model
         return $this->belongsTo(Team::class, 'team_id', 'team_id');
     }
 
+    public function dispatchAudits()
+    {
+        return $this->hasMany(IncidentDispatchAudit::class, 'incident_id', 'incident_id')
+            ->latest('incident_dispatch_audit_id');
+    }
+
     public function station()
     {
         return $this->belongsTo(Station::class, 'station_id', 'station_id');

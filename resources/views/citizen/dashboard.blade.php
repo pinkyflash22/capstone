@@ -1757,10 +1757,14 @@
                 align-items: center !important;
                 justify-content: center !important;
                 padding: calc(12px + var(--safe-top)) 12px calc(12px + var(--safe-bottom)) !important;
+                z-index: 4900 !important;
+                pointer-events: auto !important;
             }
 
             #fireIncidentModal > div,
             #concernReportModal > div {
+                position: relative !important;
+                z-index: 1 !important;
                 width: min(100%, 360px) !important;
                 max-height: min(74svh, 520px) !important;
                 margin: 0 auto !important;
@@ -4904,6 +4908,23 @@ initializeCitizenLocationIfGranted();
             }
         }
 
+        function closeCitizenReportMobileOverlays() {
+            document.querySelectorAll('.citizen-mobile-dock, .citizen-mobile-dock__center-wrap').forEach((node) => {
+                node.classList.remove('is-open');
+            });
+
+            document.querySelectorAll('[data-citizen-nav-trigger], [data-citizen-sos-open]').forEach((trigger) => {
+                trigger.setAttribute('aria-expanded', 'false');
+            });
+
+            const citizenSosMenu = document.getElementById('citizenSosMenu');
+            citizenSosMenu?.classList.add('hidden');
+
+            document.querySelectorAll('.citizen-mobile-nav-snackbar.is-visible').forEach((node) => {
+                node.classList.remove('is-visible');
+            });
+        }
+
         function openFireIncidentModal() {
             const fireModal = document.getElementById('fireIncidentModal');
             if (!fireModal) {
@@ -4911,6 +4932,7 @@ initializeCitizenLocationIfGranted();
                 return;
             }
 
+            closeCitizenReportMobileOverlays();
             stopCitizenFireMapPick();
             citizenFireDraft.mode = citizenFireDraft.mode === 'picked' ? 'picked' : 'current';
 
@@ -4943,6 +4965,7 @@ initializeCitizenLocationIfGranted();
                 return;
             }
 
+            closeCitizenReportMobileOverlays();
             stopCitizenHazardMapPick();
             if (citizenHasUsableCoords() && citizenHazardDraft.selectedLat === null && citizenHazardDraft.selectedLng === null) {
                 citizenHazardDraft.selectedLat = Number(window.userCoords.currentLatitude);

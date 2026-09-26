@@ -54,11 +54,47 @@
     .station-management-workspace :is(.filter-actions,.search-filter-bar) { flex-wrap:wrap; gap:8px; min-width:0; }
     .station-management-workspace :is(.search-box,.filter-select) { min-width:0; max-width:100%; }
     .station-management-workspace :is(.btn-primary,.btn-outline,.btn-filter) { min-height:44px; border-radius:9px; font-size:12px; }
-    .station-management-workspace > .table-card { order:6; border:1px solid #e2e8f0; border-top:3px solid #dc2626; border-radius:16px; margin:0 !important; box-shadow:none; min-width:0; max-width:100%; }
+    .station-management-workspace > .table-card { order:6; border:1px solid #E9E5DE; border-radius:16px; margin:0 !important; box-shadow:none; min-width:0; max-width:100%; }
     .station-management-workspace .table-header { padding:16px 18px; background:#fff; }
     .station-management-workspace .table-header h2 { font-size:17px; }
     .station-management-workspace .table-responsive { max-width:100%; overflow-x:auto; }
+    .station-management-workspace .data-table { border-collapse:separate; border-spacing:0; table-layout:auto; }
     .station-management-workspace .data-table th { background:#f8fafc; color:#64748b; font-size:10px; letter-spacing:.06em; }
+    .station-management-workspace .data-table th:first-child, .station-management-workspace .data-table td:first-child { width:30%; }
+    .station-management-workspace .data-table th:nth-child(2), .station-management-workspace .data-table td:nth-child(2) { width:28%; }
+    .station-management-workspace .data-table td { white-space:normal; overflow:visible; text-overflow:clip; vertical-align:top; }
+    .station-management-workspace .management-data-row { position:relative; background:#fff; }
+    .station-management-workspace .management-data-row::before { content:""; position:absolute; inset:0 auto 0 0; width:4px; background:#A5680B; }
+    .station-management-workspace .management-data-row--high::before, .station-management-workspace .management-data-row--critical::before { background:#B23A22; }
+    .station-management-workspace .management-data-row--medium::before { background:#A5680B; }
+    .station-management-workspace .management-data-row--low::before { background:#1E7A4C; }
+    .station-management-workspace .management-primary-cell { display:grid; gap:6px; min-width:0; }
+    .station-management-workspace .management-primary-cell strong { color:#172033; font-size:14px; font-weight:850; line-height:1.35; white-space:normal; overflow-wrap:anywhere; }
+    .station-management-workspace .management-primary-cell small, .station-management-workspace .management-wrap-text { color:#64748b; font-size:12px; line-height:1.45; white-space:normal; overflow-wrap:anywhere; }
+    .station-management-workspace .management-row-meta { display:flex; flex-wrap:wrap; gap:6px; }
+    .station-management-workspace .management-row-tag { display:inline-flex; align-items:center; width:max-content; max-width:100%; min-height:22px; padding:3px 8px; border-radius:999px; background:#F0EEEA; color:#6B6E76; font-size:10px; font-weight:800; line-height:1.2; text-transform:capitalize; }
+    .station-management-workspace .management-row-tag--history { background:#F3EEFB; color:#7A4FB8; }
+    .station-management-workspace .management-location-cell { display:flex; align-items:flex-start; gap:8px; min-width:0; color:#475569; font-size:12px; line-height:1.5; white-space:normal; overflow-wrap:anywhere; }
+    .station-management-workspace .management-location-cell i { margin-top:3px; color:#A5680B; flex:0 0 auto; }
+    .station-management-workspace .management-priority-stack { display:grid; gap:7px; justify-items:start; }
+    .station-management-workspace .management-priority-pill { display:inline-flex; align-items:center; gap:7px; min-height:26px; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:850; }
+    .station-management-workspace .management-priority-pill--high, .station-management-workspace .management-priority-pill--critical { background:#FBEAE4; color:#B23A22; }
+    .station-management-workspace .management-priority-pill--medium { background:#FBF0DD; color:#A5680B; }
+    .station-management-workspace .management-priority-pill--low { background:#E7F5EC; color:#1E7A4C; }
+    .station-management-workspace .management-priority-dot, .station-management-workspace .management-state-dot { width:7px; height:7px; border-radius:999px; background:currentColor; flex:0 0 auto; }
+    .station-management-workspace .management-state-label { display:inline-flex; align-items:center; gap:7px; color:#3A6FB0; font-size:11px; font-weight:750; text-transform:capitalize; }
+    .station-management-workspace .management-state-label--resolved, .station-management-workspace .management-state-label--approved, .station-management-workspace .management-state-label--active, .station-management-workspace .management-state-label--available { color:#1E7A4C; }
+    .station-management-workspace .management-state-label--rejected, .station-management-workspace .management-state-label--damaged, .station-management-workspace .management-state-label--inactive { color:#B23A22; }
+    .station-management-workspace .management-date-text { color:#4A4E58; font-size:12px; font-weight:700; white-space:nowrap; }
+    .station-management-workspace .management-row-actions { display:flex; align-items:center; justify-content:flex-end; gap:6px; min-width:max-content; }
+    .station-management-workspace .management-icon-action { width:34px; height:34px; margin:0; border:1px solid #E9E5DE; border-radius:999px; background:#fff; color:#4A4E58; }
+    .station-management-workspace .management-icon-action:hover { background:#FAF8F5; color:#E4602C; }
+    .station-management-workspace .management-more-menu { position:relative; display:inline-flex; }
+    .station-management-workspace .management-more-dropdown { position:absolute; right:0; top:calc(100% + 6px); z-index:30; display:none; min-width:132px; padding:6px; border:1px solid #E9E5DE; border-radius:12px; background:#fff; box-shadow:0 12px 28px #0f172a18; }
+    .station-management-workspace .management-more-menu:hover .management-more-dropdown, .station-management-workspace .management-more-menu:focus-within .management-more-dropdown { display:block; }
+    .station-management-workspace .management-more-item { width:100%; height:auto; min-height:36px; justify-content:flex-start; gap:8px; padding:8px 10px; border:0; border-radius:9px; color:#B23A22; font-size:12px; font-weight:800; }
+    .station-management-workspace .management-more-item:hover { background:#FBEAE4; color:#B23A22; }
+    .station-management-workspace .management-more-item span { display:inline; }
     .station-management-workspace :is(button,input,select,a):focus-visible { outline:3px solid #f59e0b; outline-offset:3px; }
     /* Gallery dialog sizing and scrolling use the shared modal stylesheet. */
     #galleryPreviewModal .station-gallery-preview { display:grid; grid-template-columns:minmax(0,2fr) minmax(200px,1fr); gap:18px; }
@@ -82,6 +118,16 @@
         .station-management-workspace .tab-btn { flex:1 1 40%; }
         .station-management-workspace .filter-actions { display:flex; width:100%; flex-wrap:wrap; }
         .station-management-workspace :is(input,select) { font-size:16px; }
+        .station-management-workspace .table-responsive { overflow-x:visible; }
+        .station-management-workspace .data-table, .station-management-workspace .data-table thead, .station-management-workspace .data-table tbody, .station-management-workspace .data-table tr, .station-management-workspace .data-table td { display:block; width:100%; }
+        .station-management-workspace .data-table thead { display:none; }
+        .station-management-workspace .management-data-row { margin-bottom:10px; padding:12px 12px 12px 16px; border:1px solid #E9E5DE; border-radius:16px; }
+        .station-management-workspace .management-data-row::before { border-radius:16px 0 0 16px; }
+        .station-management-workspace .data-table td { display:grid; grid-template-columns:108px minmax(0,1fr); gap:10px; padding:8px 0; border:0; }
+        .station-management-workspace .data-table td::before { content:attr(data-label); color:#64748b; font-size:10px; font-weight:850; letter-spacing:.06em; text-transform:uppercase; }
+        .station-management-workspace .data-table td:first-child { grid-template-columns:minmax(0,1fr); width:100%; }
+        .station-management-workspace .data-table td:first-child::before { display:none; }
+        .station-management-workspace .management-row-actions { justify-content:flex-start; }
         #galleryPreviewModal .station-gallery-preview { grid-template-columns:minmax(0,1fr); }
         #galleryPreviewModal .station-gallery-preview-frame img { max-height:45dvh; }
     }

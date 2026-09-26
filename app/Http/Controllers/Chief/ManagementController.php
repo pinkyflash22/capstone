@@ -22,6 +22,7 @@ use App\Models\SpotInvestigationReport;
 use App\Models\ProgressInvestigationReport;
 use App\Models\FinalInvestigationReport;
 use App\Models\HistoricalFireIncident;
+use App\Models\IncidentDispatchAudit;
 use App\Models\Barangay;
 use App\Models\FullAddress;
 use App\Notifications\InvestigationReportReviewedNotification;
@@ -201,8 +202,13 @@ class ManagementController extends Controller
             $stationOfficerIds = $stationOfficers->pluck('station_officer_id')->filter();
             $stationOfficerUserIds = $stationOfficers->pluck('user_id')->filter();
             $stationTeamIds = Team::query()->pluck('team_id')->all();
+            $managementTeams = $this->formatManagementTeams(
+                Team::with('station')->orderBy('team_id')->get()
+            );
 
-            $incidents = Incident::with(['marker', 'reporter', 'team', 'historicalRecords.barangay'])->get();
+            $incidents = $this->formatIncidentRows(
+                Incident::with(['marker', 'reporter', 'barangay', 'team', 'historicalRecords.barangay', 'dispatchAudits.actor', 'dispatchAudits.previousTeam', 'dispatchAudits.assignedTeam'])->get()
+            );
             $alerts = Incident::with('marker')->get();
             $provinces = Province::orderBy('province_name')->get();
 
@@ -264,7 +270,8 @@ class ManagementController extends Controller
                 'personnel',
                 'equipment',
                 'roles',
-                'managedBarangays'
+                'managedBarangays',
+                'managementTeams'
             ));
         }
 
@@ -282,10 +289,16 @@ class ManagementController extends Controller
         $stationOfficerIds = $stationOfficers->pluck('station_officer_id')->filter();
         $stationOfficerUserIds = $stationOfficers->pluck('user_id')->filter();
         $stationTeamIds = $this->stationTeamIds((int) $stationExact, $stationOfficerIds->all());
+        $managementTeams = $this->formatManagementTeams(
+            Team::with('station')
+                ->whereIn('team_id', $stationTeamIds)
+                ->orderBy('team_id')
+                ->get()
+        );
 
-        $incidents = $this->buildStationIncidentQuery((int) $stationExact, $stationTeamIds, $stationOfficerUserIds->all())
-            ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay'])
-            ->get();
+        $incidents = $this->formatIncidentRows($this->buildStationIncidentQuery((int) $stationExact, $stationTeamIds, $stationOfficerUserIds->all())
+            ->with(['marker', 'reporter', 'barangay', 'team', 'historicalRecords.barangay', 'dispatchAudits.actor', 'dispatchAudits.previousTeam', 'dispatchAudits.assignedTeam'])
+            ->get());
 
         $alerts = Incident::with('marker')
           
@@ -357,7 +370,8 @@ class ManagementController extends Controller
             'personnel',
             'equipment',
             'roles',
-            'managedBarangays'
+            'managedBarangays',
+            'managementTeams'
         ));
     }
 
@@ -372,6 +386,8 @@ class ManagementController extends Controller
         if (! in_array($this->currentRole(), ['chief', 'provincial admin'], true)) {
             abort(403, 'Only chiefs can update station information.');
         }
+
+        $manageableTeamIds = $this->manageableTeamIds();
 
         $validated = $request->validate([
             'station_name' => 'required|string|max:255',
@@ -407,6 +423,8 @@ class ManagementController extends Controller
                 'street' => trim($validated['street']),
                 'barangay_id' => (int) $validated['barangay_id'],
             ]);
+
+            $previousTeamId = $incident->team_id ? (int) $incident->team_id : null;
 
             $station->update([
                 'station_name' => $validated['station_name'],
@@ -561,7 +579,7 @@ public function getIncidents(Request $request, IncidentResponderSnapshotService 
 {
     if ($this->isProvincialAdmin()) {
         $query = Incident::query()
-            ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay', 'responderSnapshot']);
+            ->with(['marker', 'reporter', 'barangay', 'team', 'historicalRecords.barangay', 'responderSnapshot', 'dispatchAudits.actor', 'dispatchAudits.previousTeam', 'dispatchAudits.assignedTeam']);
 
         if ($request->has('search') && $request->search) {
             $search = mb_substr(trim((string) $request->search), 0, 100);
@@ -621,7 +639,7 @@ public function getIncidents(Request $request, IncidentResponderSnapshotService 
 
         return response()->json([
             'success' => true,
-            'data' => $incidents->items(),
+            'data' => $this->formatIncidentRows($incidents->getCollection())->values(),
             'pagination' => $this->paginationMeta($incidents),
             'user_team_ids' => Team::query()->pluck('team_id')->all(),
         ]);
@@ -644,7 +662,7 @@ public function getIncidents(Request $request, IncidentResponderSnapshotService 
     $stationTeamIds = $this->stationTeamIds((int) $stationOfficer->station_id, $stationOfficerIds);
 
     $query = $this->buildStationIncidentQuery((int) $stationOfficer->station_id, $stationTeamIds, $stationUserIds)
-        ->with(['marker', 'reporter', 'team', 'historicalRecords.barangay', 'responderSnapshot']);
+        ->with(['marker', 'reporter', 'barangay', 'team', 'historicalRecords.barangay', 'responderSnapshot', 'dispatchAudits.actor', 'dispatchAudits.previousTeam', 'dispatchAudits.assignedTeam']);
     
     // Apply search filter
     if ($request->has('search') && $request->search) {
@@ -709,9 +727,225 @@ public function getIncidents(Request $request, IncidentResponderSnapshotService 
     
     return response()->json([
         'success' => true,
-        'data' => $incidents->items(),
+        'data' => $this->formatIncidentRows($incidents->getCollection())->values(),
         'pagination' => $this->paginationMeta($incidents),
         'user_team_ids' => $stationTeamIds
+    ]);
+}
+
+public function getHistoricalFireIncidents(Request $request)
+{
+    $stationOfficer = $this->currentStationOfficer();
+
+    if (! $this->isProvincialAdmin() && ! $stationOfficer?->station_id) {
+        return response()->json([
+            'success' => true,
+            'data' => [],
+            'message' => 'No station assignment found for this account.',
+        ]);
+    }
+
+    $query = HistoricalFireIncident::query()
+        ->with(['barangay.city.province', 'incident.marker', 'incident.reporter']);
+
+    if (! $this->isProvincialAdmin()) {
+        $barangayIds = $this->getManagedBarangays((int) $stationOfficer->station_id)
+            ->pluck('barangay_id')
+            ->filter()
+            ->all();
+
+        $query->where(function ($stationQuery) use ($stationOfficer, $barangayIds) {
+            if (! empty($barangayIds)) {
+                $stationQuery->whereIn('barangay_id', $barangayIds);
+            } else {
+                $stationQuery->whereRaw('1 = 0');
+            }
+
+            $stationQuery->orWhereHas('incident', function ($incidentQuery) use ($stationOfficer) {
+                $incidentQuery->where('station_id', $stationOfficer->station_id);
+            });
+        });
+    }
+
+    if ($request->filled('search')) {
+        $search = mb_substr(trim((string) $request->search), 0, 100);
+        $query->where(function ($searchQuery) use ($search) {
+            $searchQuery->where('source_name', 'LIKE', "%{$search}%")
+                ->orWhere('source_reference', 'LIKE', "%{$search}%")
+                ->orWhere('incident_location', 'LIKE', "%{$search}%")
+                ->orWhere('fire_cause', 'LIKE', "%{$search}%")
+                ->orWhere('fire_classification', 'LIKE', "%{$search}%")
+                ->orWhereHas('barangay', function ($barangayQuery) use ($search) {
+                    $barangayQuery->where('barangay_name', 'LIKE', "%{$search}%");
+                })
+                ->orWhereHas('incident.marker', function ($markerQuery) use ($search) {
+                    $markerQuery->where('title', 'LIKE', "%{$search}%")
+                        ->orWhere('description', 'LIKE', "%{$search}%");
+                });
+        });
+    }
+
+    if ($request->filled('status')) {
+        if ($request->status === 'verified') {
+            $query->where('is_verified', true);
+        } elseif ($request->status === 'unverified') {
+            $query->where(function ($verificationQuery) {
+                $verificationQuery->whereNull('is_verified')
+                    ->orWhere('is_verified', false);
+            });
+        } else {
+            $query->where('source_type', mb_substr(trim((string) $request->status), 0, 40));
+        }
+    }
+
+    if ($request->filled('barangay_id')) {
+        $query->where('barangay_id', $request->integer('barangay_id'));
+    }
+
+    if ($request->filled('date_filter')) {
+        match ($request->date_filter) {
+            'today' => $query->whereDate('incident_date', Carbon::today()),
+            'week' => $query->whereBetween('incident_date', [Carbon::now()->startOfWeek(), Carbon::now()->endOfWeek()]),
+            'month' => $query->whereYear('incident_date', Carbon::now()->year)
+                ->whereMonth('incident_date', Carbon::now()->month),
+            default => null,
+        };
+    }
+
+    $sortMap = [
+        'incident_date' => 'incident_date',
+        'created_at' => 'created_at',
+        'source_name' => 'source_name',
+        'source_type' => 'source_type',
+        'fire_classification' => 'fire_classification',
+        'incident_count' => 'incident_count',
+        'estimated_damage' => 'estimated_damage',
+        'is_verified' => 'is_verified',
+    ];
+    $sortBy = $sortMap[$request->get('sort_by')] ?? 'incident_date';
+    $sortOrder = $request->get('sort_order') === 'asc' ? 'asc' : 'desc';
+
+    $paginator = $query
+        ->orderBy($sortBy, $sortOrder)
+        ->orderByDesc('historical_fire_incident_id')
+        ->paginate($this->perPage($request));
+
+    $records = collect($paginator->items())
+        ->map(fn (HistoricalFireIncident $record) => $this->serializeHistoricalFireIncident($record))
+        ->values();
+
+    return response()->json([
+        'success' => true,
+        'data' => $records,
+        'pagination' => $this->paginationMeta($paginator),
+    ]);
+}
+
+public function updateHistoricalFireRecord(Request $request, int $id)
+{
+    $historical = $this->findManagedHistoricalFireRecord($id);
+    $managedBarangayIds = $this->managedHistoricalBarangayIds();
+
+    $validated = $request->validate([
+        'title' => 'nullable|string|max:255',
+        'description' => 'nullable|string',
+        'incident_date' => 'required|date|before_or_equal:today',
+        'incident_time' => 'nullable|date_format:H:i',
+        'barangay_id' => [
+            'required',
+            'integer',
+            Rule::in($managedBarangayIds),
+        ],
+        'incident_location' => 'required|string|max:255',
+        'fire_classification' => 'required|in:accidental,intentional,undetermined',
+        'fire_cause' => 'nullable|string|max:255',
+        'incident_count' => 'nullable|integer|min:1|max:9999',
+        'injured_count' => 'nullable|integer|min:0|max:9999',
+        'death_count' => 'nullable|integer|min:0|max:9999',
+        'estimated_damage' => 'nullable|numeric|min:0',
+        'lat' => 'nullable|numeric|between:-90,90',
+        'lng' => 'nullable|numeric|between:-180,180',
+        'source_name' => 'nullable|string|max:255',
+        'source_type' => 'nullable|in:research,barangay_hall,bfp_record,lgu_record,system_incident,other',
+        'source_reference' => 'nullable|string|max:255',
+        'weather_condition' => 'nullable|string|max:255',
+        'temperature' => 'nullable|numeric',
+        'humidity' => 'nullable|numeric|min:0|max:100',
+        'wind_speed' => 'nullable|numeric|min:0',
+        'wind_direction' => 'nullable|string|max:100',
+        'is_verified' => 'nullable|boolean',
+        'notes' => 'nullable|string',
+    ]);
+
+    DB::transaction(function () use ($historical, $validated, $request) {
+        $historical->fill([
+            'barangay_id' => (int) $validated['barangay_id'],
+            'incident_date' => $validated['incident_date'],
+            'incident_time' => $validated['incident_time'] ? $validated['incident_time'] . ':00' : null,
+            'source_name' => $validated['source_name'] ?: 'Station Historical Fire Entry',
+            'source_type' => $validated['source_type'] ?? $historical->source_type ?? 'other',
+            'source_reference' => $validated['source_reference'] ?? null,
+            'fire_classification' => $validated['fire_classification'],
+            'fire_cause' => $validated['fire_cause'] ?? null,
+            'incident_location' => $validated['incident_location'],
+            'incident_count' => (int) ($validated['incident_count'] ?? 1),
+            'injured_count' => (int) ($validated['injured_count'] ?? 0),
+            'death_count' => (int) ($validated['death_count'] ?? 0),
+            'estimated_damage' => $validated['estimated_damage'] ?? null,
+            'temperature' => $validated['temperature'] ?? null,
+            'humidity' => $validated['humidity'] ?? null,
+            'wind_speed' => $validated['wind_speed'] ?? null,
+            'wind_direction' => $validated['wind_direction'] ?? null,
+            'weather_condition' => $validated['weather_condition'] ?? null,
+            'is_verified' => (bool) ($validated['is_verified'] ?? false),
+            'notes' => $validated['notes'] ?? null,
+        ]);
+        $historical->save();
+
+        if ($historical->incident) {
+            $historical->incident->barangay_id = (int) $validated['barangay_id'];
+            $historical->incident->save();
+
+            if ($historical->incident->marker) {
+                $markerPayload = [
+                    'title' => $validated['title'] ?: ($historical->incident->marker->title ?: 'Historical Fire Record'),
+                    'description' => $validated['description'] ?: $validated['incident_location'],
+                ];
+
+                if (array_key_exists('lat', $validated) && $validated['lat'] !== null) {
+                    $markerPayload['lat'] = $validated['lat'];
+                }
+
+                if (array_key_exists('lng', $validated) && $validated['lng'] !== null) {
+                    $markerPayload['lng'] = $validated['lng'];
+                }
+
+                $historical->incident->marker->update($markerPayload);
+            }
+        }
+
+        UserActivityLogger::log('updated historical fire record', Auth::user()?->user_id, $request);
+    });
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Historical fire record updated successfully.',
+        'data' => $this->serializeHistoricalFireIncident(
+            $historical->fresh(['barangay.city.province', 'incident.marker', 'incident.reporter'])
+        ),
+    ]);
+}
+
+public function destroyHistoricalFireRecord(Request $request, int $id)
+{
+    $historical = $this->findManagedHistoricalFireRecord($id);
+    $historical->delete();
+
+    UserActivityLogger::log('deleted historical fire record', Auth::user()?->user_id, $request);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Historical fire record deleted successfully.',
     ]);
 }
 // public function getIncidents(Request $request)
@@ -1044,6 +1278,215 @@ protected function stationTeamIds(int $stationId, array $stationOfficerIds): arr
         ->pluck('team_id')
         ->map(fn ($id) => (int) $id)
         ->all();
+}
+
+protected function formatManagementTeams($teams)
+{
+    return $teams->map(function (Team $team) {
+        return [
+            'team_id' => (int) $team->team_id,
+            'team_name' => $team->team_name,
+            'status' => $team->status,
+            'station_id' => $team->station_id ? (int) $team->station_id : null,
+            'station_name' => $team->station?->station_name,
+        ];
+    })->values();
+}
+
+protected function manageableTeamIds(): array
+{
+    if ($this->isProvincialAdmin()) {
+        return Team::query()
+            ->pluck('team_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    $stationOfficer = $this->currentStationOfficer();
+    if (! $stationOfficer?->station_id) {
+        return [];
+    }
+
+    $stationOfficerIds = StationOfficer::query()
+        ->where('station_id', $stationOfficer->station_id)
+        ->pluck('station_officer_id')
+        ->all();
+
+    return $this->stationTeamIds((int) $stationOfficer->station_id, $stationOfficerIds);
+}
+
+protected function auditIncidentTeamAssignmentChange(Incident $incident, ?int $previousTeamId, ?int $assignedTeamId, Request $request, string $context): void
+{
+    if ($previousTeamId === $assignedTeamId || ! Schema::hasTable('incident_dispatch_audits')) {
+        return;
+    }
+
+    $assignedTeam = $assignedTeamId ? Team::find($assignedTeamId) : null;
+
+    IncidentDispatchAudit::create([
+        'incident_id' => $incident->incident_id,
+        'actor_user_id' => $this->currentUserId(),
+        'action' => $assignedTeamId ? 'station_management_team_assigned' : 'station_management_team_unassigned',
+        'previous_team_id' => $previousTeamId,
+        'assigned_team_id' => $assignedTeamId,
+        'source_station_id' => $incident->station_id,
+        'target_station_id' => $assignedTeam?->station_id,
+        'reason' => 'Updated from Station Management edit modal.',
+        'metadata' => [
+            'context' => $context,
+            'route' => $request->path(),
+            'previous_team_id' => $previousTeamId,
+            'assigned_team_id' => $assignedTeamId,
+        ],
+    ]);
+}
+
+protected function formatIncidentRows($incidents)
+{
+    return $incidents->map(function (Incident $incident) {
+        $reporterName = trim(collect([
+            $incident->reporter?->first_name,
+            $incident->reporter?->middle_name,
+            $incident->reporter?->last_name,
+        ])->filter()->join(' '));
+        $historical = $incident->historicalRecords->first();
+        $barangayName = $incident->barangay?->barangay_name
+            ?: $historical?->barangay?->barangay_name;
+
+        $incident->setAttribute('reporter_name', $reporterName ?: null);
+        $incident->setAttribute('barangay_name', $barangayName ?: null);
+        $incident->setAttribute('location_description', $historical?->incident_location ?: $incident->marker?->description);
+        $incident->setAttribute('source_label', $historical?->source_name ?: 'System report');
+        $incident->setAttribute('team_assignment_audits', $this->formatTeamAssignmentAudits($incident));
+
+        return $incident;
+    });
+}
+
+protected function formatTeamAssignmentAudits(Incident $incident)
+{
+    if (! $incident->relationLoaded('dispatchAudits')) {
+        return collect();
+    }
+
+    return $incident->dispatchAudits
+        ->filter(fn (IncidentDispatchAudit $audit) => in_array($audit->action, ['station_management_team_assigned', 'station_management_team_unassigned'], true))
+        ->take(5)
+        ->map(function (IncidentDispatchAudit $audit) {
+            $actorName = trim(collect([
+                $audit->actor?->first_name,
+                $audit->actor?->middle_name,
+                $audit->actor?->last_name,
+            ])->filter()->join(' '));
+
+            return [
+                'id' => $audit->incident_dispatch_audit_id,
+                'action' => $audit->action,
+                'actor_name' => $actorName ?: 'System user',
+                'previous_team_id' => $audit->previous_team_id ? (int) $audit->previous_team_id : null,
+                'previous_team_name' => $audit->previousTeam?->team_name,
+                'assigned_team_id' => $audit->assigned_team_id ? (int) $audit->assigned_team_id : null,
+                'assigned_team_name' => $audit->assignedTeam?->team_name,
+                'reason' => $audit->reason,
+                'created_at' => optional($audit->created_at)->toISOString(),
+            ];
+        })
+        ->values();
+}
+
+protected function serializeHistoricalFireIncident(HistoricalFireIncident $record): array
+{
+    $incidentTitle = $record->incident?->marker?->title
+        ?: ($record->incident_id ? 'Linked incident #' . $record->incident_id : null);
+    $reporterName = trim(collect([
+        $record->incident?->reporter?->first_name,
+        $record->incident?->reporter?->middle_name,
+        $record->incident?->reporter?->last_name,
+    ])->filter()->join(' '));
+
+    return [
+        'historical_fire_incident_id' => $record->historical_fire_incident_id,
+        'id' => $record->historical_fire_incident_id,
+        'incident_id' => $record->incident_id,
+        'incident_title' => $incidentTitle,
+        'description' => $record->incident?->marker?->description,
+        'marker_lat' => $record->incident?->marker?->lat,
+        'marker_lng' => $record->incident?->marker?->lng,
+        'lat' => $record->incident?->marker?->lat,
+        'lng' => $record->incident?->marker?->lng,
+        'barangay_id' => $record->barangay_id,
+        'barangay_name' => $record->barangay?->barangay_name,
+        'city_name' => $record->barangay?->city?->city_name,
+        'province_name' => $record->barangay?->city?->province?->province_name,
+        'incident_date' => optional($record->incident_date)->toDateString(),
+        'incident_time' => $record->incident_time,
+        'source_name' => $record->source_name,
+        'source_type' => $record->source_type,
+        'source_reference' => $record->source_reference,
+        'fire_classification' => $record->fire_classification,
+        'fire_cause' => $record->fire_cause,
+        'incident_location' => $record->incident_location,
+        'incident_count' => (int) ($record->incident_count ?? 0),
+        'injured_count' => (int) ($record->injured_count ?? 0),
+        'death_count' => (int) ($record->death_count ?? 0),
+        'estimated_damage' => $record->estimated_damage !== null ? (float) $record->estimated_damage : null,
+        'temperature' => $record->temperature,
+        'humidity' => $record->humidity,
+        'wind_speed' => $record->wind_speed,
+        'wind_direction' => $record->wind_direction,
+        'weather_condition' => $record->weather_condition,
+        'is_verified' => (bool) $record->is_verified,
+        'verification_status' => $record->is_verified ? 'verified' : 'unverified',
+        'notes' => $record->notes,
+        'reported_by_name' => $reporterName ?: null,
+        'created_at' => optional($record->created_at)->toISOString(),
+        'updated_at' => optional($record->updated_at)->toISOString(),
+    ];
+}
+
+protected function managedHistoricalBarangayIds(): array
+{
+    if ($this->isProvincialAdmin()) {
+        return Barangay::query()
+            ->pluck('barangay_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
+    $stationOfficer = $this->currentStationOfficer();
+
+    return $stationOfficer?->station_id
+        ? $this->getManagedBarangays((int) $stationOfficer->station_id)
+            ->pluck('barangay_id')
+            ->map(fn ($id) => (int) $id)
+            ->all()
+        : [];
+}
+
+protected function findManagedHistoricalFireRecord(int $id): HistoricalFireIncident
+{
+    $query = HistoricalFireIncident::query()
+        ->with(['barangay.city.province', 'incident.marker', 'incident.reporter']);
+
+    if (! $this->isProvincialAdmin()) {
+        $stationOfficer = $this->currentStationOfficer();
+        abort_unless($stationOfficer?->station_id, 403, 'No station assignment found for this account.');
+
+        $barangayIds = $this->managedHistoricalBarangayIds();
+        $query->where(function ($scope) use ($stationOfficer, $barangayIds) {
+            if (! empty($barangayIds)) {
+                $scope->whereIn('barangay_id', $barangayIds);
+            } else {
+                $scope->whereRaw('1 = 0');
+            }
+
+            $scope->orWhereHas('incident', function ($incidentQuery) use ($stationOfficer) {
+                $incidentQuery->where('station_id', $stationOfficer->station_id);
+            });
+        });
+    }
+
+    return $query->findOrFail($id);
 }
 
 protected function getManagedBarangays(?int $stationId)
@@ -1562,6 +2005,7 @@ protected function storeHistoricalFireIncident(Request $request)
     {
         try {
             $incident = Incident::findOrFail($id);
+            $manageableTeamIds = $this->manageableTeamIds();
 
             if ($request->input('entry_mode') === 'historical_fire_record' || $incident->historicalRecords()->exists()) {
                 return $this->updateHistoricalFireIncident($request, $incident);
@@ -1572,11 +2016,12 @@ protected function storeHistoricalFireIncident(Request $request)
                 'description' => 'sometimes|string',
                 'priority' => 'sometimes|string|in:low,medium,high,critical',
                 'status' => 'sometimes|string|in:reported,responding,active,resolved',
-                'lat' => 'sometimes|numeric',
-                'lng' => 'sometimes|numeric',
+                'lat' => 'sometimes|nullable|numeric',
+                'lng' => 'sometimes|nullable|numeric',
                 'reported_by' => 'sometimes|string|max:255',
                 'reporter_contact' => 'sometimes|string|max:20',
-                'station_id' => 'sometimes|nullable|exists:stations,station_id'
+                'station_id' => 'sometimes|nullable|exists:stations,station_id',
+                'team_id' => ['sometimes', 'nullable', 'integer', Rule::in($manageableTeamIds)]
             ]);
             
             // Update marker if exists
@@ -1612,8 +2057,16 @@ protected function storeHistoricalFireIncident(Request $request)
             
             if (isset($validated['reported_by'])) $incident->reported_by = $validated['reported_by'];
             if (isset($validated['station_id'])) $incident->station_id = $validated['station_id'];
+            if (array_key_exists('team_id', $validated)) $incident->team_id = $validated['team_id'] ?: null;
             
             $incident->save();
+            $this->auditIncidentTeamAssignmentChange(
+                $incident,
+                $previousTeamId,
+                $incident->team_id ? (int) $incident->team_id : null,
+                $request,
+                'incident_edit'
+            );
             UserActivityLogger::log('updated incident', Auth::user()?->user_id, $request);
 
             // If incident is controlled/resolved, release team and station officers to available.
@@ -1639,10 +2092,12 @@ protected function storeHistoricalFireIncident(Request $request)
                 }
             }
             
+            $updatedIncident = $incident->fresh()->load(['marker', 'reporter', 'barangay', 'team', 'incidentType', 'incidentStatus', 'historicalRecords.barangay', 'responderSnapshot', 'dispatchAudits.actor', 'dispatchAudits.previousTeam', 'dispatchAudits.assignedTeam']);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Incident updated successfully',
-                'data' => $incident->load(['marker', 'incidentType', 'incidentStatus'])
+                'data' => $this->formatIncidentRows(collect([$updatedIncident]))->first()
             ]);
             
         } catch (\Exception $e) {
@@ -1708,6 +2163,7 @@ protected function storeHistoricalFireIncident(Request $request)
             'lng' => 'sometimes|required|numeric|between:-180,180',
             'source_name' => 'nullable|string|max:255',
             'source_reference' => 'nullable|string|max:255',
+            'team_id' => ['nullable', 'integer', Rule::in($manageableTeamIds)],
             'weather_condition' => 'nullable|string|max:255',
             'temperature' => 'nullable|numeric',
             'humidity' => 'nullable|numeric|min:0|max:100',
@@ -1716,7 +2172,9 @@ protected function storeHistoricalFireIncident(Request $request)
             'notes' => 'nullable|string',
         ]);
 
-        DB::transaction(function () use ($validated, $incident, $historical, $request) {
+        $previousTeamId = $incident->team_id ? (int) $incident->team_id : null;
+
+        DB::transaction(function () use ($validated, $incident, $historical, $request, $previousTeamId) {
             if ($incident->marker) {
                 $markerPayload = [];
                 if (array_key_exists('title', $validated)) {
@@ -1764,6 +2222,10 @@ protected function storeHistoricalFireIncident(Request $request)
                 $incident->barangay_id = (int) $validated['barangay_id'];
             }
 
+            if (array_key_exists('team_id', $validated)) {
+                $incident->team_id = $validated['team_id'] ?: null;
+            }
+
             if (array_key_exists('incident_date', $validated) || array_key_exists('incident_time', $validated)) {
                 $incidentDate = $validated['incident_date'] ?? optional($historical->incident_date)->toDateString() ?? optional($incident->created_at)->toDateString();
                 $incidentTime = array_key_exists('incident_time', $validated)
@@ -1780,15 +2242,24 @@ protected function storeHistoricalFireIncident(Request $request)
             $incident->status = 'Resolved';
             $incident->incident_status_id = 4;
             $incident->save();
+            $this->auditIncidentTeamAssignmentChange(
+                $incident,
+                $previousTeamId,
+                $incident->team_id ? (int) $incident->team_id : null,
+                $request,
+                'historical_incident_edit'
+            );
 
             IncidentContextDispatcher::dispatchFor($incident);
             UserActivityLogger::log('updated historical fire incident', Auth::user()?->user_id, $request);
         });
 
+        $updatedIncident = $incident->fresh()->load(['marker', 'reporter', 'barangay', 'team', 'historicalRecords.barangay', 'responderSnapshot', 'dispatchAudits.actor', 'dispatchAudits.previousTeam', 'dispatchAudits.assignedTeam']);
+
         return response()->json([
             'success' => true,
             'message' => 'Historical fire record updated successfully.',
-            'data' => $incident->fresh()->load(['marker', 'reporter', 'historicalRecords.barangay'])
+            'data' => $this->formatIncidentRows(collect([$updatedIncident]))->first()
         ]);
     }
 

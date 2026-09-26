@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
+use App\Models\Team;
 
 class IncidentDispatchAudit extends Model
 {
@@ -14,4 +16,19 @@ class IncidentDispatchAudit extends Model
     ];
 
     protected $casts = ['metadata' => 'array'];
+
+    public function actor()
+    {
+        return $this->belongsTo(User::class, 'actor_user_id', 'user_id');
+    }
+
+    public function previousTeam()
+    {
+        return $this->belongsTo(Team::class, 'previous_team_id', 'team_id');
+    }
+
+    public function assignedTeam()
+    {
+        return $this->belongsTo(Team::class, 'assigned_team_id', 'team_id');
+    }
 }
