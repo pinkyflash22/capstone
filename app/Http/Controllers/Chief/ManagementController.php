@@ -35,6 +35,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Validation\Rule;
 use App\Support\UserActivityLogger;
 use App\Services\IncidentResponderSnapshotService;
+use App\Services\IncidentAutoAssignmentService;
 use App\Services\StationBarangayCoverageService;
 use App\Services\InvestigationReportImageService;
 use Carbon\Carbon;
@@ -256,6 +257,7 @@ class ManagementController extends Controller
             $reports = $this->buildStationReports(null, $stationOfficerIds->all(), $stationTeamIds, $stationOfficerUserIds->all());
             $roles = Role::where('role', '!=', 'anonymous')->orderBy('role')->get();
             $managedBarangays = Barangay::with('city')->orderBy('barangay_name')->get();
+            $dispatchQueue = $this->buildDispatchQueueSummary(null);
             $totalIncidents = $incidents;
 
             return view('chief.management', compact(
@@ -271,7 +273,8 @@ class ManagementController extends Controller
                 'equipment',
                 'roles',
                 'managedBarangays',
-                'managementTeams'
+                'managementTeams',
+                'dispatchQueue'
             ));
         }
 
@@ -355,6 +358,7 @@ class ManagementController extends Controller
             ->orderBy('role')
             ->get();
         $managedBarangays = $this->getManagedBarangays($stationExact);
+        $dispatchQueue = $this->buildDispatchQueueSummary((int) $stationExact);
 
         $totalIncidents = $incidents;
 
@@ -371,7 +375,8 @@ class ManagementController extends Controller
             'equipment',
             'roles',
             'managedBarangays',
-            'managementTeams'
+            'managementTeams',
+            'dispatchQueue'
         ));
     }
 
@@ -641,6 +646,7 @@ public function getIncidents(Request $request, IncidentResponderSnapshotService 
             'success' => true,
             'data' => $this->formatIncidentRows($incidents->getCollection())->values(),
             'pagination' => $this->paginationMeta($incidents),
+            'dispatch_queue' => $this->buildDispatchQueueSummary(null),
             'user_team_ids' => Team::query()->pluck('team_id')->all(),
         ]);
     }
@@ -729,6 +735,7 @@ public function getIncidents(Request $request, IncidentResponderSnapshotService 
         'success' => true,
         'data' => $this->formatIncidentRows($incidents->getCollection())->values(),
         'pagination' => $this->paginationMeta($incidents),
+        'dispatch_queue' => $this->buildDispatchQueueSummary((int) $stationOfficer->station_id),
         'user_team_ids' => $stationTeamIds
     ]);
 }
@@ -1341,6 +1348,53 @@ protected function auditIncidentTeamAssignmentChange(Incident $incident, ?int $p
     ]);
 }
 
+protected function buildDispatchQueueSummary(?int $stationId): array
+{
+    $windowMinutes = IncidentAutoAssignmentService::DEFAULT_RECENT_ASSIGNMENT_MINUTES;
+    $cutoff = now()->subMinutes($windowMinutes);
+
+    $baseQuery = Incident::query()
+        ->with(['marker', 'barangay', 'station'])
+        ->whereNull('team_id')
+        ->where('status', 'Reported')
+        ->where('created_at', '>=', $cutoff)
+        ->when($stationId, fn ($query) => $query->where('station_id', $stationId))
+        ->when(Schema::hasColumn('incidents', 'duplicate_of_incident_id'), fn ($query) => $query->whereNull('duplicate_of_incident_id'));
+
+    $total = (clone $baseQuery)->count();
+
+    $items = $baseQuery
+        ->when(
+            Schema::hasColumn('incidents', 'dispatch_priority'),
+            fn ($query) => $query->orderByRaw("CASE LOWER(COALESCE(dispatch_priority, 'medium')) WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END")
+        )
+        ->orderBy('created_at', 'asc')
+        ->limit(6)
+        ->get()
+        ->map(function (Incident $incident) {
+            $createdAt = $incident->created_at ? Carbon::parse($incident->created_at) : null;
+
+            return [
+                'incident_id' => (int) $incident->incident_id,
+                'title' => $incident->marker?->title ?: 'Reported incident',
+                'barangay_name' => $incident->barangay?->barangay_name,
+                'location' => $incident->barangay?->barangay_name
+                    ?: ($incident->marker?->description ?: 'Location not recorded'),
+                'priority' => $incident->dispatch_priority ?: 'medium',
+                'station_name' => $incident->station?->station_name,
+                'created_at' => optional($createdAt)->toISOString(),
+                'age_minutes' => $createdAt ? max(0, (int) $createdAt->diffInMinutes(now())) : null,
+            ];
+        })
+        ->values();
+
+    return [
+        'total' => $total,
+        'window_minutes' => $windowMinutes,
+        'items' => $items,
+    ];
+}
+
 protected function formatIncidentRows($incidents)
 {
     return $incidents->map(function (Incident $incident) {
@@ -1369,8 +1423,16 @@ protected function formatTeamAssignmentAudits(Incident $incident)
         return collect();
     }
 
+    $visibleActions = [
+        'station_management_team_assigned',
+        'station_management_team_unassigned',
+        'auto_team_assigned',
+        'auto_team_reassigned',
+        'auto_team_renewed',
+    ];
+
     return $incident->dispatchAudits
-        ->filter(fn (IncidentDispatchAudit $audit) => in_array($audit->action, ['station_management_team_assigned', 'station_management_team_unassigned'], true))
+        ->filter(fn (IncidentDispatchAudit $audit) => in_array($audit->action, $visibleActions, true))
         ->take(5)
         ->map(function (IncidentDispatchAudit $audit) {
             $actorName = trim(collect([
@@ -1382,7 +1444,7 @@ protected function formatTeamAssignmentAudits(Incident $incident)
             return [
                 'id' => $audit->incident_dispatch_audit_id,
                 'action' => $audit->action,
-                'actor_name' => $actorName ?: 'System user',
+                'actor_name' => $actorName ?: (str_starts_with((string) $audit->action, 'auto_') ? 'Auto dispatch' : 'System user'),
                 'previous_team_id' => $audit->previous_team_id ? (int) $audit->previous_team_id : null,
                 'previous_team_name' => $audit->previousTeam?->team_name,
                 'assigned_team_id' => $audit->assigned_team_id ? (int) $audit->assigned_team_id : null,

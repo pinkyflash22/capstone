@@ -1452,6 +1452,125 @@
             font-weight: 800;
         }
 
+        .dispatch-queue-panel {
+            margin-bottom: 16px;
+            border: 1px solid #E9E5DE;
+            border-radius: 18px;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        .dispatch-queue-panel[hidden] {
+            display: none;
+        }
+
+        .dispatch-queue-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px 18px;
+            background: #FAF8F5;
+            border-bottom: 1px solid #E9E5DE;
+        }
+
+        .dispatch-queue-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #1f2937;
+            font-weight: 800;
+        }
+
+        .dispatch-queue-title i {
+            color: #A5680B;
+        }
+
+        .dispatch-queue-copy {
+            margin: 4px 0 0;
+            color: #6B6E76;
+            font-size: 0.82rem;
+        }
+
+        .dispatch-queue-count {
+            flex: 0 0 auto;
+            border-radius: 999px;
+            background: #FBF0DD;
+            color: #A5680B;
+            padding: 7px 12px;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
+
+        .dispatch-queue-list {
+            display: grid;
+        }
+
+        .dispatch-queue-item {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+            align-items: center;
+            padding: 14px 18px;
+            border-bottom: 1px solid #E9E5DE;
+        }
+
+        .dispatch-queue-item:last-child {
+            border-bottom: 0;
+        }
+
+        .dispatch-queue-main strong {
+            display: block;
+            color: #111827;
+            font-size: 0.94rem;
+            font-weight: 800;
+        }
+
+        .dispatch-queue-main span {
+            display: block;
+            margin-top: 4px;
+            color: #6B6E76;
+            font-size: 0.82rem;
+        }
+
+        .dispatch-queue-meta {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .dispatch-queue-pill {
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            background: #F0EEEA;
+            color: #4A4E58;
+        }
+
+        .dispatch-queue-pill--priority {
+            background: #FBEAE4;
+            color: #B23A22;
+        }
+
+        @media (max-width: 768px) {
+            .dispatch-queue-head,
+            .dispatch-queue-item {
+                grid-template-columns: 1fr;
+                align-items: flex-start;
+            }
+
+            .dispatch-queue-head {
+                display: grid;
+            }
+
+            .dispatch-queue-meta {
+                justify-content: flex-start;
+            }
+        }
+
         .table-responsive {
             padding: 0 8px 8px;
         }
@@ -3816,6 +3935,8 @@
                 <p>Loading data...</p>
             </div>
 
+            <div id="dispatchQueuePanel" class="dispatch-queue-panel" hidden></div>
+
             <!-- Data Table -->
             <div class="table-card" id="dataTable">
                 <div class="table-header">
@@ -3849,6 +3970,7 @@
                             window.currentStationData = @json($currentStation);
                             window.managedBarangays = @json($managedBarangays ?? []);
                             window.managementTeams = @json($managementTeams ?? []);
+                            window.dispatchQueue = @json($dispatchQueue ?? ['total' => 0, 'window_minutes' => 180, 'items' => []]);
                             window.csrfToken = '{{ csrf_token() }}';
                         </script>
                             <tbody id="tableBody">

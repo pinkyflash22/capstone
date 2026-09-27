@@ -88,21 +88,43 @@ class FirefighterIncidentResponseController extends Controller
 
     public function arrive(Incident $incident, IncidentResourceDispatchService $resources): JsonResponse
     {
-        DB::transaction(function () use ($incident, $resources) {
+        $alreadyOnScene = DB::transaction(function () use ($incident, $resources) {
             $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
             $officer = $this->currentOfficer();
             abort_unless($this->respondingTeamForOfficer($locked, $officer), 403, 'You are not assigned to this incident response.');
-            abort_unless(strtolower(trim((string) $locked->status)) === 'responding', 409, 'Only a responding incident can be marked on scene.');
+            $status = strtolower(trim((string) $locked->status));
+
+            if ($status === 'on scene') {
+                $resources->markIncidentUnitsOnScene($locked);
+
+                return true;
+            }
+
+            abort_unless($status === 'responding', 409, 'Only a responding incident can be marked on scene.');
 
             $locked->forceFill(['status' => 'On Scene'])->save();
             $resources->markIncidentUnitsOnScene($locked);
-        });
-        UserActivityLogger::log("marked incident #{$incident->incident_id} on scene", Auth::id(), request());
 
-        return response()->json(['success' => true, 'message' => 'Arrival confirmed. Incident updated to On Scene.']);
+            return false;
+        });
+
+        if (! $alreadyOnScene) {
+            UserActivityLogger::log("marked incident #{$incident->incident_id} on scene", Auth::id(), request());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $alreadyOnScene
+                ? 'Arrival was already confirmed. Incident is On Scene.'
+                : 'Arrival confirmed. Incident updated to On Scene.',
+        ]);
     }
 
-    public function complete(Incident $incident, IncidentResourceDispatchService $resources): JsonResponse
+    public function complete(
+        Incident $incident,
+        IncidentResourceDispatchService $resources,
+        IncidentAutoAssignmentService $assignments
+    ): JsonResponse
     {
         $completed = DB::transaction(function () use ($incident) {
             $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
@@ -119,12 +141,26 @@ class FirefighterIncidentResponseController extends Controller
         });
 
         $resources->releaseIncidentUnits($completed);
+        $queue = $assignments->assignRecentUnassignedIncidents();
         UserActivityLogger::log("marked incident #{$incident->incident_id} controlled", Auth::id(), request());
 
-        return response()->json(['success' => true, 'message' => 'Incident completed. Team, personnel, and apparatus are available again.']);
+        $message = 'Incident completed. Team, personnel, and apparatus are available again.';
+        if (count($queue['assigned'] ?? []) > 0) {
+            $message .= ' '.$this->assignmentQueueSummary($queue);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'queue' => $queue,
+        ]);
     }
 
-    public function falseAlarm(Incident $incident, IncidentResourceDispatchService $resources): JsonResponse
+    public function falseAlarm(
+        Incident $incident,
+        IncidentResourceDispatchService $resources,
+        IncidentAutoAssignmentService $assignments
+    ): JsonResponse
     {
         $closed = DB::transaction(function () use ($incident) {
             $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
@@ -145,9 +181,19 @@ class FirefighterIncidentResponseController extends Controller
         });
 
         $resources->releaseIncidentUnits($closed);
+        $queue = $assignments->assignRecentUnassignedIncidents();
         UserActivityLogger::log("closed incident #{$incident->incident_id} as false alarm", Auth::id(), request());
 
-        return response()->json(['success' => true, 'message' => 'Incident marked as a false alarm and closed.']);
+        $message = 'Incident marked as a false alarm and closed.';
+        if (count($queue['assigned'] ?? []) > 0) {
+            $message .= ' '.$this->assignmentQueueSummary($queue);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'queue' => $queue,
+        ]);
     }
 
     public function close(Incident $incident): JsonResponse
@@ -197,6 +243,31 @@ class FirefighterIncidentResponseController extends Controller
     private function currentOfficer(): StationOfficer
     {
         return StationOfficer::query()->where('user_id', Auth::id())->firstOrFail();
+    }
+
+    private function assignmentQueueSummary(array $queue): string
+    {
+        $assigned = collect($queue['assigned'] ?? [])->filter();
+        $count = $assigned->count();
+
+        if ($count === 0) {
+            return 'No waiting incidents were reassigned.';
+        }
+
+        $first = $assigned->first();
+        $firstIncident = data_get($first, 'incident_id');
+        $firstTeam = data_get($first, 'team_name') ?: (data_get($first, 'team_id') ? 'Team #'.data_get($first, 'team_id') : 'an available team');
+        $prefix = $count === 1
+            ? '1 recent waiting incident under 3 hours old was reassigned'
+            : "{$count} recent waiting incidents under 3 hours old were reassigned";
+
+        if ($firstIncident) {
+            $prefix .= " starting with incident #{$firstIncident} to {$firstTeam}.";
+        } else {
+            $prefix .= ' to available teams.';
+        }
+
+        return $prefix;
     }
 
     private function respondingTeamForOfficer(Incident $incident, StationOfficer $officer): ?Team

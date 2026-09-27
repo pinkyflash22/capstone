@@ -2495,8 +2495,30 @@
         }
 
         const selectedLabel = reportedBySearch.value.trim();
+        const normalizedSelectedLabel = selectedLabel.toLowerCase();
         const options = Array.from(document.querySelectorAll('#citizenOptions option'));
-        const match = options.find(option => option.value === selectedLabel);
+        if (!normalizedSelectedLabel) {
+            reportedByUserId.value = '';
+            return;
+        }
+        const match = options.find(option => {
+            const optionValue = String(option.value || '').trim();
+            const userId = String(option.dataset.userId || '').trim();
+
+            if (!optionValue || !userId) {
+                return false;
+            }
+
+            const normalizedValue = optionValue.toLowerCase();
+            const parts = optionValue
+                .split(/[·•|-]/)
+                .map(part => part.trim().toLowerCase())
+                .filter(Boolean);
+
+            return normalizedValue === normalizedSelectedLabel
+                || normalizedValue.includes(normalizedSelectedLabel)
+                || parts.includes(normalizedSelectedLabel);
+        });
         reportedByUserId.value = match ? (match.dataset.userId || '') : '';
     }
 

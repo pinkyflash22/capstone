@@ -12771,6 +12771,51 @@ function initAfterMapReady() {
 // Save marker button handler
 // ============================================================================
 
+function resolveSelectedCitizenUserId(searchInput = document.getElementById('reportedBySearch')) {
+    const searchValue = String(searchInput?.value || '').trim();
+
+    if (!searchValue) {
+        return '';
+    }
+
+    const normalizedSearch = searchValue.toLowerCase();
+    const options = Array.from(document.querySelectorAll('#citizenOptions option'));
+    const match = options.find((option) => {
+        const value = String(option.value || '').trim();
+        const userId = String(option.dataset.userId || '').trim();
+
+        if (!value || !userId) {
+            return false;
+        }
+
+        const normalizedValue = value.toLowerCase();
+        const parts = value
+            .split(/[·•|-]/)
+            .map((part) => part.trim().toLowerCase())
+            .filter(Boolean);
+
+        return normalizedValue === normalizedSearch
+            || normalizedValue.includes(normalizedSearch)
+            || parts.includes(normalizedSearch);
+    });
+
+    return match?.dataset.userId || '';
+}
+
+function syncReportedByUserIdFromSearch() {
+    const searchInput = document.getElementById('reportedBySearch');
+    const userIdInput = document.getElementById('reportedByUserId');
+
+    if (!searchInput || !userIdInput) {
+        return '';
+    }
+
+    const resolvedUserId = resolveSelectedCitizenUserId(searchInput);
+    userIdInput.value = resolvedUserId;
+
+    return resolvedUserId;
+}
+
 function getMarkerSaveFormContext() {
     const categorySelect = document.getElementById('mCategory');
     const selectedOption = categorySelect?.options?.[categorySelect.selectedIndex] || null;
@@ -12815,6 +12860,10 @@ function validateMarkerSaveContext(context) {
     }
 
     if (context.isIncidentMarker) {
+        if (!context.reportedByWalkInInput?.checked && !context.reportedByUserIdInput?.value) {
+            syncReportedByUserIdFromSearch();
+        }
+
         if (!context.defaultIncidentTeamIdInput?.value) {
             return 'No default station team is configured for this account yet.';
         }
@@ -12904,7 +12953,7 @@ async function readJsonResponse(response, fallbackMessage) {
 
 async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
     if (context.isIncidentMarker) {
-        let reportedByUserId = context.reportedByUserIdInput?.value || '';
+        let reportedByUserId = context.reportedByUserIdInput?.value || syncReportedByUserIdFromSearch();
 
         if (context.reportedByWalkInInput?.checked) {
             const walkInResponse = await fetch('/station-admin/api/walk-in-citizen', {

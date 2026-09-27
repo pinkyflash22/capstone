@@ -322,7 +322,7 @@ class IncidentController extends Controller
 
         if (in_array($statusId, [self::STATUS_CONTROLLED, self::STATUS_CLOSED], true)) {
             try {
-                app(IncidentAutoAssignmentService::class)->assignRecentUnassignedIncidents(60);
+                app(IncidentAutoAssignmentService::class)->assignRecentUnassignedIncidents();
             } catch (\Throwable $e) {
                 Log::error('Failed to auto-assign unassigned incidents after team became available: ' . $e->getMessage(), [
                     'incident_id' => $incident->incident_id,
@@ -1760,7 +1760,7 @@ public function getRecentIncident(Request $request, OperationalMapScope $operati
 public function autoAssignRecentUnassignedIncidents(Request $request)
 {
     try {
-        $minutes = max(1, (int) $request->input('minutes', 60));
+        $minutes = max(1, (int) $request->input('minutes', IncidentAutoAssignmentService::DEFAULT_RECENT_ASSIGNMENT_MINUTES));
         $result = app(IncidentAutoAssignmentService::class)->assignRecentUnassignedIncidents($minutes);
 
         if ($result['checked'] === 0) {

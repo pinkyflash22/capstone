@@ -44,6 +44,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     let activeResponseUnitsData = [];
     const apparatusTelemetryState = new Map();
     const APPARATUS_TELEMETRY_QUEUE_KEY = `pyrosense_apparatus_telemetry_${window.currentUserId || 'guest'}`;
+    const incidentArrivalRequestsInFlight = new Set();
     let apparatusWakeLock = null;
     let apparatusTelemetryFlushInFlight = false;
     const MAX_LIVE_GPS_ACCURACY_METERS = 150;
@@ -1351,6 +1352,12 @@ window.respondToIncidentLive = (incidentId, currentStatusId = 1, triggerButton =
 );
 
 async function arriveAtIncident(incidentId, currentStatusId, triggerButton = null) {
+    const normalizedIncidentId = Number(incidentId);
+    if (incidentArrivalRequestsInFlight.has(normalizedIncidentId)) {
+        showToast('Arrival confirmation is already being sent.', 'info');
+        return;
+    }
+
     if (currentStatusId != 2) {
         showToast('Only a responding incident can be marked on scene', 'error');
         return;
@@ -1363,6 +1370,7 @@ async function arriveAtIncident(incidentId, currentStatusId, triggerButton = nul
     });
 
     try {
+        incidentArrivalRequestsInFlight.add(normalizedIncidentId);
         const response = await fetch(`/firefighter/incidents/${incidentId}/arrive`, {
             method: 'POST',
             headers: {
@@ -1386,6 +1394,8 @@ async function arriveAtIncident(incidentId, currentStatusId, triggerButton = nul
         restoreIncidentActionPendingState(incidentId, pendingState);
         console.error('Error confirming incident arrival:', error);
         showToast(error.message || 'Failed to confirm arrival', 'error');
+    } finally {
+        incidentArrivalRequestsInFlight.delete(normalizedIncidentId);
     }
 }
 

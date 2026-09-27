@@ -23,6 +23,7 @@ class ManagementPage {
             personnel: window.personnelDb || [],
             equipment: window.equipmentDb || []
         };
+        this.dispatchQueue = window.dispatchQueue || { total: 0, window_minutes: 180, items: [] };
         this.rolesData ={
             allRoles: window.rolesData || [],
         };
@@ -406,6 +407,10 @@ class ManagementPage {
             const endpoint = this.currentTab === 'historical_records' ? 'historical-records' : this.currentTab;
             const payload = await this.fetchData(`/api/managements/${endpoint}?${params.toString()}`);
             this.data[this.currentTab] = Array.isArray(payload.data) ? payload.data : [];
+            if (this.currentTab === 'incidents' && payload.dispatch_queue) {
+                this.dispatchQueue = payload.dispatch_queue;
+                window.dispatchQueue = payload.dispatch_queue;
+            }
             this.pagination = payload.pagination || {
                 current_page: 1,
                 last_page: 1,
@@ -629,9 +634,72 @@ class ManagementPage {
 
     renderTable() {
         const data = this.data[this.currentTab] || [];
+        this.renderDispatchQueuePanel();
         this.renderTableHeader();
         this.renderTableBody(data);
         this.renderPagination(this.pagination.total || 0);
+    }
+
+    renderDispatchQueuePanel() {
+        const panel = document.getElementById('dispatchQueuePanel');
+        if (!panel) return;
+
+        const queue = this.dispatchQueue || {};
+        const items = Array.isArray(queue.items) ? queue.items : [];
+        const total = Number(queue.total || items.length || 0);
+        const windowMinutes = Number(queue.window_minutes || 180);
+
+        if (this.currentTab !== 'incidents' || total <= 0 || items.length === 0) {
+            panel.hidden = true;
+            panel.innerHTML = '';
+            return;
+        }
+
+        const moreCount = Math.max(0, total - items.length);
+        const windowLabel = windowMinutes >= 60
+            ? `${Math.round(windowMinutes / 60)} hour${Math.round(windowMinutes / 60) === 1 ? '' : 's'}`
+            : `${windowMinutes} minutes`;
+
+        panel.hidden = false;
+        panel.innerHTML = `
+            <div class="dispatch-queue-head">
+                <div>
+                    <div class="dispatch-queue-title">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>Waiting dispatch queue</span>
+                    </div>
+                    <p class="dispatch-queue-copy">Reported incidents from the last ${this.escapeHtml(windowLabel)} that are not assigned to a team yet.</p>
+                </div>
+                <span class="dispatch-queue-count">${total} waiting</span>
+            </div>
+            <div class="dispatch-queue-list">
+                ${items.map((item) => this.renderDispatchQueueItem(item)).join('')}
+                ${moreCount > 0 ? `<div class="dispatch-queue-item"><div class="dispatch-queue-main"><strong>${moreCount} more waiting</strong><span>Use search or refresh as teams become available.</span></div></div>` : ''}
+            </div>
+        `;
+    }
+
+    renderDispatchQueueItem(item) {
+        const priority = this.formatLabel(item.priority || 'medium', 'Medium');
+        const age = Number.isFinite(Number(item.age_minutes))
+            ? `${Math.max(0, Math.round(Number(item.age_minutes)))} min waiting`
+            : 'Waiting';
+        const title = item.title || `Incident #${item.incident_id}`;
+        const location = item.location || item.barangay_name || 'Location not recorded';
+
+        return `
+            <div class="dispatch-queue-item">
+                <div class="dispatch-queue-main">
+                    <strong>#${this.escapeHtml(item.incident_id)} · ${this.escapeHtml(title)}</strong>
+                    <span>${this.escapeHtml(location)}</span>
+                </div>
+                <div class="dispatch-queue-meta">
+                    <span class="dispatch-queue-pill dispatch-queue-pill--priority">${this.escapeHtml(priority)}</span>
+                    <span class="dispatch-queue-pill">${this.escapeHtml(age)}</span>
+                    <span class="dispatch-queue-pill">No team assigned</span>
+                </div>
+            </div>
+        `;
     }
 
     sortData(data) {

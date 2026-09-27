@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Incident;
+use App\Models\IncidentDispatchAudit;
 use App\Models\Station;
 use App\Models\StationOfficer;
 use App\Models\Team;
@@ -16,12 +17,13 @@ use Throwable;
 class IncidentAutoAssignmentService
 {
     public const DEFAULT_RESPONSE_TIMEOUT_MINUTES = 2;
+    public const DEFAULT_RECENT_ASSIGNMENT_MINUTES = 180;
 
     public function __construct(private readonly IncidentJurisdictionService $jurisdictionService)
     {
     }
 
-    public function assignRecentUnassignedIncidents(int $minutes = 60): array
+    public function assignRecentUnassignedIncidents(int $minutes = self::DEFAULT_RECENT_ASSIGNMENT_MINUTES): array
     {
         $expired = $this->expireUnansweredAssignments();
         $cutoff = now()->subMinutes($minutes);
@@ -41,7 +43,7 @@ class IncidentAutoAssignmentService
         $assignedIncidents = [];
 
         foreach ($incidents as $incident) {
-            $assignedIncident = $this->assignSingleIncident($incident);
+            $assignedIncident = $this->assignSingleIncident($incident, [], null, 'auto_team_assigned', 'Assigned by automatic dispatch matching.', $minutes);
             if ($assignedIncident !== null) {
                 $assignedIncidents[] = $assignedIncident;
             }
@@ -54,7 +56,14 @@ class IncidentAutoAssignmentService
         ];
     }
 
-    public function assignSingleIncidentById(int $incidentId, array $excludedTeamIds = []): ?array
+    public function assignSingleIncidentById(
+        int $incidentId,
+        array $excludedTeamIds = [],
+        ?int $previousTeamId = null,
+        string $auditAction = 'auto_team_assigned',
+        string $reason = 'Assigned by automatic dispatch matching.',
+        ?int $auditWindowMinutes = null
+    ): ?array
     {
         $incident = Incident::with('marker')->find($incidentId);
 
@@ -62,12 +71,19 @@ class IncidentAutoAssignmentService
             return null;
         }
 
-        return $this->assignSingleIncident($incident, $excludedTeamIds);
+        return $this->assignSingleIncident($incident, $excludedTeamIds, $previousTeamId, $auditAction, $reason, $auditWindowMinutes);
     }
 
-    public function assignSingleIncident(Incident $incident, array $excludedTeamIds = []): ?array
+    public function assignSingleIncident(
+        Incident $incident,
+        array $excludedTeamIds = [],
+        ?int $previousTeamId = null,
+        string $auditAction = 'auto_team_assigned',
+        string $reason = 'Assigned by automatic dispatch matching.',
+        ?int $auditWindowMinutes = null
+    ): ?array
     {
-        return DB::transaction(function () use ($incident, $excludedTeamIds) {
+        return DB::transaction(function () use ($incident, $excludedTeamIds, $previousTeamId, $auditAction, $reason, $auditWindowMinutes) {
             $lockedIncident = Incident::with('marker')
                 ->whereKey($incident->getKey())
                 ->lockForUpdate()
@@ -119,6 +135,11 @@ class IncidentAutoAssignmentService
                 $lockedIncident->updated_at = now();
                 $lockedIncident->save();
 
+                $this->recordDispatchAudit($lockedIncident, $auditAction, $previousTeamId, (int) $team->team_id, $reason, [
+                    'excluded_team_ids' => array_values(array_map('intval', $excludedTeamIds)),
+                    'window_minutes' => $auditWindowMinutes ?? self::DEFAULT_RECENT_ASSIGNMENT_MINUTES,
+                ]);
+
                 $incidentId = (int) $lockedIncident->incident_id;
                 $teamId = (int) $team->team_id;
                 DB::afterCommit(fn () => $this->notifyIncidentAssignment($incidentId, $stationId, $teamId));
@@ -126,6 +147,7 @@ class IncidentAutoAssignmentService
                 return [
                     'incident_id' => $lockedIncident->incident_id,
                     'team_id' => $team->team_id,
+                    'team_name' => $team->team_name ?? ('Team #'.$team->team_id),
                     'station_id' => $stationId,
                     'status' => 'awaiting-response',
                     'team_status_updated' => false,
@@ -183,7 +205,13 @@ class IncidentAutoAssignmentService
                 continue;
             }
 
-            $assignment = $this->assignSingleIncidentById((int) $incidentId, [$teamId]);
+            $assignment = $this->assignSingleIncidentById(
+                (int) $incidentId,
+                [$teamId],
+                $teamId,
+                'auto_team_reassigned',
+                'Previous team started another response; incident was rematched automatically.'
+            );
             if ($assignment) {
                 $reassigned[] = $assignment;
             } else {
@@ -241,13 +269,25 @@ class IncidentAutoAssignmentService
                 continue;
             }
 
-            $alternative = $this->assignSingleIncidentById((int) $incidentId, [$previousTeamId]);
+            $alternative = $this->assignSingleIncidentById(
+                (int) $incidentId,
+                [$previousTeamId],
+                $previousTeamId,
+                'auto_team_reassigned',
+                'Previous team did not accept before timeout; incident was rematched automatically.'
+            );
             if ($alternative) {
                 $reassigned[] = $alternative;
                 continue;
             }
 
-            $fallback = $this->assignSingleIncidentById((int) $incidentId);
+            $fallback = $this->assignSingleIncidentById(
+                (int) $incidentId,
+                [],
+                $previousTeamId,
+                'auto_team_renewed',
+                'No alternate team was available; assignment was renewed automatically.'
+            );
             if ($fallback) {
                 $renewed[] = $fallback;
             } else {
@@ -375,6 +415,51 @@ class IncidentAutoAssignmentService
             Log::error('Unable to notify station command about unavailable incident resources.', [
                 'incident_id' => $incidentId,
                 'station_id' => $stationId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function recordDispatchAudit(
+        Incident $incident,
+        string $action,
+        ?int $previousTeamId,
+        int $assignedTeamId,
+        string $reason,
+        array $metadata = []
+    ): void {
+        if (! Schema::hasTable('incident_dispatch_audits')) {
+            return;
+        }
+
+        if ($previousTeamId === $assignedTeamId) {
+            return;
+        }
+
+        try {
+            $assignedTeam = Team::query()->find($assignedTeamId);
+
+            IncidentDispatchAudit::create([
+                'incident_id' => $incident->incident_id,
+                'actor_user_id' => null,
+                'action' => $action,
+                'previous_team_id' => $previousTeamId,
+                'assigned_team_id' => $assignedTeamId,
+                'source_station_id' => $incident->station_id,
+                'target_station_id' => $assignedTeam?->station_id,
+                'reason' => $reason,
+                'metadata' => array_merge([
+                    'source' => 'incident_auto_assignment_service',
+                    'incident_status' => $incident->status,
+                    'dispatch_assigned_at' => optional($incident->dispatch_assigned_at)->toISOString(),
+                ], $metadata),
+            ]);
+        } catch (Throwable $exception) {
+            Log::error('Unable to write incident auto-assignment audit.', [
+                'incident_id' => $incident->incident_id,
+                'previous_team_id' => $previousTeamId,
+                'assigned_team_id' => $assignedTeamId,
+                'action' => $action,
                 'error' => $exception->getMessage(),
             ]);
         }
