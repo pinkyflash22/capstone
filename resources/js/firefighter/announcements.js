@@ -14,6 +14,7 @@ class AnnouncementSystem {
         this.csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
         this.editorPost = null;
         this.activeMediaPostId = null;
+        this.maxVideoBytes = Number(window.PyroSenseUploadConfig?.announcementVideoMaxBytes || (50 * 1024 * 1024));
         this.handleInfiniteScrollBound = () => this.handleInfiniteScroll();
         this.documentClickHandler = (event) => {
             const menuTrigger = event.target.closest('[data-post-menu-trigger]');
@@ -195,7 +196,7 @@ class AnnouncementSystem {
                 body: formData,
             });
 
-            const result = await response.json();
+            const result = await this.parseJsonResponse(response, 'The server returned an upload error instead of JSON.');
             if (!response.ok || !result.success) {
                 throw new Error(result.message || 'Failed to create post.');
             }
@@ -240,7 +241,7 @@ class AnnouncementSystem {
                 body: formData,
             });
 
-            const result = await response.json();
+            const result = await this.parseJsonResponse(response, 'The server returned an upload error instead of JSON.');
             if (!response.ok || !result.success) {
                 throw new Error(result.message || 'Failed to update post.');
             }
@@ -396,9 +397,10 @@ class AnnouncementSystem {
             return;
         }
 
-        if (file.size > 50 * 1024 * 1024) {
-            this.setInlineError('Video is larger than 50MB.');
-            this.showNotification('Video is too large. Max 50MB.', 'warning');
+        if (file.size > this.maxVideoBytes) {
+            const limitLabel = this.formatBytes(this.maxVideoBytes);
+            this.setInlineError(`Video is larger than ${limitLabel}.`);
+            this.showNotification(`Video is too large. Max ${limitLabel}.`, 'warning');
             event.target.value = '';
             return;
         }
@@ -1089,6 +1091,27 @@ class AnnouncementSystem {
         const units = ['B', 'KB', 'MB', 'GB'];
         const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
         return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+    }
+
+    async parseJsonResponse(response, fallbackMessage = 'The server returned an invalid response.') {
+        const text = await response.text();
+        try {
+            return text ? JSON.parse(text) : {};
+        } catch (error) {
+            const cleanText = text
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            const lowerText = cleanText.toLowerCase();
+            const uploadLimitHit = lowerText.includes('post content-length')
+                || lowerText.includes('exceeds the limit')
+                || lowerText.includes('upload_max_filesize')
+                || lowerText.includes('post_max_size');
+
+            throw new Error(uploadLimitHit
+                ? `The video is larger than the server upload limit. Compress it or keep it under ${this.formatBytes(this.maxVideoBytes)}.`
+                : (cleanText || fallbackMessage));
+        }
     }
 
     getTimeAgo(date) {

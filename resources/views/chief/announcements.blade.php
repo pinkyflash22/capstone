@@ -17,7 +17,33 @@
         $authName = trim((auth()->user()->first_name ?? '') . ' ' . (auth()->user()->last_name ?? '')) ?: 'Chief';
         $authInitials = strtoupper(substr(auth()->user()->first_name ?? 'C', 0, 1) . substr(auth()->user()->last_name ?? 'C', 0, 1));
         $authProfileImageUrl = \App\Support\MediaPath::url(auth()->user()?->image);
+        $iniBytes = function (?string $value): int {
+            $value = trim((string) $value);
+            if ($value === '') {
+                return 0;
+            }
+            $unit = strtolower(substr($value, -1));
+            $number = (float) $value;
+            return (int) match ($unit) {
+                'g' => $number * 1024 * 1024 * 1024,
+                'm' => $number * 1024 * 1024,
+                'k' => $number * 1024,
+                default => $number,
+            };
+        };
+        $configuredVideoLimit = 50 * 1024 * 1024;
+        $serverUploadLimit = min(
+            $iniBytes(ini_get('upload_max_filesize')),
+            $iniBytes(ini_get('post_max_size')),
+            $configuredVideoLimit
+        );
+        $announcementVideoMaxBytes = $serverUploadLimit > 0 ? $serverUploadLimit : $configuredVideoLimit;
     @endphp
+    <script>
+        window.PyroSenseUploadConfig = {
+            announcementVideoMaxBytes: @json($announcementVideoMaxBytes),
+        };
+    </script>
 </head>
 <body class="chief-legacy-layout staff-announcements" data-staff-announcements="chief">
     @include('chief.partials.sidebar', ['active' => 'announcements'])

@@ -151,7 +151,7 @@ public function getPosts(Request $request)
                 'data' => $post
             ], 201);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
             
             if (!empty($imagePaths)) {
@@ -165,7 +165,7 @@ public function getPosts(Request $request)
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create post',
+                'message' => 'Failed to create post. If you attached a video, compress it and try again.',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -274,12 +274,12 @@ public function getPosts(Request $request)
                 'message' => 'Post updated successfully',
                 'data' => $post,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update post',
+                'message' => 'Failed to update post. If you attached a video, compress it and try again.',
                 'error' => $e->getMessage(),
             ], 500);
         }
