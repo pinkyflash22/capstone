@@ -62,9 +62,11 @@ class BarangayPredictionService
         }
 
         $scriptPath = $this->relativeScriptPath();
+        $payloadCount = count($payloads);
 
         $process = Process::path(base_path())
             ->env($this->pythonEnvironment())
+            ->timeout($this->predictionTimeoutSeconds($payloadCount))
             ->input(json_encode(array_values($payloads)))
             ->run([$this->pythonBinary(), $scriptPath]);
 
@@ -72,7 +74,7 @@ class BarangayPredictionService
             Log::warning('Python barangay prediction process failed', array_merge(
                 PythonRuntime::failureContext($process, $this->pythonBinary),
                 [
-                    'payload_count' => count($payloads),
+                    'payload_count' => $payloadCount,
                     'script_path' => $scriptPath,
                 ]
             ));
@@ -85,7 +87,7 @@ class BarangayPredictionService
         if (! is_array($decoded)) {
             Log::warning('Python barangay prediction output was not valid JSON', [
                 'output' => $process->output(),
-                'payload_count' => count($payloads),
+                'payload_count' => $payloadCount,
             ]);
 
             return [];
@@ -114,6 +116,15 @@ class BarangayPredictionService
         }
 
         return $environment;
+    }
+
+    private function predictionTimeoutSeconds(int $payloadCount): int
+    {
+        $base = max(60, (int) config('services.ai_prediction.prediction_timeout_seconds', 180));
+        $perPayload = max(0, (int) config('services.ai_prediction.prediction_timeout_per_payload_seconds', 8));
+        $max = max($base, (int) config('services.ai_prediction.prediction_timeout_max_seconds', 360));
+
+        return min($max, $base + (max(1, $payloadCount) * $perPayload));
     }
 
     private function relativeScriptPath(): string
