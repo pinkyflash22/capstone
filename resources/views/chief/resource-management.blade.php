@@ -11,6 +11,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="user-id" content="{{ auth()->id() }}">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     
@@ -2359,7 +2360,7 @@
                         </thead>
                         <tbody id="usersTableBody">
                             @foreach ($usersPage as $user)
-                            <tr class="user-row" data-user-id="{{ $user->user_id }}" data-role="{{ strtolower($user->role->role ?? 'unknown') }}" data-updated-at="{{ $user->updated_at ?? $user->created_at }}">
+                            <tr class="user-row" data-user-id="{{ $user->user_id }}" data-role="{{ strtolower($user->role->role ?? 'unknown') }}" data-is-verified="{{ $user->is_verified ? '1' : '0' }}" data-updated-at="{{ $user->updated_at ?? $user->created_at }}">
                                 <td class="plain-sight-hidden" aria-hidden="true">{{ $user->user_id }}</td>
                                 <td data-label="Account Code"><strong>{{ $user->account_code ?? '--' }}</strong></td>
                                 <td data-label="Full Name">{{ $user->first_name ?? '' }} {{ $user->middle_name ?? '' }} {{ $user->last_name ?? '' }}</td>
@@ -2378,15 +2379,26 @@
                                     </span>
                                 </td>
                                 <td data-label="Status">
-                                    <span class="status {{ $user->email_verified_at ? 'active' : 'inactive' }}" style="background: {{ $user->email_verified_at ? '#10b981' : '#ef4444' }}; color: white;">
-                                        {{ $user->email_verified_at ? 'Verified' : 'Pending' }}
+                                    <span class="status {{ $user->is_verified ? 'active' : 'inactive' }}" style="background: {{ $user->is_verified ? '#10b981' : '#ef4444' }}; color: white;">
+                                        {{ $user->is_verified ? 'BFP Verified' : 'BFP Pending' }}
                                     </span>
+                                    <small style="display:block;color:#64748b;margin-top:4px;">Email: {{ $user->email_verified_at ? 'verified' : 'pending' }}</small>
                                 </td>
                                 <td data-label="Date Modified"><small>{{ \Carbon\Carbon::parse($user->updated_at ?? $user->created_at)->format('Y-m-d H:i') }}</small></td>
                                 <td class="actions" data-label="Actions">
                                     <button class="action-btn view-resource" onclick="viewUser({{ $user->user_id }})" title="View"><i class="fa-solid fa-eye"></i></button>
                                     @if($user->can_manage_resources)
                                     <button class="action-btn edit-resource" onclick="openEditUserModal({{ $user->user_id }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                                    @if((int) ($user->user_id ?? 0) !== (int) (auth()->user()->user_id ?? 0))
+                                    <button
+                                        class="action-btn {{ $user->is_verified ? 'delete-resource' : 'view-resource' }}"
+                                        onclick="toggleUserVerification({{ $user->user_id }}, {{ $user->is_verified ? 'false' : 'true' }}, this)"
+                                        title="{{ $user->is_verified ? 'Unverify account' : 'Verify account' }}"
+                                        aria-label="{{ $user->is_verified ? 'Unverify account' : 'Verify account' }}"
+                                    >
+                                        <i class="fa-solid {{ $user->is_verified ? 'fa-user-lock' : 'fa-user-check' }}"></i>
+                                    </button>
+                                    @endif
                                     @if((int) ($user->user_id ?? 0) !== (int) (auth()->user()->user_id ?? 0))
                                     <button class="action-btn delete-resource" onclick="deleteUser({{ $user->user_id }})" title="Delete"><i class="fa-solid fa-trash"></i></button>
                                     @endif
@@ -2761,10 +2773,18 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label"><i class="fa-solid fa-flag-checkered"></i> Verification Status</label>
+                            <label class="form-label"><i class="fa-solid fa-shield-halved"></i> BFP Account Approval</label>
+                            <select class="form-select" id="editAccountApprovalStatus" name="is_verified">
+                                <option value="1">Verified by BFP</option>
+                                <option value="0">Pending BFP verification</option>
+                            </select>
+                            <small style="font-size: 0.7rem; color: #64748b;">Pending accounts cannot sign in.</small>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label"><i class="fa-solid fa-envelope-circle-check"></i> Email Verification Status</label>
                             <select class="form-select" id="editVerifiedStatus" name="email_verified_at">
-                                <option value="verified">Verified</option>
-                                <option value="pending">Pending</option>
+                                <option value="verified">Email verified</option>
+                                <option value="pending">Email pending</option>
                             </select>
                         </div>
                         <div class="form-group full-width">
@@ -4062,6 +4082,7 @@ if (officerForm) {
             document.getElementById('editEmail').value = user.email || '';
             document.getElementById('editRoleId').value = user.role_id || '';
             document.getElementById('editRoleId').disabled = Boolean(user.barangay_officer);
+            document.getElementById('editAccountApprovalStatus').value = user.is_verified ? '1' : '0';
             document.getElementById('editVerifiedStatus').value = user.email_verified_at ? 'verified' : 'pending';
             document.getElementById('editPassword').value = '';
             
@@ -4150,7 +4171,8 @@ if (officerForm) {
                                 <div class="resource-detail-card"><div class="detail-label">Email Address</div><div class="detail-value">${user.email || '--'}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Contact Number</div><div class="detail-value">${user.contact_number || '--'}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Role</div><div class="detail-value"><span class="status" style="background: ${(user.role?.role ?? '') == 'admin' ? '#dc2626' : ((user.role?.role ?? '') == 'firefighter' ? '#3b82f6' : ((user.role?.role ?? '') == 'chief' ? '#8b5cf6' : '#6b7280'))}; color: white;">${ucfirst(user.role?.role ?? 'Unknown')}</span></div></div>
-                                <div class="resource-detail-card"><div class="detail-label">Verification</div><div class="detail-value"><span class="status" style="background: ${user.email_verified_at ? '#10b981' : '#ef4444'}; color: white;">${user.email_verified_at ? 'Verified' : 'Pending'}</span></div></div>
+                                <div class="resource-detail-card"><div class="detail-label">BFP Account Approval</div><div class="detail-value"><span class="status" style="background: ${user.is_verified ? '#10b981' : '#ef4444'}; color: white;">${user.is_verified ? 'Verified' : 'Pending'}</span></div></div>
+                                <div class="resource-detail-card"><div class="detail-label">Email Verification</div><div class="detail-value"><span class="status" style="background: ${user.email_verified_at ? '#10b981' : '#ef4444'}; color: white;">${user.email_verified_at ? 'Verified' : 'Pending'}</span></div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Registered On</div><div class="detail-value">${new Date(user.created_at).toLocaleString()}</div></div>
                                 <div class="resource-detail-card"><div class="detail-label">Last Modified</div><div class="detail-value">${new Date(user.updated_at).toLocaleString()}</div></div>
                             </div>
@@ -4242,6 +4264,55 @@ if (officerForm) {
                     confirmButton.innerHTML = originalLabel;
                 }
                 closeDeleteUserModal();
+            });
+        }
+
+        function toggleUserVerification(userId, shouldVerify, button = null) {
+            const activeUserId = Number(document.querySelector('meta[name="user-id"]')?.getAttribute('content') || 0);
+            if (Number(userId) === activeUserId && !shouldVerify) {
+                showToast('You cannot unverify your own account.', 'error');
+                return;
+            }
+
+            const originalMarkup = button ? button.innerHTML : '';
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            }
+
+            fetch(`${resourceAdminBaseUrl}/users/${userId}/verification`, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify({ is_verified: Boolean(shouldVerify) })
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(Object.values(data.errors || {}).flat()[0] || data.message || 'Unable to update account verification.');
+                }
+
+                return data;
+            })
+            .then(data => {
+                const updatedUser = window.resourcesData.allUsers?.find(user => Number(user.user_id) === Number(userId));
+                if (updatedUser) {
+                    updatedUser.is_verified = Boolean(data.user?.is_verified);
+                    updatedUser.updated_at = data.user?.updated_at || updatedUser.updated_at;
+                }
+
+                showToast(data.message || 'Account verification updated.');
+                window.refreshResourceWorkspace();
+            })
+            .catch(error => {
+                showToast(error.message || 'Unable to update account verification.', 'error');
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = originalMarkup;
+                }
             });
         }
 
@@ -5377,6 +5448,7 @@ function validateTeamMembers(formData) {
                 contact_number: document.getElementById('editContactNumber').value,
                 email: document.getElementById('editEmail').value,
                 role_id: document.getElementById('editRoleId').value,
+                is_verified: document.getElementById('editAccountApprovalStatus').value === '1',
                 email_verified_at: document.getElementById('editVerifiedStatus').value === 'verified' ? new Date().toISOString() : null,
                 province_id: document.getElementById('editProvince').value || null,
                 city_id: document.getElementById('editCity').value || null,

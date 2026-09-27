@@ -774,6 +774,73 @@
             color: #dc2626;
         }
 
+        .verification-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: rgba(17, 24, 39, 0.55);
+            backdrop-filter: blur(8px);
+        }
+
+        .verification-modal.is-visible {
+            display: flex;
+        }
+
+        .verification-modal__panel {
+            width: min(28rem, 100%);
+            border-radius: 24px;
+            background: #ffffff;
+            border: 1px solid rgba(198, 61, 38, 0.14);
+            box-shadow: 0 28px 70px rgba(88, 43, 20, 0.26);
+            padding: 1.5rem;
+            color: var(--gray-800);
+        }
+
+        .verification-modal__icon {
+            width: 3rem;
+            height: 3rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1rem;
+            background: var(--gradient-soft);
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .verification-modal__panel h2 {
+            font-size: 1.22rem;
+            line-height: 1.25;
+            margin-bottom: 0.55rem;
+        }
+
+        .verification-modal__panel p {
+            color: var(--gray-600);
+            line-height: 1.55;
+            font-size: 0.94rem;
+        }
+
+        .verification-modal__actions {
+            margin-top: 1.25rem;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .verification-modal__button {
+            border: 0;
+            border-radius: 999px;
+            background: var(--gradient-main);
+            color: #ffffff;
+            font-weight: 800;
+            padding: 0.78rem 1.15rem;
+            cursor: pointer;
+            box-shadow: 0 12px 24px rgba(198, 61, 38, 0.2);
+        }
+
         /* Loading spinner */
         .loading-spinner {
             display: inline-block;
@@ -1084,6 +1151,17 @@
         </button>
     </div>
 
+    <div id="accountVerificationModal" class="verification-modal" role="dialog" aria-modal="true" aria-labelledby="accountVerificationTitle" aria-hidden="true">
+        <div class="verification-modal__panel">
+            <span class="verification-modal__icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+            <h2 id="accountVerificationTitle">Account verification in progress</h2>
+            <p>{{ session('account_verification_message', 'The Bureau of Fire Protection is still verifying your account. Please wait for approval before signing in.') }}</p>
+            <div class="verification-modal__actions">
+                <button type="button" id="accountVerificationClose" class="verification-modal__button">I understand</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Content -->
     <main class="main-content">
         <div class="login-card">
@@ -1295,11 +1373,14 @@
         const loginToastPayload = {
             success: @json(session('success')),
             errors: @json($errors->all()),
+            accountVerificationPending: @json((bool) session('account_verification_pending')),
         };
         const loginToast = document.getElementById('loginToast');
         const loginToastTitle = document.getElementById('loginToastTitle');
         const loginToastMessage = document.getElementById('loginToastMessage');
         const loginToastClose = document.getElementById('loginToastClose');
+        const accountVerificationModal = document.getElementById('accountVerificationModal');
+        const accountVerificationClose = document.getElementById('accountVerificationClose');
         let loginToastTimer = null;
 
         function showLoginToast(message, type = 'success') {
@@ -1324,7 +1405,26 @@
             loginToast?.classList.remove('is-visible');
         });
 
+        function closeAccountVerificationModal() {
+            accountVerificationModal?.classList.remove('is-visible');
+            accountVerificationModal?.setAttribute('aria-hidden', 'true');
+        }
+
+        accountVerificationClose?.addEventListener('click', closeAccountVerificationModal);
+        accountVerificationModal?.addEventListener('click', (event) => {
+            if (event.target === accountVerificationModal) {
+                closeAccountVerificationModal();
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', () => {
+            if (loginToastPayload.accountVerificationPending) {
+                accountVerificationModal?.classList.add('is-visible');
+                accountVerificationModal?.setAttribute('aria-hidden', 'false');
+                accountVerificationClose?.focus();
+                return;
+            }
+
             if (loginToastPayload.errors?.length) {
                 showLoginToast(loginToastPayload.errors.join(' '), 'error');
                 return;

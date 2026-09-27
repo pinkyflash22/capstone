@@ -9991,6 +9991,40 @@ async function stopAllSimulations(syncWithServer = true) {
     };
 }
 
+async function stopNavigationForIncident(incidentId, options = {}) {
+    const normalizedIncidentId = Number(incidentId);
+
+    if (!Number.isFinite(normalizedIncidentId) || normalizedIncidentId <= 0) {
+        return { requested: 0, stopped: 0, remaining: activeTrucks.size };
+    }
+
+    const syncWithServer = options.syncWithServer !== false;
+    const showStoppedToast = options.showStoppedToast === true;
+    const routeIds = Array.from(activeTrucks.entries())
+        .filter(([, truck]) => Number(truck?.incidentId ?? truck?.incident_id ?? 0) === normalizedIncidentId)
+        .map(([routeId]) => routeId);
+
+    if (routeIds.length === 0) {
+        return { requested: 0, stopped: 0, remaining: activeTrucks.size };
+    }
+
+    const results = await Promise.all(routeIds.map((routeId) => (
+        stopSimulationForRoute(routeId, syncWithServer, showStoppedToast)
+    )));
+
+    if (activeTrucks.size === 0) {
+        document.getElementById('routeInfoCard')?.style.setProperty('display', 'none');
+    } else {
+        updateRouteInfoCard();
+    }
+
+    return {
+        requested: routeIds.length,
+        stopped: results.filter(Boolean).length,
+        remaining: activeTrucks.size,
+    };
+}
+
 document.addEventListener('click', async (event) => {
     const button = event.target?.closest?.('[data-stop-route-navigation]');
     if (!button || button.disabled) return;
@@ -13743,6 +13777,7 @@ window.displayAndStartRoute = displayAndStartRoute;
 window.startSimulationForRoute = startSimulationForRoute;
 window.stopSimulationForRoute = stopSimulationForRoute;
 window.stopAllSimulations = stopAllSimulations;
+window.stopNavigationForIncident = stopNavigationForIncident;
 window.promptRouteSourceSelection = promptRouteSourceSelection;
 window.resolveRouteOrigin = resolveRouteOrigin;
 window.updateRouteSourceBadge = updateRouteSourceBadge;

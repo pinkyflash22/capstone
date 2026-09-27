@@ -103,6 +103,7 @@ public function updateUser(Request $request, string $id)
         'password' => 'sometimes|nullable|string|min:8',
         'role_id' => 'sometimes|nullable|exists:roles,role_id',
         'email_verified_at' => 'sometimes|nullable|date',
+        'is_verified' => 'sometimes|boolean',
         'barangay_id' => 'sometimes|nullable|exists:barangays,barangay_id',
         'street' => 'sometimes|nullable|string|max:255',
     ];
@@ -133,6 +134,13 @@ public function updateUser(Request $request, string $id)
     if (isset($validated['email'])) $user->email = $validated['email'];
     if (isset($validated['role_id'])) $user->role_id = $validated['role_id'];
     if (array_key_exists('email_verified_at', $validated)) $user->email_verified_at = $validated['email_verified_at'];
+    if (array_key_exists('is_verified', $validated)) {
+        if ((int) Auth::id() === (int) $user->user_id && ! (bool) $validated['is_verified']) {
+            return response()->json(['success' => false, 'message' => 'You cannot unverify your own account.'], 422);
+        }
+
+        $user->is_verified = (bool) $validated['is_verified'];
+    }
 
     if (!empty($validated['password'])) {
         $user->password = Hash::make($validated['password']);
@@ -174,6 +182,40 @@ public function updateUser(Request $request, string $id)
     UserActivityLogger::log('updated user', Auth::user()?->user_id, $request);
 
     return response()->json(['success' => true, 'message' => 'User updated successfully']);
+}
+
+public function updateUserVerification(Request $request, string $id)
+{
+    $validated = $request->validate([
+        'is_verified' => 'required|boolean',
+    ]);
+
+    $user = User::with(['role', 'address', 'barangayOfficer'])->find($id);
+
+    if (!$user) {
+        return response()->json(['success' => false, 'message' => 'User not found'], 404);
+    }
+
+    $this->assertUserAccess($user);
+
+    if ((int) Auth::id() === (int) $user->user_id && ! (bool) $validated['is_verified']) {
+        return response()->json(['success' => false, 'message' => 'You cannot unverify your own account.'], 422);
+    }
+
+    $user->is_verified = (bool) $validated['is_verified'];
+    $user->save();
+
+    UserActivityLogger::log($user->is_verified ? 'verified user account' : 'unverified user account', Auth::user()?->user_id, $request);
+
+    return response()->json([
+        'success' => true,
+        'message' => $user->is_verified ? 'Account verified successfully.' : 'Account marked as unverified.',
+        'user' => [
+            'user_id' => $user->user_id,
+            'is_verified' => (bool) $user->is_verified,
+            'updated_at' => optional($user->updated_at)->toIso8601String(),
+        ],
+    ]);
 }
 
 public function updateStationOfficer(Request $request, string $id)

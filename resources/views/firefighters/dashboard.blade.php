@@ -3635,7 +3635,7 @@ function showFirefighterConfirmationDialog(options = {}) {
             padding: 18px;
             background: rgba(15, 23, 42, 0.42);
             backdrop-filter: blur(5px);
-            z-index: 5000;
+            z-index: 10200;
             color: #7c2d12;
         `;
 
@@ -3699,7 +3699,7 @@ function showIncidentCompletionDialog() {
             padding: 18px;
             background: rgba(15, 23, 42, 0.42);
             backdrop-filter: blur(5px);
-            z-index: 5000;
+            z-index: 10200;
             color: #7c2d12;
         `;
 

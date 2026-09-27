@@ -201,7 +201,7 @@ class RegisterController extends Controller
                 'contact_number' => $validated['contact_number'],
                 'role_id' => $validated['role_id'],
                 'address_id' => $addressId,
-                'is_verified' => true,
+                'is_verified' => Auth::check(),
                 'password' => Hash::make($plainPassword),
             ]);
 
@@ -799,7 +799,7 @@ public function verifyOTPAndRegister(Request $request)
                 'address_id' => $addressId,
                 'password' => Hash::make($formData['password']),
                 'email_verified_at' => now(),
-                'is_verified' => true,
+                'is_verified' => false,
             ];
 
             $user = User::create($userData);
@@ -815,33 +815,13 @@ public function verifyOTPAndRegister(Request $request)
 
             DB::commit();
 
-            Auth::login($user);
-
-            // Determine redirect based on role
-            $roleName = strtolower($user->role->role ?? '');
-            $redirectUrl = route('citizen.dashboard');
-            
-            switch ($roleName) {
-                case 'admin':
-                    $redirectUrl = route('admin.dashboard');
-                    break;
-                case 'firefighter':
-                    $redirectUrl = route('firefighter.dashboard');
-                    break;
-                case 'chief':
-                    $redirectUrl = route('station-admin.dashboard');
-                    break;
-                case 'stationadmin':
-                    $redirectUrl = route('station-admin.dashboard');
-                    break;
-                default:
-                    $redirectUrl = route('citizen.dashboard');
-            }
+            $request->session()->flash('account_verification_pending', true);
+            $request->session()->flash('account_verification_message', 'The Bureau of Fire Protection is still verifying your account. Please wait for approval before signing in.');
 
             return response()->json([
                 'success' => true,
-                'message' => 'Registration successful! Your account code is: ' . $accountCode,
-                'redirect' => $redirectUrl,
+                'message' => 'Registration successful. The Bureau of Fire Protection is still verifying your account before you can sign in.',
+                'redirect' => route('auth.login'),
                 'account_code' => $accountCode
             ]);
 

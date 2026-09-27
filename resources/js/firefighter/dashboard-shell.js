@@ -1436,6 +1436,25 @@ window.respondToIncidentLive = (incidentId, currentStatusId = 1, triggerButton =
     respondToIncident(incidentId, currentStatusId, triggerButton)
 );
 
+async function stopNavigationForArrivedIncident(incidentId) {
+    if (typeof window.stopNavigationForIncident !== 'function') {
+        return;
+    }
+
+    try {
+        const result = await window.stopNavigationForIncident(incidentId, {
+            syncWithServer: true,
+            showStoppedToast: false,
+        });
+
+        if (result?.stopped > 0) {
+            showToast('Navigation stopped because your team is on scene.', 'info');
+        }
+    } catch (error) {
+        console.warn('Unable to stop incident navigation after arrival:', error);
+    }
+}
+
 async function arriveAtIncident(incidentId, currentStatusId, triggerButton = null) {
     const normalizedIncidentId = Number(incidentId);
     if (incidentArrivalRequestsInFlight.has(normalizedIncidentId)) {
@@ -1477,6 +1496,7 @@ async function arriveAtIncident(incidentId, currentStatusId, triggerButton = nul
         }
 
         showToast(result.message || 'Incident updated to On Scene.', 'success');
+        await stopNavigationForArrivedIncident(incidentId);
         await Promise.all([
             fetchAssignedIncidents(true),
             refreshFirefighterLiveMap()
@@ -1790,6 +1810,7 @@ async function publishDriverApparatusLocation(position) {
             renderActiveResponseUnits(activeResponseUnitsData);
             if (arrivedNow) {
                 showToast(payload.message || 'Arrival detected. Incident updated to On Scene.', 'success');
+                await stopNavigationForArrivedIncident(unit.incident_id || payload.unit?.incident_id);
                 await Promise.allSettled([fetchAssignedIncidents(true), refreshFirefighterLiveMap()]);
             }
         } catch (error) {

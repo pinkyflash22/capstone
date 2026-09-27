@@ -130,27 +130,9 @@ class LoginController extends Controller
 
             if (! $user?->is_verified) {
                 Auth::logout();
+                $request->session()->regenerateToken();
 
-                if ($user?->google_id && $user?->email) {
-                    try {
-                        $this->sendGoogleVerificationOtp($user, $request);
-                    } catch (ValidationException $e) {
-                        throw $e;
-                    } catch (\Throwable $e) {
-                        report($e);
-
-                        throw ValidationException::withMessages([
-                            'email' => 'Unable to send a verification code right now. Please try again.',
-                        ]);
-                    }
-
-                    return redirect()->route('auth.google.verify')
-                        ->with('success', 'Verification code sent to your email. Please complete verification to continue.');
-                }
-
-                throw ValidationException::withMessages([
-                    'email' => 'Your account is not verified yet. Please complete OTP verification first.',
-                ]);
+                return $this->redirectWithPendingApprovalModal($request);
             }
 
             $this->storeUserLog($user?->user_id, 'logged in', $request);
@@ -610,7 +592,7 @@ class LoginController extends Controller
                 'email' => $email,
                 'google_id' => $googleUser->getId(),
                 'email_verified_at' => now(),
-                'is_verified' => true,
+                'is_verified' => false,
                 'password' => Hash::make($this->generateRandomPassword()),
                 'image' => $googleUser->getAvatar(),
             ]);
@@ -618,12 +600,15 @@ class LoginController extends Controller
             $user->forceFill([
                 'google_id' => $user->google_id ?: $googleUser->getId(),
                 'email_verified_at' => $user->email_verified_at ?: now(),
-                'is_verified' => true,
                 'image' => $googleUser->getAvatar() ?: $user->image,
             ])->save();
         }
 
         $request->session()->forget('pending_google_verification');
+
+        if (! $user->is_verified) {
+            return $this->redirectWithPendingApprovalModal($request);
+        }
 
         Auth::login($user, true);
         $request->session()->regenerate();
@@ -702,18 +687,22 @@ class LoginController extends Controller
             'otp_code' => null,
         ]);
 
+        $postLoginAction = $pending['post_login_action'] ?? $this->readPostLoginActionCookie($request);
+
+        $request->session()->forget('pending_google_verification');
+
         $user->forceFill([
-            'is_verified' => true,
             'email_verified_at' => $user->email_verified_at ?: now(),
         ])->save();
+
+        if (! $user->is_verified) {
+            return $this->redirectWithPendingApprovalModal($request);
+        }
 
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        $postLoginAction = $pending['post_login_action'] ?? $this->readPostLoginActionCookie($request);
         $role = strtolower($user->role->role ?? '');
-
-        $request->session()->forget('pending_google_verification');
 
         $this->storeUserLog($user->user_id, 'completed Google OTP verification', $request);
         $this->applyPostLoginAction($postLoginAction, $role);
@@ -1229,6 +1218,15 @@ class LoginController extends Controller
         }
 
         return $channels;
+    }
+
+    private function redirectWithPendingApprovalModal(Request $request): RedirectResponse
+    {
+        return redirect()
+            ->route('auth.login')
+            ->withInput($request->only('email'))
+            ->with('account_verification_pending', true)
+            ->with('account_verification_message', 'The Bureau of Fire Protection is still verifying your account. Please wait for approval before signing in.');
     }
 
     private function maskEmail(string $email): string

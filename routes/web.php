@@ -404,6 +404,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::delete('/station-officer/{id}', [StationOfficerController::class, 'destroy'])->name('station-officer.destroy');
         Route::patch('/station-officers/{id}/status', [StationOfficerController::class, 'updateStatus'])->name('station-officer.updateStatus');
         Route::delete('/users/{id}', [StationOfficerController::class, 'destroyUser'])->name('users.destroy');
+        Route::patch('/users/{id}/verification', [StationOfficerController::class, 'updateUserVerification'])->name('users.verification');
         Route::put('/users/{id}', [StationOfficerController::class, 'updateUser'])->name('users.update');
         Route::put('/officers/{id}', [StationOfficerController::class, 'updateStationOfficer'])->name('officers.update');
         Route::put('/stations/{station}', [App\Http\Controllers\Chief\ManagementController::class, 'updateStation'])->name('stations.update');
@@ -558,6 +559,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::delete('/station-officer/{id}', [StationOfficerController::class, 'destroy'])->name('station-officer.destroy');
         Route::patch('/station-officers/{id}/status', [StationOfficerController::class, 'updateStatus'])->name('station-officer.updateStatus');
         Route::delete('/users/{id}', [StationOfficerController::class, 'destroyUser'])->name('users.destroy');
+        Route::patch('/users/{id}/verification', [StationOfficerController::class, 'updateUserVerification'])->name('users.verification');
         Route::put('/users/{id}', [StationOfficerController::class, 'updateUser'])->name('users.update');
         Route::put('/officers/{id}', [StationOfficerController::class, 'updateStationOfficer'])->name('officers.update');
         Route::put('/stations/{station}', [App\Http\Controllers\Chief\ManagementController::class, 'updateStation'])->name('stations.update');

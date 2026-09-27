@@ -21,7 +21,7 @@ use Illuminate\Validation\ValidationException;
 
 class RiskAreaReviewController extends Controller
 {
-    public const RISK_REVIEW_CACHE_VERSION_KEY = 'risk-reviews:version:v2';
+    public const RISK_REVIEW_CACHE_VERSION_KEY = 'risk-reviews:version:v3';
     protected const REVIEW_TEXT_REGEX = "/^[\\pL\\pN\\s\\.,:\\-\\(\\)]*$/u";
 
     public function __construct(private readonly BoundaryMatcherService $boundaryMatcherService)
@@ -151,13 +151,18 @@ class RiskAreaReviewController extends Controller
                     ->groupBy('review_status')
                     ->pluck('total', 'review_status');
 
+                $reviewQueueQuery = clone $baseQuery;
+
+                if ($mode === 'admin') {
+                    $reviewQueueQuery->where(function ($query) {
+                        $query
+                            ->where('review_status', '!=', 'approved')
+                            ->orWhere('review_type', 'delete');
+                    });
+                }
+
                 $reviewQueue = $this->applyRiskReviewFilters(
-                    (clone $baseQuery)
-                        ->where(function ($query) {
-                            $query
-                                ->where('review_status', '!=', 'approved')
-                                ->orWhere('review_type', 'delete');
-                        }),
+                    $reviewQueueQuery,
                     $statusFilter,
                     $typeFilter,
                     $reviewTypeFilter,
@@ -171,7 +176,11 @@ class RiskAreaReviewController extends Controller
                 $activeEntries = $this->applyRiskReviewFilters(
                     (clone $baseQuery)
                         ->where('review_status', 'approved')
-                        ->where('review_type', '!=', 'delete'),
+                        ->where(function ($query) {
+                            $query
+                                ->whereNull('review_type')
+                                ->orWhere('review_type', '!=', 'delete');
+                        }),
                     'all',
                     $typeFilter,
                     'all',
