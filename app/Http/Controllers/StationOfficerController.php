@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 use App\Models\StationOfficer;
 use App\Models\User;
@@ -106,6 +108,8 @@ public function updateUser(Request $request, string $id)
         'is_verified' => 'sometimes|boolean',
         'barangay_id' => 'sometimes|nullable|exists:barangays,barangay_id',
         'street' => 'sometimes|nullable|string|max:255',
+        'rank' => ['sometimes', 'nullable', Rule::in($this->stationOfficerRanks())],
+        'station_id' => 'sometimes|nullable|exists:stations,station_id',
     ];
     
     // Only validate email uniqueness if it's being changed
@@ -121,9 +125,43 @@ public function updateUser(Request $request, string $id)
         throw \Illuminate\Validation\ValidationException::withMessages(['role_id' => 'Remove the barangay officer assignment before changing this account role.']);
     }
 
+    $requestedRole = isset($validated['role_id'])
+        ? Role::roleNameForId((int) $validated['role_id'])
+        : Role::roleNameForId((int) $user->role_id);
+    $bfpRoles = ['firefighter', 'chief', 'stationadmin'];
+
     if (isset($validated['role_id']) && ! $this->isProvincialAdmin()) {
-        $requestedRole = Role::roleNameForId((int) $validated['role_id']);
         abort_if(in_array($requestedRole, ['admin', 'provincial admin'], true), 403, 'You cannot assign a province-wide role.');
+    }
+
+    if (in_array($requestedRole, $bfpRoles, true)) {
+        $requestedStationId = $this->isProvincialAdmin()
+            ? (int) ($validated['station_id'] ?? StationOfficer::where('user_id', $user->user_id)->value('station_id') ?? 0)
+            : (int) ($this->managedStationId() ?? 0);
+
+        if ($requestedStationId <= 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'station_id' => 'A station assignment is required for firefighter, chief, and station admin accounts.',
+            ]);
+        }
+
+        if (! $this->isProvincialAdmin()) {
+            $this->assertStationAccess($requestedStationId);
+        }
+
+        if (empty($validated['rank']) && ! StationOfficer::where('user_id', $user->user_id)->whereNotNull('rank')->exists()) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'rank' => 'Rank is required for firefighter, chief, and station admin accounts.',
+            ]);
+        }
+    } elseif (
+        isset($validated['role_id'])
+        && (int) $validated['role_id'] !== (int) $user->role_id
+        && StationOfficer::where('user_id', $user->user_id)->exists()
+    ) {
+        throw \Illuminate\Validation\ValidationException::withMessages([
+            'role_id' => 'Remove the station personnel assignment before changing this account to a non-BFP role.',
+        ]);
     }
     
     // Update fields only if they exist in validated data
@@ -179,9 +217,12 @@ public function updateUser(Request $request, string $id)
     }
     
     $user->save();
+    $this->syncStationOfficerAssignment($user, $requestedRole, $validated);
     UserActivityLogger::log('updated user', Auth::user()?->user_id, $request);
 
-    return response()->json(['success' => true, 'message' => 'User updated successfully']);
+    $user->load('role', 'address.barangay.city.province', 'barangayOfficer', 'stations');
+
+    return response()->json(['success' => true, 'message' => 'User updated successfully', 'user' => $user]);
 }
 
 public function updateUserVerification(Request $request, string $id)
@@ -375,5 +416,63 @@ public function destroyUser(string $id)
 
         $role = Role::roleNameForId((int) User::query()->whereKey($userId)->value('role_id'));
         abort_if(in_array($role, ['admin', 'provincial admin'], true), 403, 'You cannot assign a province-wide account to a station.');
+    }
+
+    private function syncStationOfficerAssignment(User $user, string $roleName, array $validated): void
+    {
+        $bfpRoles = ['firefighter', 'chief', 'stationadmin'];
+        $existingOfficer = StationOfficer::where('user_id', $user->user_id)->first();
+
+        if (! in_array($roleName, $bfpRoles, true)) {
+            return;
+        }
+
+        $stationId = $this->isProvincialAdmin()
+            ? (int) ($validated['station_id'] ?? $existingOfficer?->station_id ?? 0)
+            : (int) ($this->managedStationId() ?? 0);
+
+        $rank = $validated['rank'] ?? $existingOfficer?->rank;
+
+        $payload = [
+            'station_id' => $stationId,
+            'user_id' => $user->user_id,
+            'rank' => $rank,
+        ];
+
+        if (Schema::hasColumn('station_officers', 'status')) {
+            $payload['status'] = $existingOfficer?->status ?: 'available';
+        }
+
+        if ($existingOfficer) {
+            $this->assertStationAccess((int) $existingOfficer->station_id);
+            if ($this->isProvincialAdmin()) {
+                $this->assertStationAccess($stationId);
+            }
+            $existingOfficer->fill($payload)->save();
+            return;
+        }
+
+        if (! $this->isProvincialAdmin()) {
+            $this->assertStationAccess($stationId);
+        }
+
+        StationOfficer::create($payload);
+    }
+
+    private function stationOfficerRanks(): array
+    {
+        return [
+            'Fire Officer 1',
+            'Fire Officer 2',
+            'Fire Officer 3',
+            'Senior Officer 1',
+            'Senior Officer 2',
+            'Senior Officer 3',
+            'Senior Fire Officer 4',
+            'Fire Inspector',
+            'Fire Senior Inspector',
+            'Fire Chief Inspector',
+            'Fire Superintendent',
+        ];
     }
 }

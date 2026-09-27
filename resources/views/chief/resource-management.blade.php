@@ -2768,9 +2768,40 @@
                             <select class="form-select" id="editRoleId" name="role_id" required>
                                 <option value="">Select Role</option>
                                 @foreach($roles ?? [] as $role)
-                                    <option value="{{ $role->role_id }}">{{ ucfirst($role->role) }}</option>
+                                    @if(! $isProvincialResourceAdmin && in_array(strtolower($role->role), ['admin', 'provincial admin'], true))
+                                        @continue
+                                    @endif
+                                    <option value="{{ $role->role_id }}" data-role-name="{{ strtolower($role->role) }}">{{ ucfirst($role->role) }}</option>
                                 @endforeach
                             </select>
+                        </div>
+                        <div class="form-group" id="editUserRankGroup" style="display: none;">
+                            <label class="form-label"><i class="fa-solid fa-medal"></i> Rank <span style="color: #dc2626;">*</span></label>
+                            <select class="form-select" name="rank" id="editUserRank">
+                                <option value="">Select Rank</option>
+                                <option value="Fire Officer 1">Fire Officer 1</option>
+                                <option value="Fire Officer 2">Fire Officer 2</option>
+                                <option value="Fire Officer 3">Fire Officer 3</option>
+                                <option value="Senior Officer 1">Senior Officer 1</option>
+                                <option value="Senior Officer 2">Senior Officer 2</option>
+                                <option value="Senior Officer 3">Senior Officer 3</option>
+                                <option value="Senior Fire Officer 4">Senior Fire Officer 4</option>
+                                <option value="Fire Inspector">Fire Inspector</option>
+                                <option value="Fire Senior Inspector">Fire Senior Inspector</option>
+                                <option value="Fire Chief Inspector">Fire Chief Inspector</option>
+                                <option value="Fire Superintendent">Fire Superintendent</option>
+                            </select>
+                            <small style="font-size: 0.7rem; color: #64748b;">Required for firefighter, chief, and station admin accounts.</small>
+                        </div>
+                        <div class="form-group" id="editUserStationGroup" style="display: none;">
+                            <label class="form-label"><i class="fa-solid fa-building-shield"></i> Station Assignment <span style="color: #dc2626;">*</span></label>
+                            <select class="form-select" name="station_id" id="editUserStation">
+                                <option value="">Select Station</option>
+                                @foreach($activeStations ?? [] as $station)
+                                    <option value="{{ $station->station_id }}">{{ $station->station_name }}</option>
+                                @endforeach
+                            </select>
+                            <small style="font-size: 0.7rem; color: #64748b;">Chief and station admin accounts stay linked to this station for resource permissions.</small>
                         </div>
                         <div class="form-group">
                             <label class="form-label"><i class="fa-solid fa-shield-halved"></i> BFP Account Approval</label>
@@ -3683,6 +3714,7 @@
         };
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         const resourceAdminBaseUrl = @json($resourceBaseUrl);
+        const isProvincialResourceAdmin = @json($isProvincialResourceAdmin);
 
         
         // Add Officer to Station - JavaScript ONLY (no duplicate)
@@ -4082,9 +4114,12 @@ if (officerForm) {
             document.getElementById('editEmail').value = user.email || '';
             document.getElementById('editRoleId').value = user.role_id || '';
             document.getElementById('editRoleId').disabled = Boolean(user.barangay_officer);
+            document.getElementById('editUserRank').value = getUserStationRank(user);
+            document.getElementById('editUserStation').value = getUserStationId(user) || '';
             document.getElementById('editAccountApprovalStatus').value = user.is_verified ? '1' : '0';
             document.getElementById('editVerifiedStatus').value = user.email_verified_at ? 'verified' : 'pending';
             document.getElementById('editPassword').value = '';
+            toggleEditUserStationFields();
             
             // Load address if exists
             if (user.address) {
@@ -4105,6 +4140,50 @@ if (officerForm) {
             
             document.getElementById('editUserModal').style.display = 'flex';
             document.getElementById('editUserModal').classList.add('active');
+        }
+
+        function getUserStationId(user) {
+            const station = Array.isArray(user?.stations) ? user.stations[0] : null;
+            return station?.station_id || user?.station_id || null;
+        }
+
+        function getUserStationRank(user) {
+            const station = Array.isArray(user?.stations) ? user.stations[0] : null;
+            return station?.pivot?.rank || user?.rank || '';
+        }
+
+        function selectedRoleName(select) {
+            const option = select?.options?.[select.selectedIndex];
+            return (option?.dataset?.roleName || option?.textContent || '').trim().toLowerCase();
+        }
+
+        function toggleEditUserStationFields() {
+            const roleSelect = document.getElementById('editRoleId');
+            const rankGroup = document.getElementById('editUserRankGroup');
+            const rankInput = document.getElementById('editUserRank');
+            const stationGroup = document.getElementById('editUserStationGroup');
+            const stationInput = document.getElementById('editUserStation');
+
+            if (!roleSelect || !rankGroup || !rankInput || !stationGroup || !stationInput) return;
+
+            const roleName = selectedRoleName(roleSelect);
+            const needsStationAssignment = ['firefighter', 'chief', 'stationadmin'].includes(roleName);
+
+            rankGroup.style.display = needsStationAssignment ? '' : 'none';
+            stationGroup.style.display = needsStationAssignment ? '' : 'none';
+            rankInput.required = needsStationAssignment;
+            stationInput.required = needsStationAssignment;
+
+            if (!needsStationAssignment) {
+                rankInput.value = '';
+                stationInput.value = '';
+                return;
+            }
+
+            stationInput.disabled = !isProvincialResourceAdmin;
+            if (!isProvincialResourceAdmin && !stationInput.value && stationInput.options.length === 2) {
+                stationInput.value = stationInput.options[1].value;
+            }
         }
 
         function loadCitiesForEdit(provinceId, selectedCityId = null, selectedBarangayId = null) {
@@ -5450,6 +5529,8 @@ function validateTeamMembers(formData) {
                 role_id: document.getElementById('editRoleId').value,
                 is_verified: document.getElementById('editAccountApprovalStatus').value === '1',
                 email_verified_at: document.getElementById('editVerifiedStatus').value === 'verified' ? new Date().toISOString() : null,
+                rank: document.getElementById('editUserRank')?.value || null,
+                station_id: document.getElementById('editUserStation')?.value || null,
                 province_id: document.getElementById('editProvince').value || null,
                 city_id: document.getElementById('editCity').value || null,
                 barangay_id: document.getElementById('editBarangay').value || null,
@@ -5752,6 +5833,7 @@ function validateTeamMembers(formData) {
             const roleFilter = document.getElementById('userRoleFilter');
             const sortFilter = document.getElementById('userSortFilter');
             const registerUserRole = document.getElementById('registerUserRole');
+            const editUserRole = document.getElementById('editRoleId');
             const userDropdownBtn = document.getElementById('userDropdownBtn');
             const userDropdownMenu = document.getElementById('userDropdownMenu');
             
@@ -5887,6 +5969,7 @@ function validateTeamMembers(formData) {
             if (roleFilter) roleFilter.addEventListener('change', () => loadResourceTables(window.location.href, true));
             if (sortFilter) sortFilter.addEventListener('change', () => loadResourceTables(window.location.href, true));
             if (registerUserRole) registerUserRole.addEventListener('change', toggleRegisterUserRankField);
+            if (editUserRole) editUserRole.addEventListener('change', toggleEditUserStationFields);
             if (refresh) refresh.addEventListener('click', () => loadResourceTables(window.location.href));
 
             document.addEventListener('click', (event) => {
@@ -5897,6 +5980,7 @@ function validateTeamMembers(formData) {
             });
 
             toggleRegisterUserRankField();
+            toggleEditUserStationFields();
             applyResourceTextLimits();
 
             if (userDropdownBtn && userDropdownMenu) {

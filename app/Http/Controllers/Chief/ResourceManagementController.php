@@ -62,7 +62,7 @@ class ResourceManagementController extends Controller
 
             $teamRelations = $this->teamRelations();
             $allTeam = Cache::remember("{$cacheKey}:teams", now()->addSeconds(45), fn () => Team::with($teamRelations)->orderByDesc('team_id')->get());
-            $allusers = User::with('role', 'address.barangay.city.province', 'barangayOfficer')->orderBy('last_name')->orderBy('first_name')->get();
+            $allusers = User::with('role', 'address.barangay.city.province', 'barangayOfficer', 'stations')->orderBy('last_name')->orderBy('first_name')->get();
             $users = $allusers->where('role_id', '!=', $citizenRoleId)->values();
             $citizens = $allusers->where('role_id', $citizenRoleId)->values();
             $roles = Cache::remember('resource-management:roles:v1', now()->addMinutes(10), fn () => Role::orderBy('role')->get());
@@ -170,7 +170,7 @@ class ResourceManagementController extends Controller
                         ->whereHas('role', fn ($role) => $role->whereIn(DB::raw('LOWER(role)'), ['barangay', 'barangay officer', 'barangay captain', 'barangay_officer']))
                         ->whereHas('address', fn ($address) => $address->whereIn('barangay_id', $accountBarangayIds));
                 });
-        })->with('role', 'address.barangay.city.province', 'barangayOfficer')->orderBy('last_name')->orderBy('first_name')->get();
+        })->with('role', 'address.barangay.city.province', 'barangayOfficer', 'stations')->orderBy('last_name')->orderBy('first_name')->get();
         $users = $allusers->where('role_id', '!=', $citizenRoleId)->values();
         // $userOfficer = StationOfficer::where('s', $all);
         $citizens = $allusers->where('role_id', $citizenRoleId)->values();

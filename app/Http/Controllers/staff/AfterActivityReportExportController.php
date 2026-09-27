@@ -19,10 +19,7 @@ class AfterActivityReportExportController extends Controller
 {
     public function downloadWord(Request $request, AfterActivityReport $afterActivityReport, AfterActivityReportExporter $exporter)
     {
-        $stationId = StationOfficer::query()
-            ->where('user_id', $request->user()?->user_id)
-            ->value('station_id');
-        abort_unless($stationId && (int) $afterActivityReport->station_id === (int) $stationId, 404);
+        $this->authorizeAccess($request, $afterActivityReport);
 
         $afterActivityReport->load([
             'station.address.barangay.city.province',

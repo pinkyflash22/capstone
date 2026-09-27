@@ -326,6 +326,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/final-reports/{finalReportId}/fir.docx', [FinalInvestigationFirExportController::class, 'downloadWord'])->name('final-reports.fir.word');
         Route::get('/after-activity-reports', [AfterActivityReportReviewController::class, 'index'])->name('after-activity-reports.index');
         Route::patch('/after-activity-reports/{afterActivityReport}/review', [AfterActivityReportReviewController::class, 'review'])->name('after-activity-reports.review');
+        Route::get('/after-activity-reports/{afterActivityReport}/aar.docx', [AfterActivityReportExportController::class, 'downloadWord'])->name('after-activity-reports.word');
         Route::get('/after-activity-reports/{afterActivityReport}/aar.pdf', [AfterActivityReportExportController::class, 'downloadPdf'])->name('after-activity-reports.pdf');
         Route::get('/mitigations', [App\Http\Controllers\Chief\StationAdminController::class, 'mitigations'])->name('mitigations');
         Route::post('/mitigations/suggestions/refresh', [App\Http\Controllers\Chief\StationAdminController::class, 'refreshGeneratedMitigationDraftRecommendations'])->name('mitigations.suggestions.refresh');
@@ -459,6 +460,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/final-reports/{finalReportId}/fir.docx', [FinalInvestigationFirExportController::class, 'downloadWord'])->name('final-reports.fir.word');
         Route::get('/after-activity-reports', [AfterActivityReportReviewController::class, 'index'])->name('after-activity-reports.index');
         Route::patch('/after-activity-reports/{afterActivityReport}/review', [AfterActivityReportReviewController::class, 'review'])->name('after-activity-reports.review');
+        Route::get('/after-activity-reports/{afterActivityReport}/aar.docx', [AfterActivityReportExportController::class, 'downloadWord'])->name('after-activity-reports.word');
         Route::get('/after-activity-reports/{afterActivityReport}/aar.pdf', [AfterActivityReportExportController::class, 'downloadPdf'])->name('after-activity-reports.pdf');
         Route::get('/mitigations', [StationAdminController::class, 'mitigations'])->name('mitigations');
         Route::get('/mitigations/table', [StationAdminController::class, 'mitigationTable'])->name('mitigations.table');

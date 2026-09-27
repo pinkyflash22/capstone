@@ -37,6 +37,7 @@ class AfterActivityReportReviewController extends Controller
             'status' => $status,
             'isProvincialAdmin' => $isProvincialAdmin,
             'reviewRouteName' => $isProvincialAdmin ? 'admin.after-activity-reports.review' : 'station-admin.after-activity-reports.review',
+            'wordRouteName' => $isProvincialAdmin ? 'admin.after-activity-reports.word' : 'station-admin.after-activity-reports.word',
             'pdfRouteName' => $isProvincialAdmin ? 'admin.after-activity-reports.pdf' : 'station-admin.after-activity-reports.pdf',
         ]);
     }

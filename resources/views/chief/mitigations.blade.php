@@ -567,6 +567,12 @@
         .action-menu__item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: #B23A22; font-size: 12px; font-weight: 800; text-align: left; cursor: pointer; }
         .action-menu__item:hover { background: #FCEEE7; }
         .mitigation-ai-saved .insight-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
+        .generated-month-groups { display: grid !important; grid-template-columns: 1fr !important; gap: 14px !important; }
+        .generated-month-group { display: grid; gap: 10px; }
+        .generated-month-group__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid #E9E5DE; border-radius: 14px; background: #FAF8F5; }
+        .generated-month-group__head h4 { margin: 0; color: #172033; font-size: 13px; font-weight: 850; }
+        .generated-month-group__head p { margin: 3px 0 0; color: #6B6E76; font-size: 11px; line-height: 1.45; }
+        .generated-month-group__count { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 26px; padding: 0 9px; border-radius: 999px; background: #F0EEEA; color: #4A4E58; font-size: 10px; font-weight: 850; text-transform: uppercase; letter-spacing: .04em; }
         .mitigation-ai-saved .ai-draft-card { display: flex !important; flex-direction: column; gap: 13px; min-width: 0; padding: 16px !important; border: 1px solid #E9E5DE; border-radius: 16px; background: #fff; box-shadow: none !important; }
         .mitigation-ai-saved .ai-draft-card__head { display: flex !important; align-items: flex-start; justify-content: space-between; gap: 10px; min-width: 0; }
         .mitigation-ai-saved .ai-draft-card__title { margin: 0; color: #0f172a; font-size: 18px; line-height: 1.18; font-weight: 800; letter-spacing: 0; }
@@ -635,6 +641,7 @@
             .row-btn.primary-view span { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
             .action-menu__panel { right: auto; left: 0; }
             .mitigation-ai-saved .insight-list { grid-template-columns: minmax(0, 1fr) !important; }
+            .generated-month-group__head { align-items: flex-start; flex-direction: column; }
             .mitigation-ai-saved .ai-draft-card__head,
             .mitigation-ai-saved .ai-draft-card__footer { align-items: stretch; flex-direction: column; }
             .mitigation-ai-saved .ai-draft-card__badges { justify-content: flex-start; }
@@ -758,11 +765,21 @@
                                     <p>Saved plans ready for assignment and review.</p>
                                 </div>
                             </div>
-                            @if(($newAiDraftMitigations ?? collect())->isEmpty())
+                            @if(($newAiDraftMitigationGroups ?? collect())->isEmpty())
                                 <div class="empty">No new AI-linked draft mitigation records are waiting for review right now.</div>
                             @else
-                                <div class="insight-list">
-                                    @foreach($newAiDraftMitigations as $action)
+                                <div class="generated-month-groups">
+                                    @foreach($newAiDraftMitigationGroups as $monthGroup)
+                                        <section class="generated-month-group" aria-label="{{ $monthGroup['label'] }} {{ $monthGroup['month_label'] }}">
+                                            <div class="generated-month-group__head">
+                                                <div>
+                                                    <h4>{{ $monthGroup['label'] }} · {{ $monthGroup['month_label'] }}</h4>
+                                                    <p>{{ $monthGroup['description'] }}</p>
+                                                </div>
+                                                <span class="generated-month-group__count">{{ $monthGroup['items']->count() }} {{ \Illuminate\Support\Str::plural('draft', $monthGroup['items']->count()) }}</span>
+                                            </div>
+                                            <div class="insight-list">
+                                    @foreach($monthGroup['items'] as $action)
                                         @php
                                             $linkedChecklist = $action->aiActionPlanChecklist;
                                             $linkedSuggestion = optional($linkedChecklist?->suggestions)->sortByDesc('created_at')->first();
@@ -796,6 +813,7 @@
                                                     'status' => $item->status,
                                                 ];
                                             })->values()->all();
+                                            $draftProgressPercent = (int) ($action->display_progress_percent ?? 0);
                                             $draftFactors = collect($linkedAnalysis?->contributing_factors ?? data_get($linkedChecklist, 'ai_payload.contributing_factors', []))
                                                 ->flatten()
                                                 ->filter()
@@ -852,7 +870,7 @@
                                                 'tasks' => $draftTasks,
                                                 'tasks_done' => $action->status === 'completed' ? count($draftTasks) : collect($draftTasks)->where('status', 'followed')->count(),
                                                 'tasks_total' => count($draftTasks),
-                                                'progress_percent' => 0,
+                                                'progress_percent' => $draftProgressPercent,
                                                 'attachments' => [],
                                                 'approval_label' => $action->approver?->full_name,
                                                 'approval_date_label' => optional($action->approved_at)->format('M d, Y h:i A'),
@@ -872,13 +890,16 @@
                                             <span class="ai-draft-tag">{{ $categoryLabel }}</span>
                                             <p class="ai-draft-card__summary">{{ $draftSummary }}</p>
                                             <div class="ai-draft-card__footer">
-                                                <span class="ai-draft-ready-chip">Ready to review</span>
+                                                <span class="ai-draft-ready-chip">{{ $draftProgressPercent >= 100 ? '100% complete' : 'Ready to review' }}</span>
                                                 <div class="ai-draft-card__actions">
                                                     <button type="button" class="hero-btn insight-action ai-draft-action ai-draft-action--primary" title="Review draft" aria-label="Review draft" data-open-details-modal data-payload='@json($draftPayload)'><i class="fa-solid fa-eye"></i><span>Review</span></button>
                                                     <a href="{{ route('station-admin.mitigations') }}#mitigation-row-{{ $action->mitigation_action_id }}" class="filter-btn secondary insight-action ai-draft-action ai-draft-action--secondary" title="Open plan" aria-label="Open plan"><i class="fa-solid fa-table-list"></i><span>Open plan</span></a>
                                                 </div>
                                             </div>
                                         </article>
+                                    @endforeach
+                                            </div>
+                                        </section>
                                     @endforeach
                                 </div>
                             @endif
@@ -898,11 +919,21 @@
                                     </form>
                                 @endif
                             </div>
-                            @if(($generatedMitigationDrafts ?? collect())->isEmpty())
+                            @if(($generatedMitigationDraftGroups ?? collect())->isEmpty())
                                 <div class="empty">No pending system-generated mitigation drafts right now.</div>
                             @else
-                                <div class="insight-list">
-                                    @foreach($generatedMitigationDrafts as $draftChecklist)
+                                <div class="generated-month-groups">
+                                    @foreach($generatedMitigationDraftGroups as $monthGroup)
+                                        <section class="generated-month-group" aria-label="{{ $monthGroup['label'] }} {{ $monthGroup['month_label'] }}">
+                                            <div class="generated-month-group__head">
+                                                <div>
+                                                    <h4>{{ $monthGroup['label'] }} · {{ $monthGroup['month_label'] }}</h4>
+                                                    <p>{{ $monthGroup['description'] }}</p>
+                                                </div>
+                                                <span class="generated-month-group__count">{{ $monthGroup['items']->count() }} {{ \Illuminate\Support\Str::plural('suggestion', $monthGroup['items']->count()) }}</span>
+                                            </div>
+                                            <div class="insight-list">
+                                    @foreach($monthGroup['items'] as $draftChecklist)
                                         @php
                                             $draftPayload = is_array($draftChecklist->ai_payload) ? $draftChecklist->ai_payload : [];
                                             $draftDrivers = collect($draftPayload['drivers'] ?? [])->take(3)->values();
@@ -930,6 +961,7 @@
                                                 . ", {$suggestionHistoricalCount} historical " . \Illuminate\Support\Str::plural('incident', $suggestionHistoricalCount)
                                                 . ", {$suggestionCompletedFires} completed " . \Illuminate\Support\Str::plural('fire', $suggestionCompletedFires) . ' this month.';
                                             $suggestionTasks = collect($draftChecklist->items ?? [])->map(fn ($item) => ['text' => $item->item_text, 'status' => $item->status])->values()->all();
+                                            $suggestionProgressPercent = (int) ($draftChecklist->display_progress_percent ?? 0);
                                             $suggestionReviewPayload = [
                                                 'title' => $draftChecklist->plan_title,
                                                 'description' => $draftChecklist->plan_description,
@@ -947,7 +979,7 @@
                                                 'tasks' => $suggestionTasks,
                                                 'tasks_done' => collect($suggestionTasks)->where('status', 'followed')->count(),
                                                 'tasks_total' => count($suggestionTasks),
-                                                'progress_percent' => 0,
+                                                'progress_percent' => $suggestionProgressPercent,
                                                 'effectiveness' => 'Pending evaluation',
                                                 'attachments' => [],
                                             ];
@@ -966,6 +998,7 @@
                                             <span class="suggestion-card__category">{{ $categoryLabel }}</span>
                                             <p class="suggestion-card__summary">{{ $suggestionSummary }}</p>
                                             <div class="suggestion-card__footer">
+                                                <span class="ai-draft-ready-chip">{{ $suggestionProgressPercent >= 100 ? '100% complete' : $suggestionProgressPercent . '% progress' }}</span>
                                                 <div class="suggestion-card__actions">
                                                     <button type="button" class="filter-btn secondary insight-action suggestion-action suggestion-action--view" title="View details" aria-label="View details" data-open-details-modal data-payload='@json($suggestionReviewPayload)'><i class="fa-solid fa-eye"></i><span>View details</span></button>
                                                     <form method="POST" action="{{ route('station-admin.mitigations.generated-drafts.reject', ['checklistId' => $draftChecklist->ai_action_plan_checklist_id]) }}">@csrf<button type="submit" class="filter-btn secondary insight-action suggestion-action suggestion-action--dismiss" title="Dismiss suggestion" aria-label="Dismiss suggestion"><i class="fa-solid fa-ban"></i><span>Dismiss</span></button></form>
@@ -973,6 +1006,9 @@
                                                 </div>
                                             </div>
                                         </article>
+                                    @endforeach
+                                            </div>
+                                        </section>
                                     @endforeach
                                 </div>
                             @endif

@@ -2033,6 +2033,7 @@ class StationAdminController extends Controller
                     'status',
                     'source_type',
                     'target_date',
+                    'target_month',
                     'completed_at',
                     'completion_approval_status',
                     'completion_requested_by',
@@ -2173,14 +2174,18 @@ class StationAdminController extends Controller
                 $action->source_type = $this->resolveMitigationSourceType($action->toArray());
             });
 
-            $newAiDraftMitigations = $mitigationActions
-                ->filter(function (MitigationAction $action) {
-                    return $action->status === 'draft'
-                        && $action->source_type === 'ai_action_plan';
-                })
-                ->sortByDesc('created_at')
-                ->take(6)
-                ->values();
+            $newAiDraftMitigations = (clone $mitigationBaseQuery)
+                ->where('status', 'draft')
+                ->whereNotNull('ai_action_plan_checklist_id')
+                ->orderByRaw('CASE WHEN target_month IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('target_month')
+                ->orderByDesc('created_at')
+                ->limit(24)
+                ->get()
+                ->each(function (MitigationAction $action) {
+                    $action->category = $this->normalizeMitigationCategory($action->category);
+                    $action->source_type = $this->resolveMitigationSourceType($action->toArray());
+                });
 
             $summaryCounts = collect(['total', 'awaiting_approval', 'in_progress', 'overdue', 'high_priority', 'completed', 'blocked', 'missing_owner', 'follow_up'])
                 ->mapWithKeys(fn (string $key) => [$key => (int) ($summaryRow?->{$key} ?? 0)])
@@ -2262,6 +2267,7 @@ class StationAdminController extends Controller
                     'analysis:analysis_id,station_id,risk_level,confidence_data,analysis_data,created_at',
                     'suggestions:ai_recommendation_suggestion_id,ai_action_plan_checklist_id,recommendation_title,recommendation_description',
                     'mitigationActions:mitigation_action_id,ai_action_plan_checklist_id,status',
+                    'items:ai_action_plan_checklist_item_id,ai_action_plan_checklist_id,item_text,status,item_order',
                 ])
                 ->where(function ($query) use ($barangayIds, $stationId) {
                     if (! empty($barangayIds)) {
@@ -2306,6 +2312,104 @@ class StationAdminController extends Controller
                 ->orderByDesc('created_at')
                 ->get();
 
+            $currentMonth = today()->startOfMonth();
+            $nextMonth = today()->addMonthNoOverflow()->startOfMonth();
+            $priorityRank = ['critical' => 1, 'high' => 2, 'medium' => 3, 'low' => 4];
+            $resolveMonth = function ($record, ?AiActionPlanChecklist $linkedChecklist = null): Carbon {
+                $rawMonth = $record->target_month
+                    ?? $linkedChecklist?->target_month
+                    ?? $record->target_date
+                    ?? $linkedChecklist?->target_date
+                    ?? $record->created_at
+                    ?? now();
+
+                return Carbon::parse($rawMonth)->startOfMonth();
+            };
+            $groupGeneratedRecords = function ($records, callable $monthResolver, callable $progressResolver) use ($currentMonth, $nextMonth, $priorityRank) {
+                $buckets = [
+                    'current' => collect(),
+                    'next' => collect(),
+                    'other' => collect(),
+                ];
+
+                collect($records)->each(function ($record) use ($monthResolver, $progressResolver, &$buckets, $currentMonth, $nextMonth) {
+                    $targetMonth = $monthResolver($record);
+                    $groupKey = $targetMonth->isSameMonth($currentMonth)
+                        ? 'current'
+                        : ($targetMonth->isSameMonth($nextMonth) ? 'next' : 'other');
+
+                    $record->setAttribute('display_target_month_label', $targetMonth->format('F Y'));
+                    $record->setAttribute('display_progress_percent', $progressResolver($record));
+                    $buckets[$groupKey]->push($record);
+                });
+
+                return collect([
+                    [
+                        'label' => 'Generated for current month',
+                        'month_label' => $currentMonth->format('F Y'),
+                        'description' => 'Operational drafts tied to this month\'s current risk analysis.',
+                        'items' => $buckets['current'],
+                    ],
+                    [
+                        'label' => 'Generated for next month',
+                        'month_label' => $nextMonth->format('F Y'),
+                        'description' => 'Forecast drafts prepared for next month\'s prevention cycle.',
+                        'items' => $buckets['next'],
+                    ],
+                    [
+                        'label' => 'Other generated records',
+                        'month_label' => 'Unscheduled or outside this two-month window',
+                        'description' => 'Generated items without a current or next-month target.',
+                        'items' => $buckets['other'],
+                    ],
+                ])
+                    ->map(function (array $group) use ($priorityRank) {
+                        $group['items'] = $group['items']
+                            ->sortBy(function ($record) use ($priorityRank) {
+                                $progress = (int) ($record->display_progress_percent ?? 0);
+                                $priority = strtolower((string) ($record->priority_level ?? 'medium'));
+                                $target = $record->target_date ?? $record->target_month ?? $record->created_at;
+                                $targetTimestamp = $target ? Carbon::parse($target)->timestamp : PHP_INT_MAX;
+                                $createdTimestamp = $record->created_at ? Carbon::parse($record->created_at)->timestamp : 0;
+
+                                return sprintf(
+                                    '%d-%02d-%012d-%012d',
+                                    $progress >= 100 ? 1 : 0,
+                                    $priorityRank[$priority] ?? 5,
+                                    $targetTimestamp,
+                                    PHP_INT_MAX - $createdTimestamp
+                                );
+                            })
+                            ->values();
+
+                        return $group;
+                    })
+                    ->filter(fn (array $group) => $group['items']->isNotEmpty())
+                    ->values();
+            };
+
+            $newAiDraftMitigationGroups = $groupGeneratedRecords(
+                $newAiDraftMitigations,
+                fn (MitigationAction $action) => $resolveMonth($action, $action->aiActionPlanChecklist),
+                function (MitigationAction $action): int {
+                    $items = collect($action->aiActionPlanChecklist?->items ?? []);
+                    $total = $items->count();
+                    $followed = $action->status === 'completed' ? $total : $items->where('status', 'followed')->count();
+
+                    return match ($action->status) {
+                        'completed' => 100,
+                        'draft' => $total > 0 ? (int) round(($followed / max(1, $total)) * 100) : 0,
+                        default => $total > 0 ? (int) round(($followed / max(1, $total)) * 100) : 0,
+                    };
+                }
+            );
+
+            $generatedMitigationDraftGroups = $groupGeneratedRecords(
+                $generatedMitigationDrafts,
+                fn (AiActionPlanChecklist $checklist) => $resolveMonth($checklist),
+                fn (AiActionPlanChecklist $checklist): int => (int) ($checklist->checklist_progress['percent'] ?? 0)
+            );
+
             $mitigationDraft = $draftActionPlanChecklistId
                 ? $this->buildMitigationDraftFromActionPlanChecklist($draftActionPlanChecklistId, $barangayIds)
                 : null;
@@ -2329,11 +2433,13 @@ class StationAdminController extends Controller
                 'managedBarangays' => $managedBarangays,
                 'mitigationActions' => $mitigationActions,
                 'newAiDraftMitigations' => $newAiDraftMitigations,
+                'newAiDraftMitigationGroups' => $newAiDraftMitigationGroups,
                 'mitigationSummaryCounts' => $summaryCounts,
                 'riskAreas' => $riskAreas,
                 'predictionChecklists' => $predictionChecklists,
                 'aiActionPlanOptions' => $aiActionPlanOptions,
                 'generatedMitigationDrafts' => $generatedMitigationDrafts,
+                'generatedMitigationDraftGroups' => $generatedMitigationDraftGroups,
                 'mitigationDraft' => $mitigationDraft,
                 'autoOpenCreateModal' => (bool) $mitigationDraft,
                 'mitigationCategoryOptions' => $this->mitigationCategoryOptions(),
@@ -2357,6 +2463,7 @@ class StationAdminController extends Controller
                 'managedBarangays' => collect(),
                 'mitigationActions' => collect(),
                 'newAiDraftMitigations' => collect(),
+                'newAiDraftMitigationGroups' => collect(),
                 'mitigationSummaryCounts' => [
                     'total' => 0,
                     'awaiting_approval' => 0,
@@ -2372,6 +2479,7 @@ class StationAdminController extends Controller
                 'predictionChecklists' => collect(),
                 'aiActionPlanOptions' => collect(),
                 'generatedMitigationDrafts' => collect(),
+                'generatedMitigationDraftGroups' => collect(),
                 'mitigationDraft' => null,
                 'autoOpenCreateModal' => false,
                 'mitigationCategoryOptions' => $this->mitigationCategoryOptions(),
