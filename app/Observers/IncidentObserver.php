@@ -9,6 +9,13 @@ use Illuminate\Support\Facades\Log;
 
 class IncidentObserver implements ShouldHandleEventsAfterCommit
 {
+    private static array $skipAutomaticClosureRelease = [];
+
+    public static function skipAutomaticClosureReleaseFor(int $incidentId): void
+    {
+        self::$skipAutomaticClosureRelease[$incidentId] = true;
+    }
+
     public function created(Incident $incident): void
     {
         if ($incident->team_id) {
@@ -31,6 +38,12 @@ class IncidentObserver implements ShouldHandleEventsAfterCommit
 
     public function updated(Incident $incident): void
     {
+        if (isset(self::$skipAutomaticClosureRelease[(int) $incident->incident_id])) {
+            unset(self::$skipAutomaticClosureRelease[(int) $incident->incident_id]);
+
+            return;
+        }
+
         if (! $incident->wasChanged('status')) {
             return;
         }

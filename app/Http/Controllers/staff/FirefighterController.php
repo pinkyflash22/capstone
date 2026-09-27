@@ -2560,6 +2560,7 @@ public function getAssignedIncidents(string $id){
                     'context' => [
                         'station_id' => $thisStation,
                         'user_team_id' => $userTeam?->team_id,
+                        'user_team_status' => $userTeam?->status,
                     ],
                     'counts' => [
                         'active_incidents' => $activeIncidentCount,

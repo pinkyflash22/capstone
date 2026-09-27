@@ -17,6 +17,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
     window.incidentCoords = [];
     window.currentFirefighterId = config.currentFirefighterId ?? null;
     window.currentUserId = config.currentUserId ?? null;
+    window.userTeamStatus = config.userTeamStatus ?? null;
     const FF_LOCATION_PUSH_INTERVAL_MS = 60000;
     const FF_LOCATION_PULL_INTERVAL_MS = 90000;
     const FF_ASSIGNED_INCIDENTS_INTERVAL_MS = 30000;
@@ -397,6 +398,9 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         if (context.user_team_id !== undefined && context.user_team_id !== null) {
             window.userTeamId = context.user_team_id;
         }
+        if (context.user_team_status !== undefined && context.user_team_status !== null) {
+            window.userTeamStatus = context.user_team_status;
+        }
 
         const nextMarkers = Array.isArray(payload.allMarkers) ? payload.allMarkers : [];
         const nextStations = Array.isArray(payload.stations) ? payload.stations : [];
@@ -417,6 +421,7 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
 
         renderDashboardNearbyStations(payload.stations || []);
         renderDashboardCrew(payload.crew || []);
+        renderTeamReadinessPanel();
 
         if (window.map && typeof window.refreshMapMarkers === 'function') {
             window.refreshMapMarkers({
@@ -426,6 +431,80 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
             }).catch((error) => {
                 console.warn('Unable to refresh firefighter dashboard markers:', error);
             });
+        }
+    }
+
+    function renderTeamReadinessPanel() {
+        const panel = document.getElementById('teamReadinessPanel');
+        if (!panel) return;
+
+        const status = String(window.userTeamStatus || '').trim().toLowerCase();
+        if (status !== 'off') {
+            panel.hidden = true;
+            panel.innerHTML = '';
+            return;
+        }
+
+        panel.hidden = false;
+        panel.innerHTML = `
+            <div class="ff-team-readiness-panel__icon"><i class="fas fa-droplet"></i></div>
+            <div class="ff-team-readiness-panel__copy">
+                <strong>Team held for refill/restock</strong>
+                <small>Mark ready when the crew, apparatus, and water supply are prepared for another dispatch.</small>
+            </div>
+            <button type="button" class="ff-team-readiness-panel__button" data-mark-team-ready>
+                Mark team ready
+            </button>
+        `;
+
+        panel.querySelector('[data-mark-team-ready]')?.addEventListener('click', markTeamReadyAfterRefill);
+    }
+
+    async function markTeamReadyAfterRefill(event) {
+        const button = event?.currentTarget;
+        const confirmed = await showFirefighterConfirmationDialog({
+            title: 'Mark team ready?',
+            copy: 'Confirm that refill/restock is complete and your team can receive another dispatch.',
+            confirmLabel: 'Mark ready',
+            icon: 'fa-circle-check'
+        });
+        if (!confirmed) return;
+
+        const original = button?.innerHTML;
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Updating...';
+        }
+
+        try {
+            const response = await fetch('/firefighter/team/ready', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Unable to mark team ready.');
+            }
+
+            window.userTeamStatus = result.team_status || 'available';
+            renderTeamReadinessPanel();
+            showToast(result.message || 'Team marked ready for dispatch.', 'success');
+            await Promise.all([
+                fetchAssignedIncidents(true),
+                loadFirefighterDashboardWidgets(true),
+                refreshFirefighterLiveMap()
+            ]);
+        } catch (error) {
+            console.error('Error marking team ready:', error);
+            showToast(error.message || 'Unable to mark team ready.', 'error');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = original;
+            }
         }
     }
 
@@ -1308,7 +1387,13 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
         return;
     }
     
-    if (!confirm('Confirm responding to this incident? Your status will be updated to RESPONDING.')) return;
+    const confirmed = await showFirefighterConfirmationDialog({
+        title: 'Start response?',
+        copy: 'Your team status will change to responding and this incident will become an active dispatch.',
+        confirmLabel: 'Start response',
+        icon: 'fa-truck-fast'
+    });
+    if (!confirmed) return;
     const pendingState = setIncidentActionPendingState(incidentId, {
         buttonLabel: 'Sending...',
         badgeLabel: 'RESPONDING...'
@@ -1363,7 +1448,13 @@ async function arriveAtIncident(incidentId, currentStatusId, triggerButton = nul
         return;
     }
 
-    if (!confirm('Confirm that your response team has arrived on scene?')) return;
+    const confirmed = await showFirefighterConfirmationDialog({
+        title: 'Confirm arrival?',
+        copy: 'Mark this incident as On Scene once your response team has arrived at the location.',
+        confirmLabel: 'Mark arrived',
+        icon: 'fa-location-check'
+    });
+    if (!confirmed) return;
     const pendingState = setIncidentActionPendingState(incidentId, {
         buttonLabel: 'Confirming...',
         badgeLabel: 'ARRIVING...'
@@ -1405,7 +1496,13 @@ async function requestIncidentBackup(incidentId, currentStatusId, triggerButton 
         return;
     }
 
-    if (!confirm('Call an available backup team and apparatus for this incident?')) return;
+    const confirmed = await showFirefighterConfirmationDialog({
+        title: 'Call backup?',
+        copy: 'An available backup team and apparatus will be dispatched if resources are available.',
+        confirmLabel: 'Call backup',
+        icon: 'fa-people-group'
+    });
+    if (!confirmed) return;
 
     const pendingState = setIncidentActionPendingState(incidentId, {
         buttonLabel: 'Calling backup...',
@@ -1446,10 +1543,11 @@ async function completeIncident(incidentId, currentStatusId, triggerButton = nul
         return;
     }
     
-    if (!confirm('Complete this incident and mark it as controlled?')) return;
+    const completionReadiness = await showIncidentCompletionDialog();
+    if (!completionReadiness) return;
     const pendingState = setIncidentActionPendingState(incidentId, {
-        buttonLabel: 'Submitting...',
-        badgeLabel: 'MARKING CONTROLLED...'
+        buttonLabel: completionReadiness === 'ready' ? 'Submitting...' : 'Holding team...',
+        badgeLabel: completionReadiness === 'ready' ? 'MARKING CONTROLLED...' : 'NEEDS REFILL...'
     });
     
     try {
@@ -1460,14 +1558,18 @@ async function completeIncident(incidentId, currentStatusId, triggerButton = nul
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
             },
+            body: JSON.stringify({ completion_readiness: completionReadiness }),
         });
         
         const result = await response.json();
         
         if (result.success) {
+            window.userTeamStatus = result.team_available === false ? 'off' : (result.team_status || window.userTeamStatus);
+            renderTeamReadinessPanel();
             showToast(result.message || 'Incident completed and marked as controlled!', 'success');
             await Promise.all([
                 fetchAssignedIncidents(true),
+                loadFirefighterDashboardWidgets(true),
                 refreshFirefighterLiveMap()
             ]);
         } else {
@@ -1487,7 +1589,13 @@ async function closeCase(incidentId, currentStatusId, triggerButton = null) {
         return;
     }
     
-    if (!confirm('Close this case? This action will archive the incident.')) return;
+    const confirmed = await showFirefighterConfirmationDialog({
+        title: 'Close case?',
+        copy: 'This will archive the controlled incident case.',
+        confirmLabel: 'Close case',
+        icon: 'fa-folder-closed'
+    });
+    if (!confirmed) return;
     const pendingState = setIncidentActionPendingState(incidentId, {
         buttonLabel: 'Closing...',
         badgeLabel: 'CLOSING...'
@@ -1773,38 +1881,43 @@ async function refreshFirefighterLiveMap() {
     }
 }
 
-function showFalseAlarmConfirmationToast() {
+function showFirefighterConfirmationDialog(options = {}) {
     return new Promise((resolve) => {
-        const existing = document.getElementById('falseAlarmConfirmToast');
+        const existing = document.getElementById('firefighterActionConfirmToast');
         if (existing) {
             existing.remove();
         }
 
         const previouslyFocused = document.activeElement;
+        const title = options.title || 'Confirm action?';
+        const copy = options.copy || 'Please confirm this incident status update.';
+        const confirmLabel = options.confirmLabel || 'Confirm';
+        const cancelLabel = options.cancelLabel || 'Cancel';
+        const icon = options.icon || 'fa-exclamation-triangle';
 
         const toast = document.createElement('div');
-        toast.id = 'falseAlarmConfirmToast';
+        toast.id = 'firefighterActionConfirmToast';
         toast.className = 'ff-false-alarm-confirm';
 
         toast.innerHTML = `
-            <div class="ff-false-alarm-confirm__card" role="dialog" aria-modal="true" aria-labelledby="falseAlarmConfirmTitle">
+            <div class="ff-false-alarm-confirm__card" role="dialog" aria-modal="true" aria-labelledby="firefighterActionConfirmTitle">
                 <div class="ff-false-alarm-confirm__body">
                     <div class="ff-false-alarm-confirm__icon" aria-hidden="true">
-                        <i class="fas fa-exclamation-triangle"></i>
+                        <i class="fas ${escapeHtml(icon)}"></i>
                     </div>
                     <div>
-                        <div id="falseAlarmConfirmTitle" class="ff-false-alarm-confirm__title">Flag as false alarm?</div>
+                        <div id="firefighterActionConfirmTitle" class="ff-false-alarm-confirm__title">${escapeHtml(title)}</div>
                         <div class="ff-false-alarm-confirm__copy">
-                            This will remove the incident from active response handling.
+                            ${escapeHtml(copy)}
                         </div>
                     </div>
                 </div>
                 <div class="ff-false-alarm-confirm__actions">
-                    <button type="button" id="falseAlarmCancelBtn" class="ff-false-alarm-confirm__button ff-false-alarm-confirm__button--cancel">
-                        Cancel
+                    <button type="button" data-confirm-value="cancel" class="ff-false-alarm-confirm__button ff-false-alarm-confirm__button--cancel">
+                        ${escapeHtml(cancelLabel)}
                     </button>
-                    <button type="button" id="falseAlarmConfirmBtn" class="ff-false-alarm-confirm__button ff-false-alarm-confirm__button--confirm">
-                        Confirm
+                    <button type="button" data-confirm-value="confirm" class="ff-false-alarm-confirm__button ff-false-alarm-confirm__button--confirm">
+                        ${escapeHtml(confirmLabel)}
                     </button>
                 </div>
             </div>
@@ -1820,9 +1933,9 @@ function showFalseAlarmConfirmationToast() {
 
         document.body.appendChild(toast);
 
-        toast.querySelector('#falseAlarmCancelBtn')?.addEventListener('click', () => cleanup(false));
-        toast.querySelector('#falseAlarmConfirmBtn')?.addEventListener('click', () => cleanup(true));
-        toast.querySelector('#falseAlarmConfirmBtn')?.focus();
+        toast.querySelector('[data-confirm-value="cancel"]')?.addEventListener('click', () => cleanup(false));
+        toast.querySelector('[data-confirm-value="confirm"]')?.addEventListener('click', () => cleanup(true));
+        toast.querySelector('[data-confirm-value="confirm"]')?.focus();
         toast.addEventListener('click', (event) => {
             if (event.target === toast) {
                 cleanup(false);
@@ -1834,6 +1947,81 @@ function showFalseAlarmConfirmationToast() {
                 cleanup(false);
             }
         }, 10000);
+    });
+}
+
+function showIncidentCompletionDialog() {
+    return new Promise((resolve) => {
+        const existing = document.getElementById('firefighterActionConfirmToast');
+        if (existing) {
+            existing.remove();
+        }
+
+        const previouslyFocused = document.activeElement;
+        const toast = document.createElement('div');
+        toast.id = 'firefighterActionConfirmToast';
+        toast.className = 'ff-false-alarm-confirm';
+
+        toast.innerHTML = `
+            <div class="ff-false-alarm-confirm__card" role="dialog" aria-modal="true" aria-labelledby="firefighterCompleteTitle">
+                <div class="ff-false-alarm-confirm__body">
+                    <div class="ff-false-alarm-confirm__icon" aria-hidden="true">
+                        <i class="fas fa-clipboard-check"></i>
+                    </div>
+                    <div>
+                        <div id="firefighterCompleteTitle" class="ff-false-alarm-confirm__title">Complete incident?</div>
+                        <div class="ff-false-alarm-confirm__copy">
+                            Choose whether your team can take another dispatch now or needs refill/restock first.
+                        </div>
+                    </div>
+                </div>
+                <div class="ff-false-alarm-confirm__actions ff-false-alarm-confirm__actions--three">
+                    <button type="button" data-complete-value="cancel" class="ff-false-alarm-confirm__button ff-false-alarm-confirm__button--cancel">
+                        Cancel
+                    </button>
+                    <button type="button" data-complete-value="needs_refill" class="ff-false-alarm-confirm__button ff-false-alarm-confirm__button--cancel">
+                        Need refill
+                    </button>
+                    <button type="button" data-complete-value="ready" class="ff-false-alarm-confirm__button ff-false-alarm-confirm__button--confirm">
+                        Ready
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const cleanup = (value) => {
+            if (toast.parentNode) {
+                toast.remove();
+            }
+            previouslyFocused?.focus?.();
+            resolve(value);
+        };
+
+        document.body.appendChild(toast);
+        toast.querySelector('[data-complete-value="cancel"]')?.addEventListener('click', () => cleanup(null));
+        toast.querySelector('[data-complete-value="needs_refill"]')?.addEventListener('click', () => cleanup('needs_refill'));
+        toast.querySelector('[data-complete-value="ready"]')?.addEventListener('click', () => cleanup('ready'));
+        toast.querySelector('[data-complete-value="ready"]')?.focus();
+        toast.addEventListener('click', (event) => {
+            if (event.target === toast) {
+                cleanup(null);
+            }
+        });
+
+        setTimeout(() => {
+            if (document.body.contains(toast)) {
+                cleanup(null);
+            }
+        }, 15000);
+    });
+}
+
+function showFalseAlarmConfirmationToast() {
+    return showFirefighterConfirmationDialog({
+        title: 'Flag as false alarm?',
+        copy: 'This will remove the incident from active response handling.',
+        confirmLabel: 'Confirm',
+        icon: 'fa-exclamation-triangle'
     });
 }
     

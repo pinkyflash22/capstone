@@ -257,7 +257,7 @@ class IncidentResourceDispatchService
         }
     }
 
-    public function releaseIncidentUnits(Incident $incident): int
+    public function releaseIncidentUnits(Incident $incident, bool $makeTeamAvailable = true): int
     {
         $teamIds = collect([$incident->team_id])->filter();
         $released = DB::transaction(function () use ($incident, &$teamIds) {
@@ -288,9 +288,12 @@ class IncidentResourceDispatchService
                 ->whereIn('status', ['Reported', 'Responding', 'On Scene'])
                 ->exists();
             if ($hasAnotherActiveUnit || $hasAnotherActiveIncident) continue;
-            $team->forceFill(['status' => 'available'])->save();
+            $team->forceFill(['status' => $makeTeamAvailable ? 'available' : 'off'])->save();
             $members = StationOfficer::query()->whereIn('station_officer_id', $this->teamMemberIds($team))->get(['station_officer_id', 'user_id']);
-            StationOfficer::query()->whereIn('station_officer_id', $members->pluck('station_officer_id'))->whereIn('status', ['dispatched', 'on-scene'])->update(['status' => 'available']);
+            StationOfficer::query()
+                ->whereIn('station_officer_id', $members->pluck('station_officer_id'))
+                ->whereIn('status', $makeTeamAvailable ? ['dispatched', 'on-scene'] : ['available', 'busy', 'dispatched', 'on-scene'])
+                ->update(['status' => $makeTeamAvailable ? 'available' : 'unavailable']);
             foreach ($members->pluck('user_id')->filter() as $userId) {
                 Cache::forget("firefighter:assigned:{$userId}");
                 Cache::forget("firefighter:dashboard:widgets:{$userId}");

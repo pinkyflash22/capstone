@@ -3045,16 +3045,28 @@ class ManagementPage {
         const rows = audits.map((audit) => {
             const previousTeam = audit.previous_team_name || (audit.previous_team_id ? `Team #${audit.previous_team_id}` : 'Unassigned');
             const assignedTeam = audit.assigned_team_name || (audit.assigned_team_id ? `Team #${audit.assigned_team_id}` : 'Unassigned');
-            const actionLabel = audit.assigned_team_id ? 'Assigned team' : 'Unassigned team';
+            const readinessActions = {
+                team_refill_required: {
+                    label: 'Refill required',
+                    detail: `${assignedTeam} held for refill/restock`
+                },
+                team_refill_completed: {
+                    label: 'Team ready',
+                    detail: `${assignedTeam} marked ready for dispatch`
+                }
+            };
+            const readiness = readinessActions[audit.action] || null;
+            const actionLabel = readiness?.label || (audit.assigned_team_id ? 'Assigned team' : 'Unassigned team');
             const actor = audit.actor_name || 'System user';
             const timestamp = audit.created_at ? formatDate(audit.created_at) : 'Time not recorded';
+            const detail = readiness?.detail || `${previousTeam} &rarr; ${assignedTeam}`;
 
             return `
                 <div class="info-row">
                     <span class="info-label"><i class="fa-solid fa-clipboard-check"></i> ${this.escapeHtml(actionLabel)}</span>
                     <span class="info-value">
-                        <strong>${this.escapeHtml(previousTeam)} &rarr; ${this.escapeHtml(assignedTeam)}</strong><br>
-                        <small>${this.escapeHtml(actor)} &middot; ${this.escapeHtml(timestamp)}</small>
+                        <strong>${this.escapeHtml(detail)}</strong><br>
+                        <small>${this.escapeHtml(actor)} &middot; ${this.escapeHtml(timestamp)}${audit.reason ? ` &middot; ${this.escapeHtml(audit.reason)}` : ''}</small>
                     </span>
                 </div>
             `;

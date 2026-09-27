@@ -1429,6 +1429,8 @@ protected function formatTeamAssignmentAudits(Incident $incident)
         'auto_team_assigned',
         'auto_team_reassigned',
         'auto_team_renewed',
+        'team_refill_required',
+        'team_refill_completed',
     ];
 
     return $incident->dispatchAudits

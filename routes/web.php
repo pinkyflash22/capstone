@@ -655,6 +655,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/incidents/{incident}/arrive', [FirefighterIncidentResponseController::class, 'arrive'])->name('incidents.arrive');
         Route::post('/incidents/{incident}/backup', [FirefighterIncidentResponseController::class, 'requestBackup'])->name('incidents.backup');
         Route::post('/incidents/{incident}/complete', [FirefighterIncidentResponseController::class, 'complete'])->name('incidents.complete');
+        Route::post('/team/ready', [FirefighterIncidentResponseController::class, 'markTeamReady'])->name('team.ready');
         Route::post('/incidents/{incident}/false-alarm', [FirefighterIncidentResponseController::class, 'falseAlarm'])->name('incidents.false-alarm');
         Route::post('/incidents/{incident}/close', [FirefighterIncidentResponseController::class, 'close'])->name('incidents.close');
         Route::get('/incidents/{incident}/response-resources', [FirefighterIncidentResponseController::class, 'resources'])->name('incidents.response-resources');

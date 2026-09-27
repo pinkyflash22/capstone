@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Incident;
+use App\Models\IncidentDispatchAudit;
 use App\Models\IncidentResponseUnit;
 use App\Models\StationOfficer;
 use App\Models\Team;
+use App\Observers\IncidentObserver;
 use App\Services\DutyRosterService;
 use App\Services\IncidentAutoAssignmentService;
 use App\Services\IncidentResourceDispatchService;
@@ -13,6 +15,7 @@ use App\Support\UserActivityLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -121,17 +124,25 @@ class FirefighterIncidentResponseController extends Controller
     }
 
     public function complete(
+        Request $request,
         Incident $incident,
         IncidentResourceDispatchService $resources,
         IncidentAutoAssignmentService $assignments
     ): JsonResponse
     {
+        $validated = $request->validate([
+            'completion_readiness' => ['nullable', 'string', 'in:ready,needs_refill'],
+        ]);
+        $completionReadiness = $validated['completion_readiness'] ?? 'ready';
+        $releaseAsAvailable = $completionReadiness === 'ready';
+
         $completed = DB::transaction(function () use ($incident) {
             $locked = Incident::query()->with('marker')->whereKey($incident->incident_id)->lockForUpdate()->firstOrFail();
             $officer = $this->currentOfficer();
             abort_unless($this->respondingTeamForOfficer($locked, $officer), 403, 'You are not assigned to this incident response.');
             abort_unless(strtolower(trim((string) $locked->status)) === 'on scene', 409, 'Confirm arrival before completing this incident.');
 
+            IncidentObserver::skipAutomaticClosureReleaseFor((int) $locked->incident_id);
             $locked->forceFill(['status' => 'Controlled'])->save();
             if ($locked->marker) {
                 $locked->marker->forceFill(['status' => 'completed'])->save();
@@ -140,11 +151,79 @@ class FirefighterIncidentResponseController extends Controller
             return $locked;
         });
 
-        $resources->releaseIncidentUnits($completed);
-        $queue = $assignments->assignRecentUnassignedIncidents();
+        $resources->releaseIncidentUnits($completed, $releaseAsAvailable);
+        $queue = $releaseAsAvailable
+            ? $assignments->assignRecentUnassignedIncidents()
+            : ['checked' => 0, 'assigned' => [], 'expired' => []];
         UserActivityLogger::log("marked incident #{$incident->incident_id} controlled", Auth::id(), request());
 
-        $message = 'Incident completed. Team, personnel, and apparatus are available again.';
+        $message = $releaseAsAvailable
+            ? 'Incident completed. Team, personnel, and apparatus are available again.'
+            : 'Incident completed. Team was held out of reassignment for refill/restock.';
+
+        if (! $releaseAsAvailable) {
+            $this->recordTeamReadinessAudit(
+                $completed,
+                'team_refill_required',
+                'Team requested refill/restock before accepting another dispatch.'
+            );
+            UserActivityLogger::log("held response team for refill after incident #{$incident->incident_id}", Auth::id(), request());
+        } elseif (count($queue['assigned'] ?? []) > 0) {
+            $message .= ' '.$this->assignmentQueueSummary($queue);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'completion_readiness' => $completionReadiness,
+            'team_available' => $releaseAsAvailable,
+            'queue' => $queue,
+        ]);
+    }
+
+    public function markTeamReady(IncidentAutoAssignmentService $assignments): JsonResponse
+    {
+        $officer = $this->currentOfficer();
+        $team = $this->currentOfficerTeam($officer);
+        abort_unless($team, 403, 'You are not assigned to a firefighter response team.');
+
+        $latestIncident = null;
+
+        DB::transaction(function () use ($team, $officer, &$latestIncident) {
+            $lockedTeam = Team::query()->whereKey($team->team_id)->lockForUpdate()->firstOrFail();
+            $memberIds = $this->teamMemberIds($lockedTeam);
+
+            $lockedTeam->forceFill(['status' => 'available'])->save();
+            StationOfficer::query()
+                ->whereIn('station_officer_id', $memberIds)
+                ->whereIn('status', ['unavailable', 'off-duty', 'busy'])
+                ->update(['status' => 'available', 'updated_at' => now()]);
+
+            $latestIncident = $this->latestIncidentForTeam((int) $lockedTeam->team_id);
+            if ($latestIncident) {
+                $this->recordTeamReadinessAudit(
+                    $latestIncident,
+                    'team_refill_completed',
+                    'Team marked ready after refill/restock.',
+                    (int) $lockedTeam->team_id
+                );
+            }
+
+            foreach (
+                StationOfficer::query()
+                    ->whereIn('station_officer_id', $memberIds->push((int) $officer->station_officer_id)->unique())
+                    ->pluck('user_id')
+                    ->filter() as $userId
+            ) {
+                Cache::forget("firefighter:assigned:{$userId}");
+                Cache::forget("firefighter:dashboard:widgets:{$userId}");
+            }
+        });
+
+        $queue = $assignments->assignRecentUnassignedIncidents();
+        UserActivityLogger::log('marked firefighter team ready after refill', Auth::id(), request());
+
+        $message = 'Team marked ready for dispatch.';
         if (count($queue['assigned'] ?? []) > 0) {
             $message .= ' '.$this->assignmentQueueSummary($queue);
         }
@@ -152,6 +231,7 @@ class FirefighterIncidentResponseController extends Controller
         return response()->json([
             'success' => true,
             'message' => $message,
+            'team_status' => 'available',
             'queue' => $queue,
         ]);
     }
@@ -172,6 +252,7 @@ class FirefighterIncidentResponseController extends Controller
                 'Only an active report can be marked as a false alarm.'
             );
 
+            IncidentObserver::skipAutomaticClosureReleaseFor((int) $locked->incident_id);
             $locked->forceFill(['status' => 'Closed'])->save();
             if ($locked->marker) {
                 $locked->marker->forceFill(['status' => 'inactive'])->save();
@@ -243,6 +324,68 @@ class FirefighterIncidentResponseController extends Controller
     private function currentOfficer(): StationOfficer
     {
         return StationOfficer::query()->where('user_id', Auth::id())->firstOrFail();
+    }
+
+    private function currentOfficerTeam(StationOfficer $officer): ?Team
+    {
+        return Team::query()
+            ->where(function ($query) use ($officer) {
+                foreach (DutyRosterService::DEPLOYABLE_ROLES as $role) {
+                    $query->orWhere($role, $officer->station_officer_id);
+                }
+            })
+            ->orderBy('team_id')
+            ->first();
+    }
+
+    private function latestIncidentForTeam(int $teamId): ?Incident
+    {
+        $incidentId = IncidentResponseUnit::query()
+            ->where('team_id', $teamId)
+            ->latest('updated_at')
+            ->value('incident_id');
+
+        return $incidentId
+            ? Incident::query()->find((int) $incidentId)
+            : Incident::query()->where('team_id', $teamId)->latest('updated_at')->first();
+    }
+
+    private function recordTeamReadinessAudit(
+        Incident $incident,
+        string $action,
+        string $reason,
+        ?int $teamId = null
+    ): void {
+        if (! Schema::hasTable('incident_dispatch_audits')) {
+            return;
+        }
+
+        $resolvedTeamId = $teamId ?: ($incident->team_id ? (int) $incident->team_id : null);
+
+        IncidentDispatchAudit::create([
+            'incident_id' => $incident->incident_id,
+            'actor_user_id' => Auth::id(),
+            'action' => $action,
+            'previous_team_id' => $resolvedTeamId,
+            'assigned_team_id' => $resolvedTeamId,
+            'source_station_id' => $incident->station_id,
+            'target_station_id' => $incident->station_id,
+            'reason' => $reason,
+            'metadata' => [
+                'source' => 'firefighter_response',
+                'team_readiness' => $action === 'team_refill_completed' ? 'ready' : 'needs_refill',
+            ],
+        ]);
+    }
+
+    private function teamMemberIds(Team $team)
+    {
+        return collect(DutyRosterService::DEPLOYABLE_ROLES)
+            ->map(fn (string $role) => $team->{$role})
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
     }
 
     private function assignmentQueueSummary(array $queue): string

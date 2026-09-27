@@ -1581,6 +1581,7 @@
                 <div class="ff-response-units__head"><span><i class="fas fa-truck-fast"></i> Assigned response tracking</span><strong id="activeResponseUnitsCount">0</strong></div>
                 <div class="ff-apparatus-tracking"><span id="apparatusTrackingState"><i class="fas fa-location-crosshairs"></i> Waiting for assigned driver run</span></div>
             </div>
+            <div id="teamReadinessPanel" class="ff-team-readiness-panel" hidden></div>
             <div id="assignedIncidentsList" class="incident-list">
                 <div class="empty-incidents">
                     <i class="fas fa-truck text-4xl mb-2 opacity-50"></i>
@@ -2099,6 +2100,7 @@
             currentFirefighterId: @json(auth()->user()->user_id ?? null),
             currentUserId: @json(auth()->user()->user_id ?? null),
             userTeamId: @json(isset($userTeam) ? $userTeam->team_id : null),
+            userTeamStatus: @json(isset($userTeam) ? $userTeam->status : null),
             userStationId: @json(isset($thisStation) ? $thisStation : null),
             dashboardDataUrl: @json(route('firefighter.dashboard.data')),
             dashboardPostsUrl: @json(route('firefighter.dashboard.posts')),
@@ -2227,6 +2229,7 @@
     window.__ffAllowDashboardPrefetch = false;
     window.userId = {{ auth()->user()->user_id ?? 'null' }};
     window.userTeamId = {{ isset($userTeam) ? $userTeam->team_id : 'null' }};
+    window.userTeamStatus = @json(isset($userTeam) ? $userTeam->status : null);
     window.userStationId = {{ isset($thisStation) ? $thisStation : 'null' }};
     const dashboardDataUrl = @json(route('firefighter.dashboard.data'));
     const dashboardPostsUrl = @json(route('firefighter.dashboard.posts'));
@@ -2520,12 +2523,90 @@
         if (context.user_team_id !== undefined && context.user_team_id !== null) {
             window.userTeamId = context.user_team_id;
         }
+        if (context.user_team_status !== undefined && context.user_team_status !== null) {
+            window.userTeamStatus = context.user_team_status;
+        }
         document.getElementById('activeIncidentsCount').textContent = counts.active_incidents ?? '--';
         document.getElementById('equipmentCount').textContent = counts.equipment ?? '--';
         document.getElementById('crewOnlineCount').textContent = counts.crew_online ?? '--';
 
         renderDashboardNearbyStations(payload.stations || []);
         renderDashboardCrew(payload.crew || []);
+        renderTeamReadinessPanel();
+    }
+
+    function renderTeamReadinessPanel() {
+        const panel = document.getElementById('teamReadinessPanel');
+        if (!panel) return;
+
+        const status = String(window.userTeamStatus || '').trim().toLowerCase();
+        if (status !== 'off') {
+            panel.hidden = true;
+            panel.innerHTML = '';
+            return;
+        }
+
+        panel.hidden = false;
+        panel.innerHTML = `
+            <div class="ff-team-readiness-panel__icon"><i class="fas fa-droplet"></i></div>
+            <div class="ff-team-readiness-panel__copy">
+                <strong>Team held for refill/restock</strong>
+                <small>Mark ready when the crew, apparatus, and water supply are prepared for another dispatch.</small>
+            </div>
+            <button type="button" class="ff-team-readiness-panel__button" data-mark-team-ready>
+                Mark team ready
+            </button>
+        `;
+
+        panel.querySelector('[data-mark-team-ready]')?.addEventListener('click', markTeamReadyAfterRefill);
+    }
+
+    async function markTeamReadyAfterRefill(event) {
+        const button = event?.currentTarget;
+        const confirmed = await showFirefighterConfirmationDialog({
+            title: 'Mark team ready?',
+            copy: 'Confirm that refill/restock is complete and your team can receive another dispatch.',
+            confirmLabel: 'Mark ready',
+            icon: 'fa-circle-check'
+        });
+        if (!confirmed) return;
+
+        const original = button?.innerHTML;
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Updating...';
+        }
+
+        try {
+            const response = await fetch('/firefighter/team/ready', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'Unable to mark team ready.');
+            }
+
+            window.userTeamStatus = result.team_status || 'available';
+            renderTeamReadinessPanel();
+            showToast(result.message || 'Team marked ready for dispatch.', 'success');
+            await Promise.all([
+                fetchAssignedIncidents(true),
+                loadFirefighterDashboardWidgets(true),
+                refreshFirefighterLiveMap()
+            ]);
+        } catch (error) {
+            console.error('Error marking team ready:', error);
+            showToast(error.message || 'Unable to mark team ready.', 'error');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = original;
+            }
+        }
     }
 
     async function loadFirefighterDashboardWidgets(force = false) {
@@ -3276,7 +3357,13 @@ async function respondToIncident(incidentId, currentStatusId, triggerButton = nu
     if (!routeMode) return;
 
     const routeModeLabel = routeMode === 'demo' ? 'DEMO ROUTE' : 'LIVE GPS';
-    if (!confirm(`Confirm responding to this incident? Your status will be updated to RESPONDING and navigation will use ${routeModeLabel}.`)) return;
+    const confirmed = await showFirefighterConfirmationDialog({
+        title: 'Start response?',
+        copy: `Your team status will change to responding and navigation will use ${routeModeLabel}.`,
+        confirmLabel: 'Start response',
+        icon: 'fa-truck-fast'
+    });
+    if (!confirmed) return;
     let preparedRoute = null;
 
     try {
@@ -3353,7 +3440,13 @@ async function requestIncidentBackup(incidentId, currentStatusId, triggerButton 
         return;
     }
 
-    if (!confirm('Call an available backup team and apparatus for this incident?')) return;
+    const confirmed = await showFirefighterConfirmationDialog({
+        title: 'Call backup?',
+        copy: 'An available backup team and apparatus will be dispatched if resources are available.',
+        confirmLabel: 'Call backup',
+        icon: 'fa-people-group'
+    });
+    if (!confirmed) return;
 
     const pendingState = setIncidentActionPendingState(incidentId, {
         buttonLabel: 'Calling backup...',
@@ -3396,10 +3489,11 @@ async function completeIncident(incidentId, currentStatusId, triggerButton = nul
         return;
     }
     
-    if (!confirm('Complete this incident and mark it as controlled?')) return;
+    const completionReadiness = await showIncidentCompletionDialog();
+    if (!completionReadiness) return;
     const pendingState = setIncidentActionPendingState(incidentId, {
-        buttonLabel: 'Submitting...',
-        badgeLabel: 'MARKING CONTROLLED...'
+        buttonLabel: completionReadiness === 'ready' ? 'Submitting...' : 'Holding team...',
+        badgeLabel: completionReadiness === 'ready' ? 'MARKING CONTROLLED...' : 'NEEDS REFILL...'
     });
     
     try {
@@ -3410,13 +3504,20 @@ async function completeIncident(incidentId, currentStatusId, triggerButton = nul
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
             },
+            body: JSON.stringify({ completion_readiness: completionReadiness }),
         });
         
         const result = await response.json();
         
         if (result.success) {
+            window.userTeamStatus = result.team_available === false ? 'off' : (result.team_status || window.userTeamStatus);
+            renderTeamReadinessPanel();
             showToast(result.message || 'Incident completed and marked as controlled!', 'success');
-            fetchAssignedIncidents(true); // Refresh the list
+            await Promise.all([
+                fetchAssignedIncidents(true),
+                loadFirefighterDashboardWidgets(true),
+                refreshFirefighterLiveMap()
+            ]);
         } else {
             restoreIncidentActionPendingState(incidentId, pendingState);
             showToast(result.message || 'Failed to update incident', 'error');
@@ -3434,7 +3535,13 @@ async function closeCase(incidentId, currentStatusId, triggerButton = null) {
         return;
     }
     
-    if (!confirm('Close this case? This action will archive the incident.')) return;
+    const confirmed = await showFirefighterConfirmationDialog({
+        title: 'Close case?',
+        copy: 'This will archive the controlled incident case.',
+        confirmLabel: 'Close case',
+        icon: 'fa-folder-closed'
+    });
+    if (!confirmed) return;
     const pendingState = setIncidentActionPendingState(incidentId, {
         buttonLabel: 'Closing...',
         badgeLabel: 'CLOSING...'
@@ -3505,49 +3612,54 @@ async function markIncidentFalseAlarm(incidentId, currentStatusId, triggerButton
     }
 }
 
-function showFalseAlarmConfirmationToast() {
+function showFirefighterConfirmationDialog(options = {}) {
     return new Promise((resolve) => {
-        const existing = document.getElementById('falseAlarmConfirmToast');
+        const existing = document.getElementById('firefighterActionConfirmToast');
         if (existing) {
             existing.remove();
         }
 
+        const title = options.title || 'Confirm action?';
+        const copy = options.copy || 'Please confirm this incident status update.';
+        const confirmLabel = options.confirmLabel || 'Confirm';
+        const cancelLabel = options.cancelLabel || 'Cancel';
+        const icon = options.icon || 'fa-exclamation-triangle';
         const toast = document.createElement('div');
-        toast.id = 'falseAlarmConfirmToast';
+        toast.id = 'firefighterActionConfirmToast';
         toast.style.cssText = `
             position: fixed;
-            right: 24px;
-            bottom: 24px;
-            width: min(360px, calc(100vw - 32px));
-            background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
-            border: 1px solid rgba(251, 146, 60, 0.28);
-            border-left: 4px solid #ea580c;
-            border-radius: 16px;
-            box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
-            padding: 16px;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(15, 23, 42, 0.42);
+            backdrop-filter: blur(5px);
             z-index: 5000;
             color: #7c2d12;
         `;
 
         toast.innerHTML = `
+            <div style="width:min(390px, calc(100vw - 32px)); padding:20px; background:linear-gradient(145deg,#fffaf5,#ffffff); border:1px solid rgba(201,75,42,.2); border-radius:22px; box-shadow:0 28px 70px rgba(15,23,42,.28);">
             <div style="display:flex; align-items:flex-start; gap:12px;">
                 <div style="width:38px; height:38px; border-radius:999px; background:#fb923c; color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                    <i class="fas fa-exclamation-triangle"></i>
+                    <i class="fas ${escapeHtml(icon)}"></i>
                 </div>
                 <div style="flex:1;">
-                    <div style="font-size:14px; font-weight:700; margin-bottom:4px;">Flag as False Alarm?</div>
+                    <div style="font-size:14px; font-weight:700; margin-bottom:4px;">${escapeHtml(title)}</div>
                     <div style="font-size:13px; line-height:1.45; color:#9a3412;">
-                        This will tag the incident as a false alarm and remove it from active response handling.
+                        ${escapeHtml(copy)}
                     </div>
                 </div>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
-                <button type="button" id="falseAlarmCancelBtn" style="padding:8px 12px; border-radius:10px; border:1px solid #fdba74; background:#fff; color:#9a3412; font-size:12px; font-weight:700; cursor:pointer;">
-                    Cancel
+                <button type="button" data-confirm-value="cancel" style="padding:8px 12px; border-radius:10px; border:1px solid #fdba74; background:#fff; color:#9a3412; font-size:12px; font-weight:700; cursor:pointer;">
+                    ${escapeHtml(cancelLabel)}
                 </button>
-                <button type="button" id="falseAlarmConfirmBtn" style="padding:8px 12px; border-radius:10px; border:none; background:#ea580c; color:#fff; font-size:12px; font-weight:700; cursor:pointer;">
-                    Confirm
+                <button type="button" data-confirm-value="confirm" style="padding:8px 12px; border-radius:10px; border:none; background:#ea580c; color:#fff; font-size:12px; font-weight:700; cursor:pointer;">
+                    ${escapeHtml(confirmLabel)}
                 </button>
+            </div>
             </div>
         `;
 
@@ -3560,14 +3672,80 @@ function showFalseAlarmConfirmationToast() {
 
         document.body.appendChild(toast);
 
-        toast.querySelector('#falseAlarmCancelBtn')?.addEventListener('click', () => cleanup(false));
-        toast.querySelector('#falseAlarmConfirmBtn')?.addEventListener('click', () => cleanup(true));
+        toast.querySelector('[data-confirm-value="cancel"]')?.addEventListener('click', () => cleanup(false));
+        toast.querySelector('[data-confirm-value="confirm"]')?.addEventListener('click', () => cleanup(true));
 
         setTimeout(() => {
             if (document.body.contains(toast)) {
                 cleanup(false);
             }
         }, 10000);
+    });
+}
+
+function showIncidentCompletionDialog() {
+    return new Promise((resolve) => {
+        const existing = document.getElementById('firefighterActionConfirmToast');
+        if (existing) existing.remove();
+
+        const toast = document.createElement('div');
+        toast.id = 'firefighterActionConfirmToast';
+        toast.style.cssText = `
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 18px;
+            background: rgba(15, 23, 42, 0.42);
+            backdrop-filter: blur(5px);
+            z-index: 5000;
+            color: #7c2d12;
+        `;
+
+        toast.innerHTML = `
+            <div style="width:min(440px, calc(100vw - 32px)); padding:20px; background:linear-gradient(145deg,#fffaf5,#ffffff); border:1px solid rgba(201,75,42,.2); border-radius:22px; box-shadow:0 28px 70px rgba(15,23,42,.28);">
+            <div style="display:flex; align-items:flex-start; gap:12px;">
+                <div style="width:38px; height:38px; border-radius:999px; background:#fb923c; color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                    <i class="fas fa-clipboard-check"></i>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:14px; font-weight:700; margin-bottom:4px;">Complete incident?</div>
+                    <div style="font-size:13px; line-height:1.45; color:#9a3412;">
+                        Choose whether your team can take another dispatch now or needs refill/restock first.
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:14px;">
+                <button type="button" data-complete-value="cancel" style="padding:8px 12px; border-radius:10px; border:1px solid #fdba74; background:#fff; color:#9a3412; font-size:12px; font-weight:700; cursor:pointer;">Cancel</button>
+                <button type="button" data-complete-value="needs_refill" style="padding:8px 12px; border-radius:10px; border:1px solid #fdba74; background:#fff; color:#9a3412; font-size:12px; font-weight:700; cursor:pointer;">Need refill</button>
+                <button type="button" data-complete-value="ready" style="padding:8px 12px; border-radius:10px; border:none; background:#ea580c; color:#fff; font-size:12px; font-weight:700; cursor:pointer;">Ready</button>
+            </div>
+            </div>
+        `;
+
+        const cleanup = (value) => {
+            if (toast.parentNode) toast.remove();
+            resolve(value);
+        };
+
+        document.body.appendChild(toast);
+        toast.querySelector('[data-complete-value="cancel"]')?.addEventListener('click', () => cleanup(null));
+        toast.querySelector('[data-complete-value="needs_refill"]')?.addEventListener('click', () => cleanup('needs_refill'));
+        toast.querySelector('[data-complete-value="ready"]')?.addEventListener('click', () => cleanup('ready'));
+
+        setTimeout(() => {
+            if (document.body.contains(toast)) cleanup(null);
+        }, 15000);
+    });
+}
+
+function showFalseAlarmConfirmationToast() {
+    return showFirefighterConfirmationDialog({
+        title: 'Flag as false alarm?',
+        copy: 'This will tag the incident as a false alarm and remove it from active response handling.',
+        confirmLabel: 'Confirm',
+        icon: 'fa-exclamation-triangle'
     });
 }
     
