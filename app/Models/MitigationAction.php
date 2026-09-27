@@ -28,6 +28,7 @@ class MitigationAction extends Model
         'status',
         'source_type',
         'target_date',
+        'target_month',
         'completed_at',
         'completion_approval_status',
         'completion_requested_by',
@@ -65,6 +66,7 @@ class MitigationAction extends Model
     {
         return [
             'target_date' => 'date',
+            'target_month' => 'date',
             'completed_at' => 'datetime',
             'completion_requested_at' => 'datetime',
             'completion_decided_at' => 'datetime',

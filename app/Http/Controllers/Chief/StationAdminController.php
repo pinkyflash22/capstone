@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Chief;
 use App\Http\Controllers\Controller;
 use App\Models\AiActionPlanChecklist;
 use App\Models\AiActionPlanChecklistItem;
+use App\Models\AfterActivityReport;
 use App\Models\Barangay;
 use App\Models\BarangayOfficer;
 use App\Models\BarangayPredictionChecklist;
@@ -1829,7 +1830,7 @@ class StationAdminController extends Controller
             ->filter()
             ->values();
 
-        $reportType = in_array($request->string('type')->toString(), ['all', 'spot', 'progress', 'final'], true)
+        $reportType = in_array($request->string('type')->toString(), ['all', 'spot', 'progress', 'final', 'aar'], true)
             ? $request->string('type')->toString()
             : 'all';
         $search = trim($request->string('search')->toString());
@@ -1851,6 +1852,7 @@ class StationAdminController extends Controller
                     'investigator.station',
                     'fireOrigin',
                     'finalInvestigation',
+                    'reviewer',
                 ])
                 ->whereIn('station_officer_id', $stationOfficerIds)
                 ->when($search, function ($query, $value) {
@@ -1864,6 +1866,7 @@ class StationAdminController extends Controller
                             });
                     });
                 })
+                ->when(in_array($status, ['submitted', 'approved', 'rejected'], true), fn ($query) => $query->where('review_status', $status))
                 ->when($status === 'conducting', fn ($query) => $query->whereDoesntHave('finalInvestigation'))
                 ->when($status === 'finalized', fn ($query) => $query->whereHas('finalInvestigation')),
             'final' => FinalInvestigationReport::query()
@@ -1872,6 +1875,7 @@ class StationAdminController extends Controller
                     'investigator.user',
                     'investigator.station',
                     'progressInvestigation.investigator.user',
+                    'reviewer',
                 ])
                 ->whereIn('station_officer_id', $stationOfficerIds)
                 ->when($search, function ($query, $value) {
@@ -1884,13 +1888,30 @@ class StationAdminController extends Controller
                                     ->orWhere('last_name', 'like', "%{$value}%");
                             });
                     });
-                }),
+                })
+                ->when(in_array($status, ['submitted', 'approved', 'rejected'], true), fn ($query) => $query->where('review_status', $status)),
+            'aar' => AfterActivityReport::query()
+                ->with(['station', 'preparedBy.user', 'reviewedBy'])
+                ->where('station_id', $stationId)
+                ->when($search, function ($query, $value) {
+                    $query->where(function ($searchQuery) use ($value) {
+                        $searchQuery->where('activity_title', 'like', "%{$value}%")
+                            ->orWhere('activity_type', 'like', "%{$value}%")
+                            ->orWhere('activity_location', 'like', "%{$value}%")
+                            ->orWhereHas('preparedBy.user', function ($userQuery) use ($value) {
+                                $userQuery->where('first_name', 'like', "%{$value}%")
+                                    ->orWhere('last_name', 'like', "%{$value}%");
+                            });
+                    });
+                })
+                ->when(in_array($status, ['submitted', 'approved', 'changes_requested'], true), fn ($query) => $query->where('review_status', $status)),
             'spot' => SpotInvestigationReport::query()
                 ->with([
                     'incident.marker',
                     'investigator.user',
                     'investigator.station',
                     'progressInvestigation',
+                    'reviewer',
                 ])
                 ->whereIn('station_officer_id', $stationOfficerIds)
                 ->when($search, function ($query, $value) {
@@ -1904,6 +1925,7 @@ class StationAdminController extends Controller
                             });
                     });
                 })
+                ->when(in_array($status, ['submitted', 'approved', 'rejected'], true), fn ($query) => $query->where('review_status', $status))
                 ->when(in_array($status, ['residential', 'commercial', 'industrial'], true), fn ($query) => $query->whereRaw('LOWER(occupancy) = ?', [$status]))
                 ->when($status === 'filed', fn ($query) => $query->whereDoesntHave('progressInvestigation'))
                 ->when($status === 'progressed', fn ($query) => $query->whereHas('progressInvestigation')),
@@ -1946,6 +1968,7 @@ class StationAdminController extends Controller
             'spot' => SpotInvestigationReport::whereIn('station_officer_id', $stationOfficerIds)->count(),
             'progress' => ProgressInvestigationReport::whereIn('station_officer_id', $stationOfficerIds)->count(),
             'final' => FinalInvestigationReport::whereIn('station_officer_id', $stationOfficerIds)->count(),
+            'aar' => AfterActivityReport::where('station_id', $stationId)->count(),
             'estimated_damage' => (float) SpotInvestigationReport::whereIn('station_officer_id', $stationOfficerIds)->sum('estimated_damage'),
         ];
         $stationProfile = $this->buildExecutiveStationProfile($thisperson);
@@ -2866,22 +2889,28 @@ class StationAdminController extends Controller
     ): \Illuminate\Pagination\LengthAwarePaginator {
         $rows = collect()
             ->concat(
-                SpotInvestigationReport::with(['incident.marker', 'investigator.user', 'investigator.station', 'progressInvestigation'])
+                SpotInvestigationReport::with(['incident.marker', 'investigator.user', 'investigator.station', 'progressInvestigation', 'reviewer'])
                     ->whereIn('station_officer_id', $stationOfficerIds)
                     ->get()
                     ->map(fn ($report) => $this->serializeExecutiveReportRecord($report, 'spot', $stationId))
             )
             ->concat(
-                ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'investigator.user', 'investigator.station', 'fireOrigin', 'finalInvestigation'])
+                ProgressInvestigationReport::with(['spotInvestigation.incident.marker', 'investigator.user', 'investigator.station', 'fireOrigin', 'finalInvestigation', 'reviewer'])
                     ->whereIn('station_officer_id', $stationOfficerIds)
                     ->get()
                     ->map(fn ($report) => $this->serializeExecutiveReportRecord($report, 'progress', $stationId))
             )
             ->concat(
-                FinalInvestigationReport::with(['progressInvestigation.spotInvestigation.incident.marker', 'investigator.user', 'investigator.station', 'progressInvestigation.investigator.user'])
+                FinalInvestigationReport::with(['progressInvestigation.spotInvestigation.incident.marker', 'investigator.user', 'investigator.station', 'progressInvestigation.investigator.user', 'reviewer'])
                     ->whereIn('station_officer_id', $stationOfficerIds)
                     ->get()
                     ->map(fn ($report) => $this->serializeExecutiveReportRecord($report, 'final', $stationId))
+            )
+            ->concat(
+                AfterActivityReport::with(['station', 'preparedBy.user', 'reviewedBy'])
+                    ->where('station_id', $stationId)
+                    ->get()
+                    ->map(fn ($report) => $this->serializeExecutiveReportRecord($report, 'aar', $stationId))
             );
 
         if ($search !== '') {
@@ -2898,6 +2927,7 @@ class StationAdminController extends Controller
 
         if ($status !== '') {
             $rows = $rows->filter(fn (array $row) => ($row['status'] ?? '') === $status
+                || ($row['review_status'] ?? 'submitted') === $status
                 || mb_strtolower((string) ($row['occupancy'] ?? '')) === $status);
         }
 
@@ -2932,6 +2962,69 @@ class StationAdminController extends Controller
 
     private function serializeExecutiveReportRecord($report, string $reportType, int $stationId): array
     {
+        if ($reportType === 'aar') {
+            $reviewPayload = $this->executiveReportReviewPayload($report, 'aar');
+            $participants = collect($report->participants ?? [])
+                ->map(function ($participant) {
+                    if (is_array($participant)) {
+                        return $participant['name'] ?? $participant['label'] ?? json_encode($participant);
+                    }
+
+                    return (string) $participant;
+                })
+                ->filter()
+                ->values();
+            $resources = collect($report->deployed_resources ?? [])
+                ->map(function ($resource) {
+                    if (is_array($resource)) {
+                        return $resource['name'] ?? $resource['label'] ?? json_encode($resource);
+                    }
+
+                    return (string) $resource;
+                })
+                ->filter()
+                ->values();
+
+            return [
+                'id' => $report->after_activity_report_id,
+                'type' => 'aar',
+                'incident_id' => null,
+                'incident_title' => $report->activity_title ?: 'After activity report',
+                'investigator' => $report->preparedBy?->user?->full_name ?: 'Unassigned preparer',
+                'station_id' => $stationId,
+                'station_name' => $report->station?->station_name,
+                'status' => $report->activity_type ?: 'activity',
+                'activity_title' => $report->activity_title ?: 'After activity report',
+                'activity_type' => $report->activity_type ?: 'Activity',
+                'activity_location' => $report->activity_location ?: 'Not recorded',
+                'activity_date' => $report->activity_date,
+                'created_at' => $report->created_at,
+                'completed_at' => $report->report_completed_at,
+                'download_url' => route('station-admin.after-activity-reports.pdf', $report),
+                'review_url' => route('station-admin.after-activity-reports.review', $report),
+                ...$reviewPayload,
+                'fields' => [
+                    'activity_title' => $report->activity_title,
+                    'activity_type' => $report->activity_type,
+                    'activity_date' => optional($report->activity_date)->toDateString(),
+                    'activity_location' => $report->activity_location,
+                    'participants' => $participants->implode(', '),
+                    'deployed_resources' => $resources->implode(', '),
+                    'memorandum_for' => $report->memorandum_for,
+                    'report_completed_at' => optional($report->report_completed_at)?->toIso8601String(),
+                    'references' => $report->references,
+                    'background' => $report->background,
+                    'significance' => $report->significance,
+                    'activity_details' => $report->activity_details,
+                    'issues_challenges' => $report->issues_challenges,
+                    'discussion_assessment' => $report->discussion_assessment,
+                    'recommendations' => $report->recommendations,
+                ],
+            ];
+        }
+
+        $reviewPayload = $this->executiveReportReviewPayload($report);
+
         if ($reportType === 'progress') {
             $incident = $report->spotInvestigation?->incident;
 
@@ -2949,6 +3042,7 @@ class StationAdminController extends Controller
                 'responsible_arson' => $report->responsible_arson ?: 'Not recorded',
                 'created_at' => $report->created_at,
                 'completed_at' => $report->report_completed_at,
+                ...$reviewPayload,
                 'fields' => $report->only([
                     'memorandum_for', 'mission_order_number', 'mission_order_date', 'responsible_arson',
                     'fire_cause', 'facts_of_case', 'disposition', 'report_completed_at',
@@ -2974,6 +3068,7 @@ class StationAdminController extends Controller
                 'cause_of_fire' => $report->cause_of_fire ?: 'Not recorded',
                 'created_at' => $report->created_at,
                 'completed_at' => $report->report_completed_at,
+                ...$reviewPayload,
                 'fields' => $report->only([
                     'memorandum_for', 'office_address', 'alarm_at', 'establishment_burned', 'fire_victims',
                     'origin_of_fire', 'cause_of_fire', 'exact_address', 'total_damage', 'facts_of_case',
@@ -3002,12 +3097,27 @@ class StationAdminController extends Controller
             'fire_out' => $report->fire_out,
             'created_at' => $report->created_at,
             'completed_at' => $report->report_completed_at,
+            ...$reviewPayload,
             'fields' => $report->only([
                 'memorandum_for', 'place_of_occurrence', 'involved_structure', 'establishment_name',
                 'occupant', 'owner', 'occupancy', 'estimated_damage', 'estimated_area', 'dead', 'injured',
                 'highest_alarm_level', 'affected_establishments_count', 'description', 'fatality_details',
                 'details_of_investigation', 'disposition', 'fire_started', 'fire_out',
             ]),
+        ];
+    }
+
+    private function executiveReportReviewPayload($report, string $reportType = 'investigation'): array
+    {
+        $status = $report->review_status ?: 'submitted';
+        $reviewer = $reportType === 'aar' ? $report->reviewedBy : $report->reviewer;
+
+        return [
+            'review_status' => $status,
+            'review_status_label' => ucfirst(str_replace('_', ' ', $status)),
+            'review_comments' => $report->review_comments,
+            'reviewed_at' => optional($report->reviewed_at)?->toIso8601String(),
+            'reviewed_by_name' => trim(($reviewer?->first_name ?? '') . ' ' . ($reviewer?->last_name ?? '')) ?: null,
         ];
     }
 

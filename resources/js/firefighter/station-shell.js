@@ -1618,7 +1618,7 @@ function bootFirefighterMyStationPage() {
         const officerSelects = aarForm?.querySelectorAll('select[data-station-ref="officers"]');
         if (!activitySelect || !officerSelects) return;
 
-        activitySelect.innerHTML = `<option value="">Unscheduled operation or activity</option>${createOptions(data.activities || [], '', (item) => `data-title="${escapeHtml(item.title || '')}" data-type="${escapeHtml(item.type || '')}" data-date="${escapeHtml(item.date || '')}" data-location="${escapeHtml(item.location || '')}"`)}`;
+        activitySelect.innerHTML = `<option value="">Select eligible activity</option>${createOptions(data.activities || [], '', (item) => `data-title="${escapeHtml(item.title || '')}" data-type="${escapeHtml(item.type || '')}" data-date="${escapeHtml(item.date || '')}" data-location="${escapeHtml(item.location || '')}" data-source-label="${escapeHtml(item.source_label || 'Station schedule')}"`)}`;
         officerSelects.forEach((select) => populateOfficerSelect(select));
 
         if (activitySelect.dataset.aarBound !== 'true') {
@@ -1963,7 +1963,7 @@ function bootFirefighterMyStationPage() {
             return `
                 <div class="detail-grid">
                     <div class="detail-item"><div class="detail-label">Report Type</div><div class="detail-value">After Activity Report</div></div>
-                    <div class="detail-item"><div class="detail-label">Source</div><div class="detail-value">${escapeHtml(report.source_label || 'Unscheduled operation')}</div></div>
+                    <div class="detail-item"><div class="detail-label">Source</div><div class="detail-value">${escapeHtml(report.source_label || 'Station schedule')}</div></div>
                     <div class="detail-item full"><div class="detail-label">Activity</div><div class="detail-value">${escapeHtml(report.activity_title || 'BFP activity')}</div></div>
                     <div class="detail-item"><div class="detail-label">Date</div><div class="detail-value">${escapeHtml(report.activity_date || 'N/A')}</div></div>
                     <div class="detail-item"><div class="detail-label">Location</div><div class="detail-value">${escapeHtml(report.activity_location || 'Not recorded')}</div></div>
@@ -2030,7 +2030,7 @@ function bootFirefighterMyStationPage() {
             return `
                 <form id="manageReportEditForm" class="form-grid">
                     <input type="hidden" name="event_activity_id" value="${escapeHtml(report.event_activity_id || '')}">
-                    <div class="form-group full"><label class="form-label">Activity Source</label><div class="form-auto-value">${escapeHtml(report.source_label || 'Unscheduled operation')}</div></div>
+                    <div class="form-group full"><label class="form-label">Activity Source</label><div class="form-auto-value">${escapeHtml(report.source_label || 'Station schedule')}</div></div>
                     <div class="form-group full"><label class="form-label">Activity Title</label><input class="form-input" name="activity_title" value="${escapeHtml(report.activity_title || '')}" required></div>
                     <div class="form-group"><label class="form-label">Activity Type</label><input class="form-input" name="activity_type" value="${escapeHtml(report.activity_type || '')}"></div>
                     <div class="form-group"><label class="form-label">Activity Date</label><input class="form-input" type="date" name="activity_date" value="${escapeHtml(report.activity_date || '')}" required></div>
@@ -2628,7 +2628,7 @@ function bootFirefighterMyStationPage() {
                 id: data.after_activity_report_id,
                 type: 'aar',
                 event_activity_id: data.event_activity_id || formData.get('event_activity_id'),
-                source_label: (data.event_activity_id || formData.get('event_activity_id')) ? 'Scheduled activity' : 'Unscheduled operation',
+                source_label: activitySelect?.selectedOptions?.[0]?.dataset?.sourceLabel || 'Station schedule',
                 activity_title: data.activity_title || formData.get('activity_title'),
                 activity_type: data.activity_type || formData.get('activity_type'),
                 activity_date: String(data.activity_date || formData.get('activity_date') || '').slice(0, 10),

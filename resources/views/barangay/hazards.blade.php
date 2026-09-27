@@ -969,12 +969,9 @@
                                     </div>
                                     <div class="risk-form-field">
                                         <label for="hazard_report_station">Station</label>
-                                        <select id="hazard_report_station" name="station_id">
-                                            <option value="">No linked station</option>
-                                            @foreach ($stations as $station)
-                                                <option value="{{ $station->station_id }}" @selected((string) old('station_id') === (string) $station->station_id)>{{ $station->station_name }}</option>
-                                            @endforeach
-                                        </select>
+                                        <input type="hidden" id="hazard_report_station" name="station_id" value="{{ old('station_id', $autoLinkedStationId ?? '') }}">
+                                        <input type="text" value="{{ $autoLinkedStation?->station_name ?? 'Will be matched from barangay/municipality' }}" readonly>
+                                        <small class="table-muted">Station is assigned automatically from barangay coverage or municipality match.</small>
                                     </div>
                                     <div class="full risk-form-field">
                                         <label for="hazard_report_notes">Notes</label>

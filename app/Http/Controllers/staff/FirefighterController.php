@@ -764,7 +764,7 @@ class FirefighterController extends Controller
     protected function loadAfterActivityReportsPaginator(int $stationId, int $perPage = 10)
     {
         return AfterActivityReport::query()
-            ->with(['eventActivity', 'investigator.user.role', 'approvedBy.user', 'proofImages'])
+            ->with(['eventActivity.communityActivityRequest', 'investigator.user.role', 'approvedBy.user', 'proofImages'])
             ->where('station_id', $stationId)
             ->latest('activity_date')
             ->latest('after_activity_report_id')
@@ -933,12 +933,16 @@ class FirefighterController extends Controller
     protected function mapAfterActivityReportStore($reports, string $currentOfficerName): array
     {
         return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName) {
+            $sourceLabel = $report->eventActivity?->communityActivityRequest
+                ? 'Community requested event'
+                : ($report->event_activity_id ? 'Station schedule' : 'Unlinked activity');
+
             return [
                 $report->after_activity_report_id => [
                     'id' => $report->after_activity_report_id,
                     'type' => 'aar',
                     'event_activity_id' => $report->event_activity_id,
-                    'source_label' => $report->event_activity_id ? 'Scheduled activity' : 'Unscheduled operation',
+                    'source_label' => $sourceLabel,
                     'activity_title' => $report->activity_title,
                     'activity_type' => $report->activity_type,
                     'activity_date' => optional($report->activity_date)->format('Y-m-d'),
@@ -1803,6 +1807,7 @@ class FirefighterController extends Controller
 
         if ($scope === 'aar') {
             $payload['activities'] = EventActivity::query()
+                ->with('communityActivityRequest')
                 ->where('station_id', $context['stationId'])
                 ->whereNull('user_id')
                 ->whereDate('event_date', '<=', today())
@@ -1812,6 +1817,8 @@ class FirefighterController extends Controller
                 ->map(fn (EventActivity $event) => [
                     'id' => $event->event_id,
                     'label' => $event->event . ' - ' . optional($event->event_date)->format('M d, Y'),
+                    'source' => $event->communityActivityRequest ? 'community_request' : 'station_schedule',
+                    'source_label' => $event->communityActivityRequest ? 'Community requested event' : 'Station schedule',
                     'title' => $event->event,
                     'type' => $event->activity_type,
                     'date' => optional($event->event_date)->format('Y-m-d'),

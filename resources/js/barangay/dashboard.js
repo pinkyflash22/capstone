@@ -112,6 +112,18 @@ function getFilterKey(category) {
     return 'hazards';
 }
 
+function getLayerKey(category) {
+    const normalized = String(category || '').trim().toLowerCase();
+
+    if (normalized === 'fire') return 'incidents';
+    if (normalized === 'station') return 'stations';
+    if (normalized === 'barangay') return 'barangay';
+    if (normalized === 'hydrant') return 'support';
+    if (['risk', 'hazard'].includes(normalized)) return 'hazard';
+
+    return 'hazard';
+}
+
 function createPopupContent(marker, highlighted = false) {
     const visual = getCategoryVisual(marker.category);
 
@@ -145,6 +157,7 @@ async function loadDashboardMap() {
     const incidentCountElement = document.getElementById('barangayMapIncidentCount');
     const lastUpdatedElement = document.getElementById('barangayMapLastUpdated');
     const filterButtons = Array.from(document.querySelectorAll('[data-map-filter]'));
+    const layerToggles = Array.from(document.querySelectorAll('[data-map-layer]'));
     const currentBarangayId = Number(mapElement.dataset.currentBarangayId || 0);
     const boundaryRecords = parseBoundaryCollection(mapElement.dataset.barangayBoundaries);
     const latestPins = (() => {
@@ -173,6 +186,13 @@ async function loadDashboardMap() {
         incidents: L.layerGroup(),
         stations: L.layerGroup(),
         hazards: L.layerGroup(),
+    };
+    const layerGroups = {
+        incidents: L.layerGroup(),
+        stations: L.layerGroup(),
+        barangay: L.layerGroup(),
+        hazard: L.layerGroup(),
+        support: L.layerGroup(),
     };
     const bounds = L.latLngBounds();
     let userMarker = null;
@@ -214,6 +234,10 @@ async function loadDashboardMap() {
         leafletMarker.addTo(allMarkerLayer);
         if (categoryLayers[filterKey]) {
             leafletMarker.addTo(categoryLayers[filterKey]);
+        }
+        const layerKey = getLayerKey(marker.category);
+        if (layerGroups[layerKey]) {
+            leafletMarker.addTo(layerGroups[layerKey]);
         }
         bounds.extend([Number(marker.lat), Number(marker.lng)]);
     });
@@ -267,7 +291,9 @@ async function loadDashboardMap() {
             latestPins.forEach((pin) => {
                 const visual = getCategoryVisual(pin.category);
                 const chip = document.createElement('span');
-                chip.className = 'tag low';
+                chip.className = pin.category === 'fire'
+                    ? 'pin-tag pin-tag--fire'
+                    : (pin.category === 'barangay' ? 'pin-tag pin-tag--civic' : 'pin-tag pin-tag--neutral');
                 chip.style.borderColor = `${visual.color}33`;
                 chip.style.color = visual.color;
                 chip.textContent = `${pin.title}`;
@@ -290,27 +316,37 @@ async function loadDashboardMap() {
         });
     }
 
-    const overlays = {
-        'All Markers': allMarkerLayer,
-        'Barangay Boundaries': boundaryLayer,
-        'Your Location': userLayer,
-    };
-
-    L.control.layers(null, overlays, {
-        collapsed: false,
-        position: 'topright',
-    }).addTo(map);
+    let activeFilter = 'all';
 
     function applyMapFilter(filter) {
+        activeFilter = filter || activeFilter || 'all';
         allMarkerLayer.remove();
         Object.values(categoryLayers).forEach((layer) => {
             layer.remove();
         });
+        Object.values(layerGroups).forEach((layer) => {
+            layer.remove();
+        });
 
-        if (filter === 'all') {
-            allMarkerLayer.addTo(map);
-        } else if (categoryLayers[filter]) {
-            categoryLayers[filter].addTo(map);
+        if (activeFilter === 'all') {
+            layerToggles.forEach((toggle) => {
+                const key = toggle.dataset.mapLayer;
+                if (toggle.checked && layerGroups[key]) {
+                    layerGroups[key].addTo(map);
+                }
+            });
+        } else if (activeFilter === 'hazards') {
+            ['barangay', 'hazard', 'support'].forEach((key) => {
+                const matchingToggle = layerToggles.find((toggle) => toggle.dataset.mapLayer === key);
+                if ((!matchingToggle || matchingToggle.checked) && layerGroups[key]) {
+                    layerGroups[key].addTo(map);
+                }
+            });
+        } else if (categoryLayers[activeFilter]) {
+            const matchingToggle = layerToggles.find((toggle) => toggle.dataset.mapLayer === activeFilter);
+            if ((!matchingToggle || matchingToggle.checked) && layerGroups[activeFilter]) {
+                layerGroups[activeFilter].addTo(map);
+            }
         } else {
             allMarkerLayer.addTo(map);
         }
@@ -327,6 +363,10 @@ async function loadDashboardMap() {
             button.classList.add('is-active');
             applyMapFilter(filter);
         });
+    });
+
+    layerToggles.forEach((toggle) => {
+        toggle.addEventListener('change', () => applyMapFilter(activeFilter));
     });
 
     applyMapFilter('all');
@@ -424,6 +464,88 @@ function initializeDashboardRecords() {
         return record.verified ? 'complied' : 'pending';
     }
 
+    function emptyAware(value) {
+        const normalized = String(value ?? '').trim();
+        if (!normalized || ['n/a', 'na', 'none', 'null', 'not recorded'].includes(normalized.toLowerCase())) {
+            return '<span class="dashboard-record-empty">Not recorded</span>';
+        }
+
+        return escapeHtml(normalized);
+    }
+
+    function causeClass(value) {
+        const normalized = String(value || '').toLowerCase();
+        return normalized.includes('pending') || normalized.includes('investigation') || normalized.includes('unknown')
+            ? ' dashboard-record-fact__value--pending'
+            : '';
+    }
+
+    function buildRecordModal(record) {
+        const description = record.description_text || record.marker?.description || record.location_label || record.location || 'No description recorded.';
+        const technicalDetail = record.technical_detail || '';
+        const dateTime = `${record.date || 'Date not recorded'} · ${record.time || 'Time not recorded'}`;
+        const barangayName = record.barangay_name || record.location_label || 'Barangay not recorded';
+        const facts = [
+            ['Classification', record.classification],
+            ['Cause', record.cause, causeClass(record.cause)],
+            ['Occurrences', Number(record.incident_count || 1)],
+            ['Estimated Damage', record.estimated_damage],
+            ['Injured', Number(record.injured_count || 0)],
+            ['Deaths', Number(record.death_count || 0)],
+        ];
+
+        return `
+            <div class="dashboard-record-modal-content">
+                <div class="dashboard-record-badges">
+                    <span class="dashboard-record-badge dashboard-record-badge--classification">${escapeHtml(record.classification || 'Undetermined')}</span>
+                    <span class="dashboard-record-badge dashboard-record-badge--status">${escapeHtml(record.status || 'Reported')}</span>
+                </div>
+
+                <div class="dashboard-record-chip-grid">
+                    <div class="dashboard-record-chip-card">
+                        <i class="bi bi-calendar-event"></i>
+                        <div><span>Date</span><strong>${escapeHtml(dateTime)}</strong></div>
+                    </div>
+                    <div class="dashboard-record-chip-card">
+                        <i class="bi bi-geo-alt"></i>
+                        <div><span>Barangay</span><strong>${escapeHtml(barangayName)}</strong></div>
+                    </div>
+                    <div class="dashboard-record-chip-card">
+                        <i class="bi bi-file-earmark-text"></i>
+                        <div><span>Source</span><strong>${emptyAware(record.source)}</strong></div>
+                    </div>
+                </div>
+
+                <section class="dashboard-record-section">
+                    <div class="dashboard-record-section__header">Description</div>
+                    <div class="dashboard-record-section__body">
+                        <p class="dashboard-record-description">${escapeHtml(description)}</p>
+                        ${technicalDetail ? `<div class="dashboard-record-technical">${escapeHtml(technicalDetail)}</div>` : ''}
+                    </div>
+                </section>
+
+                <section class="dashboard-record-section">
+                    <div class="dashboard-record-section__header">Fire record details</div>
+                    <div class="dashboard-record-fact-grid">
+                        ${facts.map(([label, value, extraClass = '']) => `
+                            <div class="dashboard-record-fact">
+                                <span>${escapeHtml(label)}</span>
+                                <strong class="dashboard-record-fact__value${extraClass}">${emptyAware(value)}</strong>
+                            </div>
+                        `).join('')}
+                    </div>
+                </section>
+
+                <section class="dashboard-record-section">
+                    <div class="dashboard-record-section__header">Notes</div>
+                    <div class="dashboard-record-section__body">
+                        <p class="dashboard-record-description">${emptyAware(record.notes)}</p>
+                    </div>
+                </section>
+            </div>
+        `;
+    }
+
     function renderRows(items) {
         records.clear();
         items.forEach((record) => records.set(Number(record.id), record));
@@ -431,8 +553,11 @@ function initializeDashboardRecords() {
         tableBody.innerHTML = items.map((record) => `
             <tr class="dashboard-record-row" data-record-id="${Number(record.id)}">
                 <td><strong>${escapeHtml(record.date)}</strong><br><span class="text-slate-400">${escapeHtml(record.time)}</span></td>
-                <td><strong>${escapeHtml(record.classification)}</strong><br><span class="text-slate-400">${escapeHtml(record.cause)}</span></td>
-                <td>${escapeHtml(record.location)}</td>
+                <td><strong>${escapeHtml(record.display_title || record.classification)}</strong><br><span class="text-slate-400">${escapeHtml(record.cause)}</span></td>
+                <td>
+                    <strong class="record-location-title">${escapeHtml(record.location_label || record.location)}</strong>
+                    ${record.technical_detail ? `<span class="record-location-tech">${escapeHtml(record.technical_detail)}</span>` : ''}
+                </td>
                 <td><span class="tag ${statusClass(record)}">${escapeHtml(record.status)}</span></td>
                 <td>
                     <button type="button" class="dashboard-record-view" data-record-view="${Number(record.id)}" aria-label="View fire record">
@@ -469,6 +594,12 @@ function initializeDashboardRecords() {
         if (!record) return;
 
         lastFocusedElement = document.activeElement;
+        modalBody.innerHTML = buildRecordModal(record);
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        modal.querySelector('[data-record-modal-close]')?.focus();
+        return;
+
         modalBody.innerHTML = `
             <div class="dashboard-record-detail-grid">
                 <div class="dashboard-record-detail"><span>Date</span><strong>${escapeHtml(record.date)} · ${escapeHtml(record.time)}</strong></div>

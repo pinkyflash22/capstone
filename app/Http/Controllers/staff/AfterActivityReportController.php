@@ -30,7 +30,7 @@ class AfterActivityReportController extends Controller
         return response()->json([
             'success' => true,
             'data' => InvestigationReportImageService::responsePayload(
-                $report->load(['eventActivity', 'investigator.user', 'approvedBy.user'])
+                $report->load(['eventActivity.communityActivityRequest', 'investigator.user', 'approvedBy.user'])
             ),
         ]);
     }
@@ -58,7 +58,7 @@ class AfterActivityReportController extends Controller
         return response()->json([
             'success' => true,
             'data' => InvestigationReportImageService::responsePayload(
-                $afterActivityReport->fresh()->load(['eventActivity', 'investigator.user', 'approvedBy.user'])
+                $afterActivityReport->fresh()->load(['eventActivity.communityActivityRequest', 'investigator.user', 'approvedBy.user'])
             ),
         ]);
     }
@@ -81,7 +81,7 @@ class AfterActivityReportController extends Controller
         $officer = $this->currentOfficer($request);
         $validated = $request->validate([
             'event_activity_id' => [
-                'nullable',
+                'required',
                 'integer',
                 'exists:event_activities,event_id',
                 Rule::unique('after_activity_reports', 'event_activity_id')->ignore($report?->getKey(), 'after_activity_report_id'),
@@ -120,7 +120,9 @@ class AfterActivityReportController extends Controller
         unset($validated['participants_text'], $validated['deployed_resources_text']);
 
         if (! empty($validated['event_activity_id'])) {
-            $event = EventActivity::query()->findOrFail($validated['event_activity_id']);
+            $event = EventActivity::query()
+                ->with('communityActivityRequest')
+                ->findOrFail($validated['event_activity_id']);
             if ((int) $event->station_id !== (int) $officer->station_id) {
                 throw ValidationException::withMessages([
                     'event_activity_id' => 'Select an activity from your assigned station.',
@@ -129,6 +131,13 @@ class AfterActivityReportController extends Controller
             if ($event->user_id !== null) {
                 throw ValidationException::withMessages([
                     'event_activity_id' => 'Select an official station activity, not a personal schedule item.',
+                ]);
+            }
+            if ($event->afterActivityReport()
+                ->when($report, fn ($query) => $query->where('after_activity_report_id', '!=', $report->getKey()))
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'event_activity_id' => 'An AAR already exists for this scheduled activity.',
                 ]);
             }
             if ($event->event_date?->isFuture()) {
@@ -143,6 +152,10 @@ class AfterActivityReportController extends Controller
                 $validated['activity_date'] = $event->event_date?->toDateString();
                 $validated['activity_location'] = $event->barangay ?: ($validated['activity_location'] ?? null);
             }
+        } else {
+            throw ValidationException::withMessages([
+                'event_activity_id' => 'Select a completed community requested event or station schedule before creating an AAR.',
+            ]);
         }
 
         if (! empty($validated['approved_by_station_officer_id'])) {

@@ -3,13 +3,7 @@
 @section('active_nav', 'risk-map')
 @section('page_title', 'Map')
 @section('page_subtitle', 'Incidents, risks, hydrants, and response points')
-@section('hero_title', 'Barangay Risk Map')
-@section('hero_copy', 'View local fire-safety markers and submit a risk area.')
-
-@section('hero_badges')
-    <span class="hero-badge"><i class="fa-solid fa-layer-group"></i> Operational layers</span>
-    <span class="hero-badge"><i class="fa-solid fa-location-dot"></i> Barangay vicinity</span>
-@endsection
+@section('hide_hero', '1')
 
 @php
     $riskAreaMapPayload = $riskAreas->map(function ($riskArea) {
@@ -58,6 +52,17 @@
 
         return strtoupper(str_replace('_', ' ', (string) $value));
     };
+
+    $cleanMarkerDescription = static function (?string $description, ?string $fallback = null) {
+        $description = trim((string) ($description ?? ''));
+        $cleaned = trim((string) preg_replace('/\s*GPS accuracy.*$/i', '', $description));
+
+        if ($cleaned === '' || str_contains(strtolower($cleaned), 'fire emergency reported')) {
+            return $fallback ?: 'Mapped fire-safety point for barangay review.';
+        }
+
+        return $cleaned;
+    };
 @endphp
 
 @push('styles')
@@ -66,6 +71,45 @@
         display: flex;
         flex-direction: column;
         gap: 1.25rem;
+    }
+
+    .barangay-risk-lede {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 1.1rem;
+        border: 1px solid #E9E5DE;
+        border-radius: 16px;
+        background: #fff;
+    }
+
+    .barangay-risk-lede p {
+        margin: 0;
+        color: #4A4E58;
+        font-size: 0.95rem;
+        font-weight: 650;
+    }
+
+    .barangay-risk-lede__links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .barangay-risk-lede__links a {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: 34px;
+        padding: 0 0.7rem;
+        border: 1px solid #E9E5DE;
+        border-radius: 999px;
+        background: #FAF8F5;
+        color: #4A4E58;
+        font-size: 0.78rem;
+        font-weight: 800;
+        text-decoration: none;
     }
 
     .barangay-risk-grid-shell {
@@ -104,10 +148,16 @@
     .barangay-summary-card {
         border-radius: 20px;
         border: 1px solid rgba(226, 232, 240, 0.92);
+        border-left: 4px solid transparent;
         background: rgba(248, 250, 252, 0.96);
         padding: 0.9rem 1rem;
         min-height: 92px;
     }
+
+    .risk-stat--fire .barangay-summary-card { border-left-color: #B23A22; }
+    .risk-stat--incident .barangay-summary-card { border-left-color: #A5680B; }
+    .risk-stat--marker .barangay-summary-card { border-left-color: #7A4FB8; }
+    .risk-stat--updated .barangay-summary-card { border-left-color: #3A6FB0; }
 
     .barangay-summary-card .tiny-label {
         margin-bottom: 0.25rem;
@@ -386,6 +436,11 @@
         gap: 0.5rem;
         font-size: 0.82rem;
         font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .barangay-risk-launch__button {
+        min-width: 146px;
     }
 
     .barangay-risk-launch__button,
@@ -582,6 +637,89 @@
         text-transform: uppercase;
     }
 
+    .barangay-risk-record-cards {
+        display: grid;
+        gap: 0.75rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .barangay-risk-record-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.9rem;
+        border: 1px solid #E9E5DE;
+        border-radius: 16px;
+        background: #fff;
+    }
+
+    .barangay-risk-record-card__dot {
+        width: 10px;
+        height: 10px;
+        margin-top: 0.35rem;
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: #A5680B;
+    }
+
+    .barangay-risk-record-card__dot--purple {
+        background: #7A4FB8;
+    }
+
+    .barangay-risk-record-card h4 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 0.92rem;
+        font-weight: 900;
+    }
+
+    .barangay-risk-record-card p {
+        margin: 0.3rem 0 0;
+        color: #64748b;
+        font-size: 0.84rem;
+        line-height: 1.5;
+    }
+
+    .risk-status-tile-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .risk-status-tile {
+        padding: 0.9rem;
+        border: 1px solid #E9E5DE;
+        border-radius: 16px;
+        background: #fff;
+    }
+
+    .risk-status-tile span {
+        display: block;
+        color: #64748b;
+        font-size: 0.7rem;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .risk-status-tile strong {
+        display: block;
+        margin-top: 0.45rem;
+        color: #0f172a;
+        font-size: 1.5rem;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    .risk-status-tile--pending { background: #FBF0DD; }
+    .risk-status-tile--pending strong { color: #A5680B; }
+    .risk-status-tile--verified { background: #EAF1FB; }
+    .risk-status-tile--verified strong { color: #3A6FB0; }
+    .risk-status-tile--resolved { background: #E7F5EC; }
+    .risk-status-tile--resolved strong { color: #1E7A4C; }
+
     .barangay-risk-record-head {
         display: flex;
         align-items: start;
@@ -748,11 +886,17 @@
         .barangay-risk-metric-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+
+        .risk-status-tile-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
 
     @media (max-width: 768px) {
+        .barangay-risk-lede { align-items: flex-start; flex-direction: column; }
         .barangay-risk-launch { align-items: flex-start; flex-direction: column; }
         .barangay-risk-launch__button { width: 100%; }
+        .risk-status-tile-grid { grid-template-columns: 1fr; }
         .barangay-risk-modal { padding: 0.45rem; }
         .barangay-risk-modal__dialog { max-height: calc(100dvh - 0.9rem); border-radius: 18px; }
         .barangay-risk-modal__header,
@@ -823,6 +967,14 @@
 
 @section('content')
     <div class="barangay-risk-stack">
+        <section class="barangay-risk-lede">
+            <p>View local fire-safety markers and submit a risk area.</p>
+            <div class="barangay-risk-lede__links" aria-label="Risk map shortcuts">
+                <a href="#barangayOperationsMap"><i class="fa-solid fa-layer-group"></i> Operational layers</a>
+                <a href="#barangayOperationsMap"><i class="fa-solid fa-location-dot"></i> Barangay vicinity</a>
+            </div>
+        </section>
+
         @if (session('success'))
             <div class="panel-card rounded-3xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
                 {{ session('success') }}
@@ -851,10 +1003,10 @@
                 </div>
 
                 <div class="barangay-risk-metric-grid">
-                    @include('barangay.partials.summary-metric-card', ['label' => 'Active Fires', 'value' => '<span id="barangayMapLiveCount">0</span>'])
-                    @include('barangay.partials.summary-metric-card', ['label' => 'Incidents', 'value' => '<span id="barangayMapIncidentCount">0</span>'])
-                    @include('barangay.partials.summary-metric-card', ['label' => 'Risk Markers', 'value' => '<span id="barangayMapRiskCount">' . e($riskAreas->count()) . '</span>'])
-                    @include('barangay.partials.summary-metric-card', ['label' => 'Last Updated', 'value' => '<span id="barangayMapUpdatedAt">Loading...</span>', 'valueClass' => 'text-sm font-bold text-slate-700 mt-2'])
+                    <div class="risk-stat--fire">@include('barangay.partials.summary-metric-card', ['label' => 'Active Fires', 'value' => '<span id="barangayMapLiveCount">0</span>'])</div>
+                    <div class="risk-stat--incident">@include('barangay.partials.summary-metric-card', ['label' => 'Incidents', 'value' => '<span id="barangayMapIncidentCount">0</span>'])</div>
+                    <div class="risk-stat--marker">@include('barangay.partials.summary-metric-card', ['label' => 'Risk Markers', 'value' => '<span id="barangayMapRiskCount">' . e($riskAreas->count()) . '</span>'])</div>
+                    <div class="risk-stat--updated">@include('barangay.partials.summary-metric-card', ['label' => 'Last Updated', 'value' => '<span id="barangayMapUpdatedAt">Loading...</span>', 'valueClass' => 'text-sm font-bold text-slate-700 mt-2'])</div>
                 </div>
 
                 <div class="barangay-risk-map-shell">
@@ -888,16 +1040,22 @@
                         </div>
                     </div>
 
-                    <div class="list-stack">
-                        <div class="list-item">
-                            <h4>Risk submissions</h4>
-                            <p>{{ $riskAreaFeed->total() }} recorded barangay risk markers linked to this area.</p>
-                        </div>
-                        <div class="list-item">
-                            <h4>Mapped points</h4>
-                            <p>{{ $markerInventory->total() }} related marker records currently available on the map feed.</p>
-                        </div>
-                    </div>
+                    <ul class="barangay-risk-record-cards">
+                        <li class="barangay-risk-record-card">
+                            <span class="barangay-risk-record-card__dot" aria-hidden="true"></span>
+                            <div>
+                                <h4>Risk submissions</h4>
+                                <p>{{ $riskAreaFeed->total() }} recorded barangay risk markers linked to this area.</p>
+                            </div>
+                        </li>
+                        <li class="barangay-risk-record-card">
+                            <span class="barangay-risk-record-card__dot barangay-risk-record-card__dot--purple" aria-hidden="true"></span>
+                            <div>
+                                <h4>Mapped points</h4>
+                                <p>{{ $markerInventory->total() }} related marker records currently available on the map feed.</p>
+                            </div>
+                        </li>
+                    </ul>
                 </article>
             </aside>
         </section>
@@ -1016,10 +1174,17 @@
                 <div class="list-stack">
                     @foreach($markerInventory as $marker)
                         @php
+                            $markerDescription = $cleanMarkerDescription($marker->description, match ($marker->category) {
+                                'fire' => 'Fire incident marker recorded for this barangay.',
+                                'station' => 'Fire station or response facility marker.',
+                                'barangay' => 'Barangay hall reference point.',
+                                'hydrant' => 'Hydrant or support resource marker.',
+                                default => 'Mapped fire-safety point for barangay review.',
+                            });
                             $markerDetail = [
                                 'title' => $marker->title ?? 'Untitled marker',
                                 'kind' => 'Mapped Point',
-                                'description' => $marker->description ?? 'No marker description provided.',
+                                'description' => $markerDescription,
                                 'fields' => [
                                     ['label' => 'Category', 'value' => $formatRiskLabel($marker->category ?? 'unknown')],
                                     ['label' => 'Status', 'value' => $formatRiskLabel($marker->status ?? 'unknown')],
@@ -1032,7 +1197,7 @@
                             <div class="barangay-risk-record-head">
                                 <div class="barangay-risk-record-copy">
                                     <h4>{{ $marker->title ?? 'Untitled marker' }}</h4>
-                                    <p>{{ $marker->description ?? 'No marker description provided.' }}</p>
+                                    <p>{{ $markerDescription }}</p>
                                 </div>
                                 <button type="button" class="barangay-risk-record-action" data-risk-detail='@json($markerDetail)'>
                                     <i class="fa-solid fa-eye" aria-hidden="true"></i>
@@ -1072,22 +1237,22 @@
                     <p>Current review breakdown for barangay risk submissions.</p>
                 </div>
             </div>
-            <div class="list-stack">
-                <div class="stat-line">
-                    <strong>Total risk markers</strong>
-                    <span class="tag high">{{ $portalStats['risk_markers'] ?? $riskAreas->count() }}</span>
+            <div class="risk-status-tile-grid">
+                <div class="risk-status-tile">
+                    <span>Total risk markers</span>
+                    <strong>{{ $portalStats['risk_markers'] ?? $riskAreas->count() }}</strong>
                 </div>
-                <div class="stat-line">
-                    <strong>Pending review</strong>
-                    <span class="tag pending">{{ (int) ($riskAreaStatusCounts['pending'] ?? 0) }}</span>
+                <div class="risk-status-tile risk-status-tile--pending">
+                    <span>Pending review</span>
+                    <strong>{{ (int) ($riskAreaStatusCounts['pending'] ?? 0) }}</strong>
                 </div>
-                <div class="stat-line">
-                    <strong>Verified</strong>
-                    <span class="tag complied">{{ (int) ($riskAreaStatusCounts['verified'] ?? 0) }}</span>
+                <div class="risk-status-tile risk-status-tile--verified">
+                    <span>Verified</span>
+                    <strong>{{ (int) ($riskAreaStatusCounts['verified'] ?? 0) }}</strong>
                 </div>
-                <div class="stat-line">
-                    <strong>Resolved</strong>
-                    <span class="tag low">{{ (int) ($riskAreaStatusCounts['resolved'] ?? 0) }}</span>
+                <div class="risk-status-tile risk-status-tile--resolved">
+                    <span>Resolved</span>
+                    <strong>{{ (int) ($riskAreaStatusCounts['resolved'] ?? 0) }}</strong>
                 </div>
             </div>
         </article>
@@ -1395,6 +1560,7 @@
 
         const riskAreaRecords = @json($riskAreaMapPayload);
         const fallbackMarkerRecords = @json($fallbackMarkerMapPayload);
+        const localMarkerIds = new Set(@json(($localMarkerIds ?? collect())->map(fn ($markerId) => (string) $markerId)->values()));
         const hallRecord = @json($hallMapPayload);
         const barangayBoundaryGeojson = @json($barangayBoundaryGeojson);
         const defaultLat = hallRecord && hallRecord.lat !== null && hallRecord.lat !== undefined
@@ -1495,6 +1661,11 @@
             `;
         }
 
+        function markerBelongsToCurrentBarangay(marker) {
+            const markerId = marker?.marker_id;
+            return markerId !== null && markerId !== undefined && localMarkerIds.has(String(markerId));
+        }
+
         function ensurePane(map, name, zIndex) {
             const pane = map.getPane(name) || map.createPane(name);
             pane.style.zIndex = String(zIndex);
@@ -1566,6 +1737,12 @@
                 const payload = await incidentsResponse.value.json();
                 incidents = Array.isArray(payload?.data) ? payload.data : [];
             }
+
+            apiMarkers = apiMarkers.filter(markerBelongsToCurrentBarangay);
+            incidents = incidents.filter((incident) => {
+                const markerId = incident?.marker_id ?? incident?.marker?.marker_id;
+                return markerId !== null && markerId !== undefined && localMarkerIds.has(String(markerId));
+            });
 
             const incidentMarkerIds = new Set(
                 incidents
@@ -1868,6 +2045,8 @@
             }
 
             function belongsToBarangay(marker) {
+                if (markerBelongsToCurrentBarangay(marker)) return true;
+                if (localMarkerIds.size > 0) return false;
                 const lat = Number(marker?.lat);
                 const lng = Number(marker?.lng);
                 if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;

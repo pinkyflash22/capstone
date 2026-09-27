@@ -27,13 +27,38 @@
     $riskTrend = $recentIncidentCount > $previousIncidentCount ? 'Increasing' : ($recentIncidentCount < $previousIncidentCount ? 'Decreasing' : 'Stable');
     $riskTrendIcon = $riskTrend === 'Increasing' ? 'bi-graph-up-arrow' : ($riskTrend === 'Decreasing' ? 'bi-graph-down-arrow' : 'bi-dash-circle');
     $riskTrendClass = $riskTrend === 'Increasing' ? 'high' : ($riskTrend === 'Decreasing' ? 'low' : 'medium');
-    $contributingFactors = collect([
-        $highRiskAreas > 0 ? $highRiskAreas . ' high-risk zone' . ($highRiskAreas === 1 ? '' : 's') : null,
-        $pendingInspections > 0 ? $pendingInspections . ' pending inspection item' . ($pendingInspections === 1 ? '' : 's') : null,
-        $criticalActions > 0 ? $criticalActions . ' high-priority action' . ($criticalActions === 1 ? '' : 's') : null,
-        $recentIncidentCount > 0 ? $recentIncidentCount . ' recent fire-related report' . ($recentIncidentCount === 1 ? '' : 's') : null,
-        $openMitigations > 0 ? $openMitigations . ' open mitigation' . ($openMitigations === 1 ? '' : 's') : null,
-    ])->filter()->take(4)->values();
+    $riskAreaTotal = $highRiskAreas + $mediumRiskAreas + $lowRiskAreas;
+    $unresolvedHazards = (int) $predictionChecklists->whereIn('status', ['pending', 'in_progress', 'not_complied'])->count();
+    $historicalTotal = (int) ($portalStats['historical_total'] ?? 0);
+    $recordedReports = (int) ($portalStats['recorded_reports'] ?? 0);
+    $mainDriverLabel = $highRiskAreas > 0 ? $highRiskAreas . ' high-risk ' . ($highRiskAreas === 1 ? 'zone' : 'zones') : ($criticalActions > 0 ? $criticalActions . ' priority ' . ($criticalActions === 1 ? 'action' : 'actions') : 'Monitoring');
+    $factorCards = collect([
+        [
+            'value' => $pendingInspections,
+            'label' => 'Pending inspection ' . ($pendingInspections === 1 ? 'item' : 'items'),
+            'icon' => 'bi-clipboard2-pulse',
+        ],
+        [
+            'value' => $recentIncidentCount,
+            'label' => 'Recent fire-related ' . ($recentIncidentCount === 1 ? 'report' : 'reports'),
+            'icon' => 'bi-fire',
+        ],
+    ]);
+    $hallMarkerImage = trim((string) ($hall?->marker?->image ?? ''));
+    $hallPhotoUrl = null;
+
+    if ($hallMarkerImage !== '') {
+        if (preg_match('/^(https?:)?\/\//i', $hallMarkerImage) || str_starts_with($hallMarkerImage, '/storage/')) {
+            $hallPhotoUrl = $hallMarkerImage;
+        } elseif (str_starts_with($hallMarkerImage, 'public://') || str_starts_with($hallMarkerImage, 'supabase://')) {
+            $hallPhotoUrl = \App\Support\MediaPath::url($hallMarkerImage);
+        } else {
+            $hallPhotoUrl = asset('storage/' . ltrim($hallMarkerImage, '/'));
+        }
+    }
+    $officerUser = auth()->user();
+    $officerPhotoUrl = $officerUser?->profile_thumbnail_url ?: $officerUser?->profile_image_url;
+    $officerInitials = strtoupper(substr($officerUser?->first_name ?? 'B', 0, 1) . substr($officerUser?->last_name ?? 'R', 0, 1));
     $preparednessScore = max(18, min(100, (int) round(
         (35 * ($inspectionCompletionRate / 100))
         + (25 * (($lowRiskAreas + 1) / max(1, $highRiskAreas + $mediumRiskAreas + $lowRiskAreas + 1)))
@@ -41,35 +66,47 @@
         + (20 * ((max(0, 10 - $criticalActions)) / 10))
     )));
     $preparednessLabel = $preparednessScore >= 80 ? 'Operationally ready' : ($preparednessScore >= 60 ? 'Needs targeted follow-through' : 'Requires immediate strengthening');
-    $highPriorityReports = $predictionChecklists->whereIn('priority_level', ['critical', 'high'])->take(4);
-    $attentionItems = collect([
+    $preparednessTone = $preparednessScore >= 80 ? 'good' : ($preparednessScore >= 55 ? 'medium' : 'critical');
+    $activityTiles = collect([
         [
-            'label' => 'Pending inspections',
-            'value' => $pendingInspections,
-            'icon' => 'bi-clipboard2-pulse',
-            'class' => 'pending',
-            'copy' => 'Inspection and checklist items still waiting for validation.',
+            'label' => 'Hazards & Risks',
+            'value' => $riskAreaTotal,
+            'icon' => 'bi-exclamation-triangle',
+            'tone' => 'amber',
+            'attention' => $unresolvedHazards,
+            'attention_label' => 'unresolved risk signal',
         ],
         [
-            'label' => 'Unresolved hazards',
-            'value' => (int) $predictionChecklists->whereIn('status', ['pending', 'in_progress', 'not_complied'])->count(),
-            'icon' => 'bi-exclamation-octagon',
-            'class' => 'high',
-            'copy' => 'Barangay risk conditions that remain open or not complied with.',
+            'label' => 'Fire Reports',
+            'value' => max($recordedReports, $totalHazardsReported),
+            'icon' => 'bi-fire',
+            'tone' => 'incident',
+            'attention' => $recentIncidentCount,
+            'attention_label' => 'recent fire-related report',
         ],
         [
-            'label' => 'Open mitigations',
+            'label' => 'Incident History',
+            'value' => $historicalTotal,
+            'icon' => 'bi-clock-history',
+            'tone' => 'blue',
+            'attention' => $recentIncidentCount,
+            'attention_label' => 'incident in last 30 days',
+        ],
+        [
+            'label' => 'Checklists',
+            'value' => $totalChecklists,
+            'icon' => 'bi-clipboard2-check',
+            'tone' => 'green',
+            'attention' => $pendingInspections,
+            'attention_label' => 'pending inspection',
+        ],
+        [
+            'label' => 'Mitigation',
             'value' => $openMitigations,
             'icon' => 'bi-shield-check',
-            'class' => 'medium',
-            'copy' => 'Mitigation actions still being handled.',
-        ],
-        [
-            'label' => 'High-priority reports',
-            'value' => $criticalActions,
-            'icon' => 'bi-bell-fill',
-            'class' => 'critical',
-            'copy' => 'Checklist actions flagged as critical or high priority.',
+            'tone' => 'purple',
+            'attention' => $pendingActions,
+            'attention_label' => 'open action',
         ],
     ]);
 @endphp
@@ -77,26 +114,7 @@
 @section('active_nav', 'dashboard')
 @section('page_title', 'Barangay Dashboard')
 @section('page_subtitle', 'Local fire risk and response overview')
-@section('hero_title', 'Barangay fire safety overview')
-@section('hero_copy', 'Review current risks, incidents, and pending actions.')
-
-@section('hero_badges')
-    <span class="hero-badge"><i class="bi bi-fire"></i> Risks</span>
-    <span class="hero-badge"><i class="bi bi-map"></i> Live map</span>
-    <span class="hero-badge"><i class="bi bi-clipboard-data"></i> Actions</span>
-@endsection
-
-@section('hero_actions')
-    <button
-        type="button"
-        class="hero-action-btn hero-action-btn--primary"
-        data-barangay-quick-report
-        data-report-url="{{ route('barangay.reports.quick') }}"
-    >
-        <i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i>
-        1-Tap Fire Report
-    </button>
-@endsection
+@section('hide_hero', '1')
 
 @push('scripts')
 <script>
@@ -276,14 +294,59 @@ document.addEventListener('DOMContentLoaded', function () {
             color: #047857;
         }
 
-        .factor-list,
+        .factor-stat-grid,
         .next-actions-list {
             margin: 18px 0 0;
             display: grid;
             gap: 12px;
         }
 
-        .factor-item,
+        .factor-stat-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .factor-stat-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-height: 82px;
+            border-radius: 18px;
+            padding: 15px 16px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            border-left: 4px solid #A5680B;
+        }
+
+        .factor-stat-card__icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            background: #FBF0DD;
+            color: #A5680B;
+            font-size: 1.1rem;
+        }
+
+        .factor-stat-card__value {
+            display: block;
+            color: #0f172a;
+            font-size: 1.75rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .factor-stat-card__label {
+            display: block;
+            margin-top: 5px;
+            color: #64748b;
+            font-size: 0.82rem;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
         .next-action-item,
         .attention-item {
             display: flex;
@@ -295,7 +358,6 @@ document.addEventListener('DOMContentLoaded', function () {
             border: 1px solid rgba(226, 232, 240, 0.88);
         }
 
-        .factor-item i,
         .next-action-item i,
         .attention-item i {
             color: #ea580c;
@@ -303,7 +365,6 @@ document.addEventListener('DOMContentLoaded', function () {
             margin-top: 2px;
         }
 
-        .factor-item strong,
         .next-action-item strong,
         .attention-item strong {
             display: block;
@@ -312,7 +373,6 @@ document.addEventListener('DOMContentLoaded', function () {
             font-weight: 800;
         }
 
-        .factor-item span,
         .next-action-item span,
         .attention-item span {
             display: block;
@@ -626,10 +686,58 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         .compact-profile-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             border-radius: 22px;
             background: #f8fafc;
             border: 1px solid rgba(226, 232, 240, 0.92);
             padding: 16px;
+        }
+
+        .compact-profile-item__body {
+            min-width: 0;
+            flex: 1;
+        }
+
+        .compact-profile-media {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 38px;
+            overflow: hidden;
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background: #fff7ed;
+            color: #c2410c;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 0.74rem;
+            line-height: 1;
+        }
+
+        .compact-profile-media--square {
+            border-radius: 12px;
+        }
+
+        .compact-profile-media--circle {
+            border-radius: 999px;
+        }
+
+        .compact-profile-media img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .compact-profile-caption {
+            display: block;
+            margin-top: 4px;
+            color: #B7B4AC;
+            font-size: 10px;
+            font-weight: 600;
+            line-height: 1.2;
         }
 
         .compact-profile-item .label {
@@ -646,6 +754,7 @@ document.addEventListener('DOMContentLoaded', function () {
             font-size: 1rem;
             font-weight: 800;
             line-height: 1.45;
+            overflow-wrap: anywhere;
         }
 
         .compact-profile-item .meta {
@@ -683,6 +792,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         @media (max-width: 768px) {
             .risk-status-metrics,
+            .factor-stat-grid,
             .attention-grid,
             .compact-profile-grid {
                 grid-template-columns: 1fr;
@@ -702,6 +812,343 @@ document.addEventListener('DOMContentLoaded', function () {
             .barangay-section-heading {
                 align-items: start;
                 flex-direction: column;
+            }
+        }
+
+        .dashboard-lede-card,
+        .barangay-risk-profile-card,
+        .activity-overview-card,
+        .map-monitoring-card,
+        .hazard-table-card,
+        .preparedness-card {
+            border: 1px solid #E9E5DE;
+            border-radius: 16px;
+            box-shadow: none;
+            background: #fff;
+        }
+
+        .dashboard-lede-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 16px 18px;
+        }
+
+        .dashboard-lede-card p {
+            margin: 0;
+            color: #4A4E58;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .dashboard-lede-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .dashboard-lede-links a {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 34px;
+            padding: 0 11px;
+            border: 1px solid #E9E5DE;
+            border-radius: 999px;
+            color: #4A4E58;
+            background: #FAF8F5;
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-decoration: none;
+        }
+
+        .barangay-risk-profile-card {
+            padding: 22px;
+        }
+
+        .barangay-risk-profile-card__identity {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .identity-icon {
+            display: grid;
+            width: 48px;
+            height: 48px;
+            place-items: center;
+            border-radius: 14px;
+            background: #F3EEFB;
+            color: #7A4FB8;
+            font-size: 1.25rem;
+        }
+
+        .barangay-risk-profile-card__identity h2 {
+            margin: 0;
+            color: #0f172a;
+            font-size: clamp(1.35rem, 2vw, 1.85rem);
+            font-weight: 900;
+            letter-spacing: 0;
+        }
+
+        .barangay-risk-profile-card__identity p {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 5px 0 0;
+            color: #6B6E76;
+            font-size: 0.9rem;
+            font-weight: 650;
+        }
+
+        .profile-contact-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .profile-contact-tile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+            padding: 14px;
+            border: 1px solid #E9E5DE;
+            border-radius: 14px;
+            background: #FAF8F5;
+        }
+
+        .compact-profile-item .value,
+        .profile-contact-tile .value {
+            overflow-wrap: normal;
+            word-break: normal;
+            white-space: normal;
+        }
+
+        .risk-classification-divider {
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid #E9E5DE;
+            color: #6B6E76;
+            font-size: 0.72rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .risk-pill-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .risk-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 34px;
+            padding: 0 12px;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 850;
+        }
+
+        .risk-pill--high { background: #FBEAE4; color: #B23A22; }
+        .risk-pill--medium { background: #FBF0DD; color: #A5680B; }
+        .risk-pill--low { background: #E7F5EC; color: #1E7A4C; }
+        .risk-pill--trend.high { background: #FBEAE4; color: #B23A22; }
+        .risk-pill--trend.medium { background: #FBF0DD; color: #A5680B; }
+        .risk-pill--trend.low { background: #E7F5EC; color: #1E7A4C; }
+        .risk-pill--neutral { background: #F0EEEA; color: #4A4E58; }
+
+        .activity-overview-card {
+            padding: 20px;
+        }
+
+        .activity-overview-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .activity-tile {
+            min-width: 0;
+            padding: 15px;
+            border: 1px solid #E9E5DE;
+            border-radius: 14px;
+            background: #fff;
+        }
+
+        .activity-tile__top {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #4A4E58;
+            font-size: 0.78rem;
+            font-weight: 850;
+        }
+
+        .activity-tile__icon {
+            display: grid;
+            width: 30px;
+            height: 30px;
+            place-items: center;
+            border-radius: 10px;
+        }
+
+        .activity-tile strong {
+            display: block;
+            margin-top: 13px;
+            color: #0f172a;
+            font-size: 1.8rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .activity-tile__status {
+            margin: 9px 0 0;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
+
+        .activity-tile__status.is-clear { color: #1E7A4C; }
+        .activity-tile__status.is-attention { color: #A5680B; }
+        .activity-tile--incident .activity-tile__icon { background: #FBEAE4; color: #B23A22; }
+        .activity-tile--amber .activity-tile__icon { background: #FBF0DD; color: #A5680B; }
+        .activity-tile--green .activity-tile__icon { background: #E7F5EC; color: #1E7A4C; }
+        .activity-tile--purple .activity-tile__icon { background: #F3EEFB; color: #7A4FB8; }
+        .activity-tile--blue .activity-tile__icon { background: #EAF1FB; color: #3A6FB0; }
+
+        .map-control-group {
+            display: grid;
+            gap: 8px;
+        }
+
+        .map-control-label {
+            color: #6B6E76;
+            font-size: 0.68rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .map-layer-toggle-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .map-layer-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 36px;
+            padding: 0 11px;
+            border: 1px solid #E9E5DE;
+            border-radius: 999px;
+            background: #fff;
+            color: #4A4E58;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
+
+        .map-layer-toggle input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .map-layer-toggle:has(input:not(:checked)) {
+            opacity: 0.48;
+        }
+
+        .layer-dot,
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            display: inline-block;
+            flex: 0 0 auto;
+        }
+
+        .pin-tag {
+            display: inline-flex;
+            align-items: center;
+            min-height: 30px;
+            padding: 0 10px;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            font-size: 0.76rem;
+            font-weight: 850;
+        }
+
+        .pin-tag--fire { background: #FBEAE4; color: #B23A22; border-color: rgba(178, 58, 34, 0.16); }
+        .pin-tag--civic { background: #F3EEFB; color: #7A4FB8; border-color: rgba(122, 79, 184, 0.18); }
+        .pin-tag--neutral { background: #F0EEEA; color: #4A4E58; border-color: #E9E5DE; }
+
+        .record-location-title,
+        .record-location-tech {
+            display: block;
+            white-space: normal;
+            word-break: normal;
+            overflow-wrap: break-word;
+        }
+
+        .record-location-title {
+            color: #334155;
+            font-weight: 850;
+        }
+
+        .record-location-tech {
+            margin-top: 4px;
+            color: #8A8D96;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 0.7rem;
+            line-height: 1.45;
+        }
+
+        .preparedness-progress--good .preparedness-progress-bar {
+            background: linear-gradient(90deg, #22c55e 0%, #1E7A4C 100%);
+        }
+
+        .preparedness-progress--medium .preparedness-progress-bar {
+            background: linear-gradient(90deg, #f59e0b 0%, #A5680B 100%);
+        }
+
+        .preparedness-progress--critical .preparedness-progress-bar {
+            background: linear-gradient(90deg, #ef4444 0%, #B23A22 100%);
+        }
+
+        body.barangay-portal-shell .pyro-routing-launcher {
+            right: 24px;
+            bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            z-index: 1030;
+        }
+
+        @media (max-width: 1280px) {
+            .activity-overview-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 980px) {
+            .profile-contact-grid,
+            .panel-grid.two {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-lede-card {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .activity-overview-grid {
+                grid-template-columns: 1fr;
             }
         }
 
@@ -829,6 +1276,185 @@ document.addEventListener('DOMContentLoaded', function () {
             padding: 14px 16px;
         }
 
+        .dashboard-record-modal-content {
+            display: grid;
+            gap: 14px;
+        }
+
+        .dashboard-record-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .dashboard-record-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 30px;
+            padding: 0 11px;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 850;
+        }
+
+        .dashboard-record-badge--classification {
+            background: #FBF0DD;
+            color: #A5680B;
+        }
+
+        .dashboard-record-badge--status {
+            background: #EAF1FB;
+            color: #3A6FB0;
+        }
+
+        .dashboard-record-chip-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .dashboard-record-chip-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 76px;
+            padding: 12px;
+            border: 1px solid #E9E5DE;
+            border-radius: 14px;
+            background: #fff;
+        }
+
+        .dashboard-record-chip-card i {
+            display: grid;
+            width: 32px;
+            height: 32px;
+            place-items: center;
+            flex: 0 0 auto;
+            border-radius: 10px;
+            background: #FAF8F5;
+            color: #A5680B;
+        }
+
+        .dashboard-record-chip-card span,
+        .dashboard-record-chip-card strong {
+            display: block;
+        }
+
+        .dashboard-record-chip-card span {
+            color: #8A8D96;
+            font-size: 0.66rem;
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .dashboard-record-chip-card strong {
+            margin-top: 3px;
+            color: #0f172a;
+            font-size: 0.84rem;
+            font-weight: 850;
+            line-height: 1.35;
+            white-space: normal;
+            word-break: normal;
+            overflow-wrap: break-word;
+        }
+
+        .dashboard-record-section {
+            overflow: hidden;
+            border: 1px solid #E9E5DE;
+            border-radius: 14px;
+            background: #fff;
+        }
+
+        .dashboard-record-section__header {
+            padding: 10px 12px;
+            border-bottom: 1px solid #E9E5DE;
+            background: #FAF8F5;
+            color: #4A4E58;
+            font-size: 0.72rem;
+            font-weight: 900;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .dashboard-record-section__body {
+            padding: 12px;
+        }
+
+        .dashboard-record-description {
+            margin: 0;
+            color: #334155;
+            font-size: 0.86rem;
+            line-height: 1.55;
+        }
+
+        .dashboard-record-technical {
+            margin-top: 9px;
+            padding: 8px 10px;
+            border: 1px dashed #E9E5DE;
+            border-radius: 10px;
+            background: #FAF8F5;
+            color: #8A8D96;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-size: 11px;
+            line-height: 1.45;
+        }
+
+        .dashboard-record-fact-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0;
+        }
+
+        .dashboard-record-fact {
+            min-width: 0;
+            padding: 12px;
+            border-right: 1px solid #E9E5DE;
+            border-bottom: 1px solid #E9E5DE;
+        }
+
+        .dashboard-record-fact:nth-child(2n) {
+            border-right: 0;
+        }
+
+        .dashboard-record-fact:nth-last-child(-n + 2) {
+            border-bottom: 0;
+        }
+
+        .dashboard-record-fact span,
+        .dashboard-record-fact strong {
+            display: block;
+        }
+
+        .dashboard-record-fact span {
+            color: #8A8D96;
+            font-size: 0.66rem;
+            font-weight: 900;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .dashboard-record-fact strong {
+            margin-top: 5px;
+            color: #0f172a;
+            font-size: 0.88rem;
+            font-weight: 850;
+            line-height: 1.4;
+            white-space: normal;
+            word-break: normal;
+            overflow-wrap: break-word;
+        }
+
+        .dashboard-record-empty {
+            color: #B7B4AC;
+            font-style: italic;
+            font-weight: 650;
+        }
+
+        .dashboard-record-fact__value--pending {
+            color: #A5680B !important;
+        }
+
         .dashboard-record-detail-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -917,6 +1543,22 @@ document.addEventListener('DOMContentLoaded', function () {
                 gap: 7px;
             }
 
+            .dashboard-record-chip-grid,
+            .dashboard-record-fact-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .dashboard-record-fact,
+            .dashboard-record-fact:nth-child(2n),
+            .dashboard-record-fact:nth-last-child(-n + 2) {
+                border-right: 0;
+                border-bottom: 1px solid #E9E5DE;
+            }
+
+            .dashboard-record-fact:last-child {
+                border-bottom: 0;
+            }
+
             .dashboard-record-detail--wide {
                 grid-column: auto;
             }
@@ -924,164 +1566,104 @@ document.addEventListener('DOMContentLoaded', function () {
     </style>
 
     <div class="barangay-dashboard-stack">
-        <section class="risk-status-grid">
-            <article class="risk-status-card">
-                <div class="risk-status-header">
-                    <div>
-                        <span class="risk-status-label {{ $riskLevelClass }}">
-                            <i class="bi bi-shield-exclamation"></i>
-                            Current Barangay Risk Status
-                        </span>
-                        <h2 class="risk-status-title">{{ $riskLevel }} fire risk</h2>
-                    </div>
-                    <span class="trend-pill {{ $riskTrendClass }}">
-                        <i class="bi {{ $riskTrendIcon }}"></i>
-                        {{ $riskTrend }}
-                    </span>
-                </div>
-
-                <div class="risk-status-metrics">
-                    <div class="risk-status-metric">
-                        <div class="label">Risk Level</div>
-                        <div class="value">{{ $riskLevel }}</div>
-                        <div class="sub">Current local conditions</div>
-                    </div>
-                    <div class="risk-status-metric">
-                        <div class="label">Predicted Risk</div>
-                        <div class="value">{{ $predictedRiskPercentage }}%</div>
-                        <div class="sub">Current indicator estimate</div>
-                    </div>
-                    <div class="risk-status-metric">
-                        <div class="label">Main Driver</div>
-                        <div class="value">{{ $highRiskAreas > 0 ? $highRiskAreas . ' zones' : 'Monitoring' }}</div>
-                        <div class="sub">{{ $criticalActions > 0 ? $criticalActions . ' high-priority action items remain open.' : 'No critical queue detected right now.' }}</div>
-                    </div>
-                </div>
-
-                <div class="factor-list">
-                    @forelse($contributingFactors as $factor)
-                        <div class="factor-item">
-                            <i class="bi bi-dot"></i>
-                            <div>
-                                <strong>Contributing factor</strong>
-                                <span>{{ $factor }}</span>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="factor-item">
-                            <i class="bi bi-check2-circle"></i>
-                            <div>
-                                <strong>No major risk signal detected</strong>
-                                <span>Current barangay data does not show strong fire-risk escalation at this moment.</span>
-                            </div>
-                        </div>
-                    @endforelse
-                </div>
-            </article>
-
-            <div class="risk-side-card">
-                <article class="decision-card">
-                    <h3>Next Actions</h3>
-
-                    <div class="next-actions-list">
-                        <div class="next-action-item">
-                            <i class="bi bi-clipboard-check"></i>
-                            <div>
-                                <strong>Close pending inspections first</strong>
-                                <span>{{ $pendingInspections > 0 ? 'Address the ' . $pendingInspections . ' pending inspection and checklist items before risk pressure grows further.' : 'Inspection backlog is currently under control.' }}</span>
-                            </div>
-                        </div>
-                        <div class="next-action-item">
-                            <i class="bi bi-geo-alt"></i>
-                            <div>
-                                <strong>Focus on recurrent hotspots</strong>
-                                <span>{{ $highRiskAreas > 0 ? 'Prioritize site visits and community reminders in high-risk areas that show repeated incident history.' : 'Continue validating emerging locations through the live map and recent reports.' }}</span>
-                            </div>
-                        </div>
-                        <div class="next-action-item">
-                            <i class="bi bi-megaphone"></i>
-                            <div>
-                                <strong>Push preparedness reminders</strong>
-                                <span>Use community advisories to reinforce safe wiring, open access routes, and rapid reporting where hazards remain unresolved.</span>
-                            </div>
-                        </div>
-                    </div>
-                </article>
-
-                <article class="compact-profile-card">
-                    <div class="compact-profile-header">
-                        <div>
-                            <h3>Barangay Information</h3>
-                        </div>
-                        <span class="tag low"><i class="bi bi-buildings"></i> Reference</span>
-                    </div>
-
-                    <div class="compact-profile-grid">
-                        <div class="compact-profile-item">
-                            <div class="label">Barangay</div>
-                            <div class="value">{{ $barangay?->barangay_name ?? 'Not linked' }}</div>
-                        </div>
-                        <div class="compact-profile-item">
-                            <div class="label">City</div>
-                            <div class="value">{{ $city?->city_name ?? 'No city data' }}</div>
-                        </div>
-                        <div class="compact-profile-item">
-                            <div class="label">Barangay Hall</div>
-                            <div class="value">{{ $hall?->hall_name ?? 'Hall profile pending' }}</div>
-                        </div>
-                        <div class="compact-profile-item">
-                            <div class="label">Officer</div>
-                            <div class="value">{{ auth()->user()->full_name }}</div>
-                        </div>
-                    </div>
-                </article>
+        <section class="dashboard-lede-card">
+            <p>Review current risks, incidents, and pending actions for your barangay.</p>
+            <div class="dashboard-lede-links" aria-label="Dashboard shortcuts">
+                <a href="{{ route('barangay.hazards') }}"><i class="bi bi-exclamation-triangle"></i> Risks</a>
+                <a href="#barangayDashboardMap"><i class="bi bi-map"></i> Live map</a>
+                <a href="{{ route('barangay.checklists') }}"><i class="bi bi-clipboard-data"></i> Actions</a>
             </div>
         </section>
 
-        <section>
-            <div class="barangay-section-heading">
+        <section class="barangay-risk-profile-card">
+            <div class="barangay-risk-profile-card__identity">
+                <div class="identity-icon" aria-hidden="true">
+                    <i class="bi bi-building"></i>
+                </div>
                 <div>
-                    <h2>Operational Metrics</h2>
+                    <h2>{{ $barangay?->barangay_name ?? 'Barangay not linked' }}</h2>
+                    <p><i class="bi bi-geo-alt"></i> {{ $city?->city_name ?? 'No city data' }}</p>
                 </div>
             </div>
 
-            <section class="metric-grid">
-                <article class="metric-card metric-card--enhanced">
-                    <div class="metric-card-head">
-                        <div class="metric-label">Total Hazards Reported</div>
-                        <span class="metric-card-icon"><i class="bi bi-fire"></i></span>
+            <div class="profile-contact-grid">
+                <div class="profile-contact-tile">
+                    <div class="compact-profile-media compact-profile-media--square" aria-hidden="true">
+                        @if($hallPhotoUrl)
+                            <img src="{{ $hallPhotoUrl }}" alt="">
+                        @else
+                            <i class="bi bi-building"></i>
+                        @endif
                     </div>
-                    <div class="metric-card-number">{{ $totalHazardsReported }}</div>
-                    <div class="metric-card-description">Fire records linked to this barangay.</div>
-                </article>
+                    <div class="compact-profile-item__body">
+                        <div class="label">Barangay Hall</div>
+                        <div class="value">{{ $hall?->hall_name ?? 'Hall profile pending' }}</div>
+                        @if($hallPhotoUrl)
+                            <span class="compact-profile-caption">Photo on file</span>
+                        @endif
+                    </div>
+                </div>
+                <div class="profile-contact-tile">
+                    <div class="compact-profile-media compact-profile-media--circle" aria-hidden="true">
+                        @if($officerPhotoUrl)
+                            <img src="{{ $officerPhotoUrl }}" alt="">
+                        @else
+                            {{ $officerInitials }}
+                        @endif
+                    </div>
+                    <div class="compact-profile-item__body">
+                        <div class="label">Officer-in-charge</div>
+                        <div class="value">{{ $officerUser?->full_name }}</div>
+                    </div>
+                </div>
+            </div>
 
-                <article class="metric-card metric-card--enhanced">
-                    <div class="metric-card-head">
-                        <div class="metric-label">High-Risk Areas</div>
-                        <span class="metric-card-icon"><i class="bi bi-exclamation-triangle"></i></span>
-                    </div>
-                    <div class="metric-card-number">{{ $highRiskAreas }}</div>
-                    <div class="metric-card-description">Locations requiring priority review.</div>
-                </article>
+            <div class="risk-classification-divider">Current fire risk classification</div>
+            <div class="risk-pill-row">
+                <span class="risk-pill risk-pill--{{ $riskLevelClass }}"><i class="bi bi-shield-exclamation"></i> {{ $riskLevel }} fire risk</span>
+                <span class="risk-pill risk-pill--trend {{ $riskTrendClass }}"><i class="bi {{ $riskTrendIcon }}"></i> {{ $riskTrend }}</span>
+                <span class="risk-pill risk-pill--neutral">{{ $predictedRiskPercentage }}% predicted risk</span>
+                <span class="risk-pill risk-pill--neutral">{{ $mainDriverLabel }}</span>
+            </div>
 
-                <article class="metric-card metric-card--enhanced">
-                    <div class="metric-card-head">
-                        <div class="metric-label">Pending Actions</div>
-                        <span class="metric-card-icon"><i class="bi bi-list-task"></i></span>
+            <div class="factor-stat-grid">
+                @foreach($factorCards as $factor)
+                    <div class="factor-stat-card">
+                        <span class="factor-stat-card__icon" aria-hidden="true">
+                            <i class="bi {{ $factor['icon'] }}"></i>
+                        </span>
+                        <div>
+                            <strong class="factor-stat-card__value">{{ $factor['value'] }}</strong>
+                            <span class="factor-stat-card__label">{{ $factor['label'] }}</span>
+                        </div>
                     </div>
-                    <div class="metric-card-number">{{ $pendingActions }}</div>
-                    <div class="metric-card-description">Pending and in-progress tasks.</div>
-                </article>
+                @endforeach
+            </div>
+        </section>
 
-                <article class="metric-card metric-card--enhanced">
-                    <div class="metric-card-head">
-                        <div class="metric-label">Inspection Completion Rate</div>
-                        <span class="metric-card-icon"><i class="bi bi-clipboard2-check"></i></span>
-                    </div>
-                    <div class="metric-card-number">{{ $inspectionCompletionRate }}%</div>
-                    <div class="metric-card-description">{{ $completedChecklists }} of {{ $totalChecklists }} completed.</div>
-                </article>
-            </section>
+        <section class="activity-overview-card">
+            <div class="barangay-section-heading">
+                <div>
+                    <h2>Barangay Activity Overview</h2>
+                </div>
+            </div>
+
+            <div class="activity-overview-grid">
+                @foreach($activityTiles as $tile)
+                    <article class="activity-tile activity-tile--{{ $tile['tone'] }}">
+                        <div class="activity-tile__top">
+                            <span class="activity-tile__icon"><i class="bi {{ $tile['icon'] }}"></i></span>
+                            <span>{{ $tile['label'] }}</span>
+                        </div>
+                        <strong>{{ $tile['value'] }}</strong>
+                        @if((int) $tile['attention'] > 0)
+                            <p class="activity-tile__status is-attention">{{ $tile['attention'] }} {{ $tile['attention_label'] }}{{ (int) $tile['attention'] === 1 ? '' : 's' }}</p>
+                        @else
+                            <p class="activity-tile__status is-clear"><i class="bi bi-check2-circle"></i> All clear</p>
+                        @endif
+                    </article>
+                @endforeach
+            </div>
         </section>
 
         <section class="map-monitoring-card">
@@ -1097,18 +1679,24 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
 
             <div class="map-monitoring-toolbar">
-                <div class="map-filter-group" data-map-filter-group>
-                    <button type="button" class="map-filter-btn is-active" data-map-filter="all">All</button>
-                    <button type="button" class="map-filter-btn" data-map-filter="incidents">Incidents</button>
-                    <button type="button" class="map-filter-btn" data-map-filter="stations">Stations</button>
-                    <button type="button" class="map-filter-btn" data-map-filter="hazards">Hazards</button>
+                <div class="map-control-group">
+                    <div class="map-control-label">View</div>
+                    <div class="map-filter-group" data-map-filter-group>
+                        <button type="button" class="map-filter-btn is-active" data-map-filter="all">All</button>
+                        <button type="button" class="map-filter-btn" data-map-filter="incidents">Incidents</button>
+                        <button type="button" class="map-filter-btn" data-map-filter="stations">Stations</button>
+                        <button type="button" class="map-filter-btn" data-map-filter="hazards">Hazards</button>
+                    </div>
                 </div>
-                <div class="map-legend">
-                    <span class="legend-chip"><img class="legend-image" src="{{ asset('fire.png') }}" alt="Incidents" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#dc2626;display:none;"></span> Incidents</span>
-                    <span class="legend-chip"><img class="legend-image" src="{{ asset('station.png') }}" alt="Stations" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#2563eb;display:none;"></span> Stations</span>
-                    <span class="legend-chip"><img class="legend-image" src="{{ asset('hall.png') }}" alt="Barangay hall" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#0f766e;display:none;"></span> Barangay hall</span>
-                    <span class="legend-chip"><img class="legend-image" src="{{ asset('hazard.png') }}" alt="Hazard areas" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#b91c1c;display:none;"></span> Hazard areas</span>
-                    <span class="legend-chip"><img class="legend-image" src="{{ asset('hydrant.png') }}" alt="Support and hydrants" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';"><span class="legend-dot" style="background:#0f766e;display:none;"></span> Support / hydrants</span>
+                <div class="map-control-group">
+                    <div class="map-control-label">Layers</div>
+                    <div class="map-layer-toggle-group">
+                        <label class="map-layer-toggle"><input type="checkbox" data-map-layer="incidents" checked><span class="layer-dot" style="background:#dc2626"></span> Incidents</label>
+                        <label class="map-layer-toggle"><input type="checkbox" data-map-layer="stations" checked><span class="layer-dot" style="background:#2563eb"></span> Stations</label>
+                        <label class="map-layer-toggle"><input type="checkbox" data-map-layer="barangay" checked><span class="layer-dot" style="background:#0f766e"></span> Barangay hall</label>
+                        <label class="map-layer-toggle"><input type="checkbox" data-map-layer="hazard" checked><span class="layer-dot" style="background:#d97706"></span> Hazard areas</label>
+                        <label class="map-layer-toggle"><input type="checkbox" data-map-layer="support" checked><span class="layer-dot" style="background:#ef4444"></span> Support-hydrants</label>
+                    </div>
                 </div>
             </div>
 
@@ -1127,7 +1715,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div class="tiny-label">Latest Local Pins</div>
                         <div id="barangayDashboardMapLatestPins" class="tag-row">
                             @forelse($miniMapPins as $pin)
-                                <span class="tag low">{{ $pin['title'] }}</span>
+                                @php
+                                    $pinCategory = strtolower((string) ($pin['category'] ?? ''));
+                                    $pinClass = $pinCategory === 'fire' ? 'pin-tag pin-tag--fire' : ($pinCategory === 'barangay' ? 'pin-tag pin-tag--civic' : 'pin-tag pin-tag--neutral');
+                                @endphp
+                                <span class="{{ $pinClass }}">{{ $pin['title'] }}</span>
                             @empty
                                 <span class="tag deferred">No latest pins yet</span>
                             @endforelse
@@ -1136,51 +1728,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div>
                         <div class="tiny-label">Map Interpretation</div>
                         <div class="tag-row">
-                            <span class="tag high"><i class="bi bi-fire"></i> Fire / incident points</span>
-                            <span class="tag medium"><i class="bi bi-geo"></i> Barangay / civic context</span>
-                            <span class="tag low"><i class="bi bi-water"></i> Hydrant / support access</span>
+                            <span class="legend-chip"><span class="legend-dot" style="background:#dc2626"></span> Fire / incident points</span>
+                            <span class="legend-chip"><span class="legend-dot" style="background:#2563eb"></span> Stations</span>
+                            <span class="legend-chip"><span class="legend-dot" style="background:#0f766e"></span> Barangay / civic context</span>
+                            <span class="legend-chip"><span class="legend-dot" style="background:#d97706"></span> Hazard areas</span>
+                            <span class="legend-chip"><span class="legend-dot" style="background:#ef4444"></span> Hydrant / support access</span>
                         </div>
                     </div>
                 </div>
             </div>
-        </section>
-
-        <section class="attention-card">
-            <div class="barangay-section-heading">
-                <div>
-                    <h2>Requires Attention</h2>
-                </div>
-            </div>
-
-            <div class="attention-grid">
-                @foreach($attentionItems as $item)
-                    <div class="attention-item">
-                        <div class="attention-top">
-                            <span class="attention-tag {{ $item['class'] }}"><i class="bi {{ $item['icon'] }}"></i> {{ $item['label'] }}</span>
-                            <span class="attention-value">{{ $item['value'] }}</span>
-                        </div>
-                        <div>
-                            <strong>{{ $item['label'] }}</strong>
-                            <span>{{ $item['copy'] }}</span>
-                        </div>
-                    </div>
-                @endforeach
-            </div>
-
-            @if($highPriorityReports->isNotEmpty())
-                <div class="list-stack">
-                    @foreach($highPriorityReports as $item)
-                        <div class="list-item">
-                            <h4>{{ $item->title }}</h4>
-                            <p>{{ $item->planning_notes ?: $item->ai_output ?: 'No additional operational note available.' }}</p>
-                            <div class="tag-row">
-                                <span class="tag {{ $item->priority_level }}"><i class="bi bi-flag"></i> {{ strtoupper($item->priority_level) }}</span>
-                                <span class="tag {{ $item->status }}"><i class="bi bi-hourglass-split"></i> {{ str_replace('_', ' ', strtoupper($item->status)) }}</span>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
         </section>
 
         <section class="panel-grid two">
@@ -1206,8 +1762,13 @@ document.addEventListener('DOMContentLoaded', function () {
                                 @foreach($dashboardRecords as $record)
                                     <tr class="dashboard-record-row" data-record-id="{{ $record['id'] }}">
                                         <td><strong>{{ $record['date'] }}</strong><br><span class="text-slate-400">{{ $record['time'] }}</span></td>
-                                        <td><strong>{{ $record['classification'] }}</strong><br><span class="text-slate-400">{{ $record['cause'] }}</span></td>
-                                        <td>{{ $record['location'] }}</td>
+                                        <td><strong>{{ $record['display_title'] ?? $record['classification'] }}</strong><br><span class="text-slate-400">{{ $record['cause'] }}</span></td>
+                                        <td>
+                                            <strong class="record-location-title">{{ $record['location_label'] ?? $record['location'] }}</strong>
+                                            @if(!empty($record['technical_detail']))
+                                                <span class="record-location-tech">{{ $record['technical_detail'] }}</span>
+                                            @endif
+                                        </td>
                                         <td><span class="tag {{ $record['verified'] ? 'complied' : 'pending' }}">{{ $record['status'] }}</span></td>
                                         <td>
                                             <button type="button" class="dashboard-record-view" data-record-view="{{ $record['id'] }}" aria-label="View fire record">
@@ -1258,7 +1819,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <span class="map-meta-chip"><i class="bi bi-check2-square"></i> {{ $inspectionCompletionRate }}% checklist completion</span>
                 </div>
 
-                <div class="preparedness-progress" aria-label="Preparedness score progress">
+                <div class="preparedness-progress preparedness-progress--{{ $preparednessTone }}" aria-label="Preparedness score progress">
                     <div class="preparedness-progress-bar" style="width: {{ $preparednessScore }}%;"></div>
                 </div>
 

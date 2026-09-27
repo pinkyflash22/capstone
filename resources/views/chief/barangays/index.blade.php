@@ -1580,17 +1580,14 @@
                                 <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
                                 <span>{{ $coordinates }}</span>
                             </div>
-                            <button
-                                type="button"
+                            <a
+                                href="{{ route('station-admin.barangays.show', $barangay) }}"
                                 class="barangay-tile__edit"
-                                data-barangay-edit-trigger
-                                data-barangay-id="{{ $barangay->barangay_id }}"
-                                data-barangay-name="{{ $barangay->barangay_name }}"
                                 aria-label="Edit {{ $barangay->barangay_name }}"
                             >
                                 <span>Edit</span>
                                 <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-                            </button>
+                            </a>
                         </div>
                     </article>
                 @empty

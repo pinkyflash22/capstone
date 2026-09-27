@@ -423,12 +423,12 @@
             <form id="aarReportForm">
                 <div class="report-modal-body">
                     <div class="form-grid" data-report-form-content>
-                        <div class="report-form-hint full"><strong>Record any completed BFP activity.</strong><span>Link a scheduled activity, or leave it blank for an unscheduled rescue, operation, or community service.</span></div>
+                        <div class="report-form-hint full"><strong>Record a completed official activity.</strong><span>Select a completed community requested event or station-wide schedule. Personal schedule items are not eligible for AAR.</span></div>
                         <div class="form-section-label">Activity source</div>
                         <div class="form-group full">
-                            <label class="form-label">Scheduled Activity (Optional)</label>
-                            <div class="form-helper">For an unscheduled operation, keep the first option and enter the details below.</div>
-                            <select name="event_activity_id" class="form-select" data-station-ref="aar-activities"><option value="">Unscheduled operation or activity</option></select>
+                            <label class="form-label">Eligible Activity</label>
+                            <div class="form-helper">Only completed community requests and official station schedules appear here.</div>
+                            <select name="event_activity_id" class="form-select" data-station-ref="aar-activities" required><option value="">Select eligible activity</option></select>
                         </div>
                         <div class="form-group full"><label class="form-label">Activity Title</label><input type="text" name="activity_title" class="form-input" placeholder="Example: Rescue operation or fire safety seminar" required></div>
                         <div class="form-group"><label class="form-label">Activity Type</label><input type="text" name="activity_type" class="form-input" placeholder="Rescue, seminar, drill, inspection"></div>

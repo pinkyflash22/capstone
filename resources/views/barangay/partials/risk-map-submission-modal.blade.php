@@ -48,12 +48,9 @@
                             </div>
                             <div class="barangay-risk-field">
                                 <label for="risk_area_station_id">Linked Station</label>
-                                <select id="risk_area_station_id" name="station_id" class="barangay-risk-select">
-                                    <option value="">No linked station</option>
-                                    @foreach ($stations as $station)
-                                        <option value="{{ $station->station_id }}" @selected((string) old('station_id') === (string) $station->station_id)>{{ $station->station_name }}</option>
-                                    @endforeach
-                                </select>
+                                <input type="hidden" id="risk_area_station_id" name="station_id" value="{{ old('station_id', $autoLinkedStationId ?? '') }}">
+                                <input type="text" class="barangay-risk-input" value="{{ $autoLinkedStation?->station_name ?? 'Will be matched from barangay/municipality' }}" readonly>
+                                <p class="barangay-risk-field__hint"><i class="fa-solid fa-building-shield text-orange-500 mr-1"></i>Station is assigned automatically from barangay coverage or municipality match.</p>
                             </div>
                         </div>
                     </div>

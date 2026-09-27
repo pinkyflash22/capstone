@@ -1450,6 +1450,29 @@ class AnalyticController extends Controller
         ];
     }
 
+    private function targetMonthFromRawData(array $rawData): ?string
+    {
+        $predictionContext = is_array($rawData['prediction_context'] ?? null)
+            ? $rawData['prediction_context']
+            : [];
+
+        $label = trim((string) ($predictionContext['target_month_label'] ?? ''));
+
+        if ($label === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('F Y', $label)->startOfMonth()->toDateString();
+        } catch (\Throwable) {
+            try {
+                return Carbon::parse($label)->startOfMonth()->toDateString();
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+    }
+
     private function scopeSignatureFromRequest(Request $request): array
     {
         $predictionScope = (string) ($request->input('prediction_scope') ?: 'current_month');
@@ -3253,6 +3276,7 @@ class AnalyticController extends Controller
         }
 
         $analysisRevision = max(1, (int) (Analysis::query()->find($analysisId)?->revision_number ?? 1));
+        $targetMonth = $this->targetMonthFromRawData($rawData);
         $existingPlans = AiActionPlanChecklist::withoutGlobalScope('current_revision')
             ->where('analysis_id', $analysisId)
             ->where('is_superseded', false)
@@ -3300,6 +3324,13 @@ class AnalyticController extends Controller
                     (int) ($rawData['station_id'] ?? 0),
                     (int) $targetBarangayId,
                     $riskAreaId ? (int) $riskAreaId : null,
+                    (string) $sourceTitle,
+                    $targetMonth
+                );
+                $legacySourceSignature = $this->buildActionPlanRevisionSignature(
+                    (int) ($rawData['station_id'] ?? 0),
+                    (int) $targetBarangayId,
+                    $riskAreaId ? (int) $riskAreaId : null,
                     (string) $sourceTitle
                 );
                 $checklistAttributes = [
@@ -3331,9 +3362,28 @@ class AnalyticController extends Controller
                     'superseded_at' => null,
                 ];
 
-                $matchingPlan = $existingPlans->first(function (AiActionPlanChecklist $existing) use ($sourceSignature, $targetBarangayId, $riskAreaId, $sourceTitle) {
+                if (Schema::hasColumn('ai_action_plan_checklists', 'target_month')) {
+                    $checklistAttributes['target_month'] = $targetMonth;
+                }
+
+                $matchingPlan = $existingPlans->first(function (AiActionPlanChecklist $existing) use ($sourceSignature, $legacySourceSignature, $targetBarangayId, $riskAreaId, $sourceTitle, $targetMonth) {
                     if (filled($existing->source_signature)) {
-                        return hash_equals((string) $existing->source_signature, $sourceSignature);
+                        $existingSignature = (string) $existing->source_signature;
+
+                        if (hash_equals($existingSignature, $sourceSignature) || hash_equals($existingSignature, $legacySourceSignature)) {
+                            return true;
+                        }
+
+                        return false;
+                    }
+
+                    if (
+                        Schema::hasColumn('ai_action_plan_checklists', 'target_month')
+                        && filled($existing->target_month)
+                        && $targetMonth
+                        && Carbon::parse($existing->target_month)->startOfMonth()->toDateString() !== $targetMonth
+                    ) {
+                        return false;
                     }
 
                     return (int) $existing->barangay_id === (int) $targetBarangayId
@@ -3412,14 +3462,21 @@ class AnalyticController extends Controller
         ];
     }
 
-    private function buildActionPlanRevisionSignature(int $stationId, int $barangayId, ?int $riskAreaId, string $sourceTitle): string
+    private function buildActionPlanRevisionSignature(int $stationId, int $barangayId, ?int $riskAreaId, string $sourceTitle, ?string $targetMonth = null): string
     {
-        return hash('sha256', implode('|', [
+        $parts = [
             $stationId,
             $barangayId,
             $riskAreaId ?: 0,
-            Str::lower(preg_replace('/\s+/', ' ', trim($sourceTitle)) ?: 'ai action plan'),
-        ]));
+        ];
+
+        if ($targetMonth) {
+            $parts[] = $targetMonth;
+        }
+
+        $parts[] = Str::lower(preg_replace('/\s+/', ' ', trim($sourceTitle)) ?: 'ai action plan');
+
+        return hash('sha256', implode('|', $parts));
     }
 
     private function isActionPlanRevisionProtected(AiActionPlanChecklist $checklist): bool
@@ -3954,7 +4011,7 @@ class AnalyticController extends Controller
             $firstSuggestion?->estimated_timeline ? "Suggested timeline: {$firstSuggestion->estimated_timeline}" : null,
         ]);
 
-        return [
+        $payload = [
             'barangay_id' => (int) $checklist->barangay_id,
             'risk_area_id' => $checklist->risk_area_id ? (int) $checklist->risk_area_id : null,
             'barangay_prediction_checklist_id' => null,
@@ -3989,6 +4046,14 @@ class AnalyticController extends Controller
             'is_manually_edited' => false,
             'superseded_at' => null,
         ];
+
+        if (Schema::hasColumn('mitigation_actions', 'target_month')) {
+            $payload['target_month'] = filled($checklist->target_month)
+                ? Carbon::parse($checklist->target_month)->startOfMonth()->toDateString()
+                : $this->targetMonthFromRawData((array) data_get($checklist->ai_payload, 'source_raw_data', []));
+        }
+
+        return $payload;
     }
 
     private function inferMitigationCategoryFromChecklistForAnalysis(AiActionPlanChecklist $checklist): string

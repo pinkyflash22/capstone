@@ -43,4 +43,9 @@ class EventActivity extends Model
     {
         return $this->hasOne(AfterActivityReport::class, 'event_activity_id', 'event_id');
     }
+
+    public function communityActivityRequest()
+    {
+        return $this->hasOne(CommunityActivityRequest::class, 'converted_event_id', 'event_id');
+    }
 }
