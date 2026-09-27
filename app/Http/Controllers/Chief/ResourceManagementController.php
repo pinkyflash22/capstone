@@ -163,7 +163,12 @@ class ResourceManagementController extends Controller
         //dit osa all team dapat ung belong lang sa station nato dadaan ulit kay team to station offcier to get station_id
         $accountBarangayIds = app(\App\Services\BoundaryManagementScope::class)->coveredBarangayIds($loggedInChief);
         $allusers = User::where(function ($query) use ($stationUserIds, $citizenRoleId, $accountBarangayIds) {
-            $query->whereIn('user_id', $stationUserIds)->orWhere('role_id', $citizenRoleId)
+            $query->whereIn('user_id', $stationUserIds)
+                ->orWhere(function ($citizenQuery) use ($citizenRoleId, $accountBarangayIds) {
+                    $citizenQuery
+                        ->where('role_id', $citizenRoleId)
+                        ->whereHas('address', fn ($address) => $address->whereIn('barangay_id', $accountBarangayIds));
+                })
                 ->orWhereHas('barangayOfficer', fn ($officer) => $officer->whereIn('barangay_id', $accountBarangayIds))
                 ->orWhere(function ($account) use ($accountBarangayIds) {
                     $account->whereDoesntHave('barangayOfficer')

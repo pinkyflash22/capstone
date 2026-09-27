@@ -253,6 +253,7 @@ class AnalyticController extends Controller
             ->when($view === 'unassigned', fn ($builder) => $builder->whereNull('assigned_to'));
 
         $checklists = $query
+            ->orderByRaw($this->completedChecklistSortSql())
             ->orderByRaw("
                 CASE priority_level
                     WHEN 'critical' THEN 1
@@ -306,6 +307,27 @@ class AnalyticController extends Controller
         }
 
         return view('chief.course-checklists', $viewData);
+    }
+
+    private function completedChecklistSortSql(): string
+    {
+        return "
+            CASE
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM ai_action_plan_checklist_items completed_items
+                    WHERE completed_items.ai_action_plan_checklist_id = ai_action_plan_checklists.ai_action_plan_checklist_id
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM ai_action_plan_checklist_items open_items
+                    WHERE open_items.ai_action_plan_checklist_id = ai_action_plan_checklists.ai_action_plan_checklist_id
+                      AND COALESCE(open_items.status, '') <> 'followed'
+                )
+                THEN 1
+                ELSE 0
+            END
+        ";
     }
 
     /**
@@ -5516,6 +5538,7 @@ class AnalyticController extends Controller
                     ]),
                 ])
                 ->when($stationId, fn ($builder) => $builder->where('station_id', $stationId))
+                ->orderByRaw($this->completedChecklistSortSql())
                 ->orderByRaw("
                     CASE priority_level
                         WHEN 'critical' THEN 1

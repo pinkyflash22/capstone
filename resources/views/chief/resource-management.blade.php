@@ -2360,6 +2360,11 @@
                         </thead>
                         <tbody id="usersTableBody">
                             @foreach ($usersPage as $user)
+                            @php
+                                $userRoleName = strtolower(trim((string) ($user->role->role ?? 'unknown')));
+                                $canManageUser = (bool) ($user->can_manage_resources ?? false);
+                                $showCitizenEditActions = $userRoleName === 'citizen';
+                            @endphp
                             <tr class="user-row" data-user-id="{{ $user->user_id }}" data-role="{{ strtolower($user->role->role ?? 'unknown') }}" data-is-verified="{{ $user->is_verified ? '1' : '0' }}" data-updated-at="{{ $user->updated_at ?? $user->created_at }}">
                                 <td class="plain-sight-hidden" aria-hidden="true">{{ $user->user_id }}</td>
                                 <td data-label="Account Code"><strong>{{ $user->account_code ?? '--' }}</strong></td>
@@ -2387,7 +2392,7 @@
                                 <td data-label="Date Modified"><small>{{ \Carbon\Carbon::parse($user->updated_at ?? $user->created_at)->format('Y-m-d H:i') }}</small></td>
                                 <td class="actions" data-label="Actions">
                                     <button class="action-btn view-resource" onclick="viewUser({{ $user->user_id }})" title="View"><i class="fa-solid fa-eye"></i></button>
-                                    @if($user->can_manage_resources)
+                                    @if($canManageUser || $showCitizenEditActions)
                                     <button class="action-btn edit-resource" onclick="openEditUserModal({{ $user->user_id }})" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                                     @if((int) ($user->user_id ?? 0) !== (int) (auth()->user()->user_id ?? 0))
                                     <button
@@ -4102,7 +4107,8 @@ if (officerForm) {
         function openEditUserModal(userId) {
             const user = window.resourcesData.allUsers.find(u => u.user_id == userId);
             if (!user) return;
-            if (!user.can_manage_resources) { showToast('This account is outside your station editing scope.', 'error'); return; }
+            const roleName = String(user.role?.role || '').trim().toLowerCase();
+            if (!user.can_manage_resources && roleName !== 'citizen') { showToast('This account is outside your station editing scope.', 'error'); return; }
             
             currentUserId = userId;
             document.getElementById('editUserId').value = user.user_id;

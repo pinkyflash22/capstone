@@ -2122,6 +2122,24 @@ body.firefighter-portal-shell .spot-location-picker__reported {
 .form-auto-value i { color: #c63d26; }
 .narrative-action-row { display: flex; justify-content: flex-end; margin-top: 0.85rem; }
 .narrative-action-row .btn { width: fit-content; }
+.narrative-action-row .btn.is-narrative-loading {
+    cursor: wait;
+    opacity: 0.86;
+    pointer-events: none;
+}
+.narrative-spinner {
+    width: 15px;
+    height: 15px;
+    border: 2px solid rgba(154, 52, 18, 0.24);
+    border-top-color: currentColor;
+    border-radius: 999px;
+    display: inline-block;
+    flex: 0 0 15px;
+    animation: narrative-spin 0.72s linear infinite;
+}
+@keyframes narrative-spin {
+    to { transform: rotate(360deg); }
+}
 
 .report-modal[data-report-state="loading"] [data-report-form-content],
 .report-modal[data-report-state="error"] [data-report-form-content] {

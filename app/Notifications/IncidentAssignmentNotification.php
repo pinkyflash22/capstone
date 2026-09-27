@@ -33,7 +33,7 @@ class IncidentAssignmentNotification extends Notification
             'category' => 'incident_assignment',
             'title' => $this->isResponder ? 'New fire response assignment' : 'Response team assigned',
             'message' => $this->isResponder
-                ? "Your team has been assigned to incident #{$this->incidentId}. Open the incident and acknowledge the dispatch."
+                ? "Team #{$this->teamId} has been assigned to incident #{$this->incidentId}. Open the incident and acknowledge the dispatch."
                 : "Team #{$this->teamId} has been assigned to incident #{$this->incidentId} and is awaiting a response.",
             'url' => $this->isResponder
                 ? "/firefighter/incidents?focus_incident_id={$this->incidentId}"

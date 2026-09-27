@@ -2390,11 +2390,16 @@ function bootFirefighterMyStationPage() {
     }
 
     async function generateNarrative(endpoint, payload, fields, triggerButton) {
+        if (!triggerButton || triggerButton.dataset.narrativeLoading === 'true') return;
         const originalHtml = triggerButton.innerHTML;
+        triggerButton.dataset.narrativeLoading = 'true';
         triggerButton.disabled = true;
-        triggerButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Drafting...';
+        triggerButton.classList.add('is-narrative-loading');
+        triggerButton.setAttribute('aria-busy', 'true');
+        triggerButton.innerHTML = '<span class="narrative-spinner" aria-hidden="true"></span><span>Drafting narrative...</span>';
 
         try {
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
@@ -2421,7 +2426,10 @@ function bootFirefighterMyStationPage() {
             console.error('Narrative draft failed:', error);
             showToast(error.message || 'Failed to generate a narrative draft.', 'error');
         } finally {
+            delete triggerButton.dataset.narrativeLoading;
             triggerButton.disabled = false;
+            triggerButton.classList.remove('is-narrative-loading');
+            triggerButton.removeAttribute('aria-busy');
             triggerButton.innerHTML = originalHtml;
         }
     }
