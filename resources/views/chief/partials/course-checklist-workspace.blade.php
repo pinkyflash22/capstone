@@ -146,6 +146,9 @@
                             <td data-label="Actions" class="checklist-col-actions">
                                 <div class="table-actions">
                                     <button type="button" class="icon-button icon-button--primary" data-open-checklist="{{ $checklist->ai_action_plan_checklist_id }}" title="Review checklist" aria-label="Review {{ $checklist->plan_title }}"><i class="fa-solid fa-eye"></i></button>
+                                    @if (! in_array($status, ['confirmed', 'rejected'], true))
+                                        <button type="button" class="icon-button icon-button--approve" data-approve-checklist="{{ $checklist->ai_action_plan_checklist_id }}" title="Approve checklist" aria-label="Approve {{ $checklist->plan_title }}"><i class="fa-solid fa-circle-check"></i></button>
+                                    @endif
                                     <button type="button" class="icon-button" data-edit-checklist='@json($checklistEditPayload)' title="Edit checklist" aria-label="Edit {{ $checklist->plan_title }}"><i class="fa-solid fa-pen"></i></button>
                                     <button type="button" class="icon-button" data-delete-checklist="{{ $checklist->ai_action_plan_checklist_id }}" data-checklist-title="{{ $checklist->plan_title }}" title="Delete checklist" aria-label="Delete {{ $checklist->plan_title }}"><i class="fa-solid fa-trash"></i></button>
                                     <a class="icon-button" href="{{ $mitigationUrl }}" title="{{ $mitigation ? 'View linked mitigation' : 'Create Mitigation Plan' }}" aria-label="{{ $mitigation ? 'Open linked mitigation' : 'Create Mitigation Plan from checklist' }}"><i class="fa-solid fa-shield-halved"></i></a>

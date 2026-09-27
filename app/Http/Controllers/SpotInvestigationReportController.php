@@ -171,7 +171,7 @@ class SpotInvestigationReportController extends Controller
         if (! $this->canReviseReport($spot)) {
             return response()->json([
                 'success' => false,
-                'message' => 'This report is already submitted for review and cannot be edited unless it is rejected for revision.',
+                'message' => 'Only the personnel who created this report can edit it while it is not approved.',
             ], 403);
         }
         if ($cached = $imageService->cachedSubmissionResponse($request, "spot:update:{$id}")) {
@@ -346,7 +346,7 @@ class SpotInvestigationReportController extends Controller
         if (! $this->canReviseReport($spot)) {
             return response()->json([
                 'success' => false,
-                'message' => 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.',
+                'message' => 'Only the personnel who created this report can delete it while it is not approved.',
             ], 403);
         }
 
@@ -361,14 +361,24 @@ class SpotInvestigationReportController extends Controller
     private function canReviseReport(SpotInvestigationReport $report): bool
     {
         if (! Schema::hasColumn('spot_investigation_report', 'review_status')) {
-            return true;
+            return $this->isReportOwner((int) $report->station_officer_id);
         }
 
-        if (strtolower((string) (auth()->user()?->role?->role ?? '')) !== 'firefighter') {
-            return true;
+        return ($report->review_status ?? 'submitted') !== 'approved'
+            && $this->isReportOwner((int) $report->station_officer_id);
+    }
+
+    private function isReportOwner(int $stationOfficerId): bool
+    {
+        $userId = auth()->user()?->user_id;
+        if (! $userId || ! $stationOfficerId) {
+            return false;
         }
 
-        return ($report->review_status ?? 'submitted') === 'rejected';
+        return StationOfficer::query()
+            ->whereKey($stationOfficerId)
+            ->where('user_id', $userId)
+            ->exists();
     }
 
     private function markResubmittedAfterRevision(array $validated): array

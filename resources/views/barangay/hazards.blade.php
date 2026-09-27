@@ -1209,6 +1209,33 @@
             return;
         }
 
+        function notifyHazardReport(message, type = 'success') {
+            if (typeof window.PyroNotify?.notify === 'function') {
+                window.PyroNotify.notify(message, type);
+                return;
+            }
+
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 104px;
+                right: 24px;
+                z-index: 12000;
+                max-width: min(420px, calc(100vw - 32px));
+                padding: 14px 16px;
+                border-radius: 16px;
+                border: 1px solid ${type === 'error' ? '#fecaca' : '#bbf7d0'};
+                background: ${type === 'error' ? '#fef2f2' : '#f0fdf4'};
+                color: ${type === 'error' ? '#991b1b' : '#166534'};
+                box-shadow: 0 18px 38px rgba(15,23,42,.16);
+                font-size: .86rem;
+                font-weight: 800;
+            `;
+            document.body.appendChild(toast);
+            window.setTimeout(() => toast.remove(), 3800);
+        }
+
         const defaultLat = hallPayload && hallPayload.lat !== null && hallPayload.lat !== undefined
             ? Number(hallPayload.lat)
             : 15.8222;
@@ -1391,8 +1418,9 @@
 
                     tableRows = Array.from(tableBody.querySelectorAll('tr[data-entry-type]'));
                     applyTableFilters();
+                    notifyHazardReport(payload.message || 'Delete request sent for review.', 'success');
                 } catch (error) {
-                    window.alert(error.message || 'Unable to send delete request.');
+                    notifyHazardReport(error.message || 'Unable to send delete request.', 'error');
 
                     if (submitBtn) {
                         submitBtn.disabled = false;
@@ -1789,10 +1817,11 @@
                 } else {
                     prependRiskTableRow(payload.data);
                 }
+                notifyHazardReport(payload.message || 'Hazard or risk report saved successfully.', 'success');
                 resetFormForCreate(reportKindInput.value || 'risk');
                 closeModal();
             } catch (error) {
-                window.alert(error.message || 'Unable to save the hazard or risk report.');
+                notifyHazardReport(error.message || 'Unable to save the hazard or risk report.', 'error');
             } finally {
                 submitButton.disabled = false;
                 submitButton.textContent = originalLabel;

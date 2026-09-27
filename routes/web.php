@@ -334,6 +334,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/mitigations', [App\Http\Controllers\Chief\StationAdminController::class, 'storeMitigation'])->name('mitigations.store');
         Route::post('/mitigations/generated-drafts/{checklistId}/approve', [App\Http\Controllers\Chief\StationAdminController::class, 'approveGeneratedMitigationDraft'])->name('mitigations.generated-drafts.approve');
         Route::post('/mitigations/generated-drafts/{checklistId}/reject', [App\Http\Controllers\Chief\StationAdminController::class, 'rejectGeneratedMitigationDraft'])->name('mitigations.generated-drafts.reject');
+        Route::post('/mitigations/{mitigationActionId}/approve', [App\Http\Controllers\Chief\StationAdminController::class, 'approveMitigationAction'])->name('mitigations.approve');
         Route::put('/mitigations/{mitigationActionId}', [App\Http\Controllers\Chief\StationAdminController::class, 'updateMitigation'])->name('mitigations.update');
         Route::delete('/mitigations/{mitigationActionId}', [App\Http\Controllers\Chief\StationAdminController::class, 'destroyMitigation'])->name('mitigations.destroy');
         Route::get('/schedule', [AdminController::class, 'schedule'])->name('schedule');
@@ -469,6 +470,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::post('/mitigations', [StationAdminController::class, 'storeMitigation'])->name('mitigations.store');
         Route::post('/mitigations/generated-drafts/{checklistId}/approve', [StationAdminController::class, 'approveGeneratedMitigationDraft'])->name('mitigations.generated-drafts.approve');
         Route::post('/mitigations/generated-drafts/{checklistId}/reject', [StationAdminController::class, 'rejectGeneratedMitigationDraft'])->name('mitigations.generated-drafts.reject');
+        Route::post('/mitigations/{mitigationActionId}/approve', [StationAdminController::class, 'approveMitigationAction'])->name('mitigations.approve');
         Route::put('/mitigations/{mitigationActionId}', [StationAdminController::class, 'updateMitigation'])->name('mitigations.update');
         Route::post('/mitigations/{mitigationActionId}/completion-review', [StationAdminController::class, 'reviewMitigationCompletion'])->name('mitigations.completion-review');
         Route::delete('/mitigations/{mitigationActionId}', [StationAdminController::class, 'destroyMitigation'])->name('mitigations.destroy');

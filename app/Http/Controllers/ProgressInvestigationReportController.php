@@ -140,7 +140,7 @@ class ProgressInvestigationReportController extends Controller
         if (! $this->canReviseReport($progress)) {
             return response()->json([
                 'success' => false,
-                'message' => 'This report is already submitted for review and cannot be edited unless it is rejected for revision.',
+                'message' => 'Only the personnel who created this report can edit it while it is not approved.',
             ], 403);
         }
         if ($cached = $imageService->cachedSubmissionResponse($request, "progress:update:{$id}")) {
@@ -259,11 +259,11 @@ class ProgressInvestigationReportController extends Controller
             if (request()->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.',
+                    'message' => 'Only the personnel who created this report can delete it while it is not approved.',
                 ], 403);
             }
 
-            return back()->with('error', 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.');
+            return back()->with('error', 'Only the personnel who created this report can delete it while it is not approved.');
         }
 
         if ($progressInvestigationReport->secondProgressInvestigation) {
@@ -392,14 +392,24 @@ class ProgressInvestigationReportController extends Controller
     private function canReviseReport(ProgressInvestigationReport $report): bool
     {
         if (! $this->reviewWorkflowEnabled('progress_investigation_report')) {
-            return true;
+            return $this->isReportOwner((int) $report->station_officer_id);
         }
 
-        if (strtolower((string) (auth()->user()?->role?->role ?? '')) !== 'firefighter') {
-            return true;
+        return ($report->review_status ?? 'submitted') !== 'approved'
+            && $this->isReportOwner((int) $report->station_officer_id);
+    }
+
+    private function isReportOwner(int $stationOfficerId): bool
+    {
+        $userId = auth()->user()?->user_id;
+        if (! $userId || ! $stationOfficerId) {
+            return false;
         }
 
-        return ($report->review_status ?? 'submitted') === 'rejected';
+        return StationOfficer::query()
+            ->whereKey($stationOfficerId)
+            ->where('user_id', $userId)
+            ->exists();
     }
 
     private function markResubmittedAfterRevision(array $validated): array

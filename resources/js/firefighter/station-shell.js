@@ -1811,7 +1811,7 @@ function bootFirefighterMyStationPage() {
 
     function createActionButtons(type, report) {
         const reviewStatus = report.review_status || 'submitted';
-        const canRevise = reviewStatus === 'rejected';
+        const canRevise = report.can_revise === true || (report.can_revise !== false && reviewStatus !== 'approved');
         const actions = [
             `<button type="button" class="table-action view" data-report-action="view" data-report-type="${type}" data-report-id="${report.id}">View</button>`,
         ];

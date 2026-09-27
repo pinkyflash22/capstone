@@ -2632,6 +2632,51 @@ class StationAdminController extends Controller
             ->with('success', 'AI mitigation draft rejected.');
     }
 
+    public function approveMitigationAction(Request $request, int $mitigationActionId)
+    {
+        $allowedBarangayIds = $this->getManagedBarangaysForStationAdmin()
+            ->pluck('barangay_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $action = $this->resolveManagedMitigationAction($mitigationActionId, $allowedBarangayIds);
+
+        if (! in_array($action->status, ['draft', 'planned'], true)) {
+            return redirect()->route('station-admin.mitigations', [
+                'mitigation_action_id' => $action->getKey(),
+            ])->withErrors([
+                'mitigation' => 'Only draft or planned mitigation actions can be approved from this shortcut.',
+            ]);
+        }
+
+        DB::transaction(function () use ($action, $request): void {
+            $oldStatus = $action->status;
+
+            $action->update([
+                'status' => 'approved',
+                'approved_by' => Auth::id(),
+                'approved_at' => now(),
+                'reviewed_by' => Auth::id(),
+                'reviewed_at' => now(),
+                'requires_revision_review' => false,
+            ]);
+
+            $action->activities()->create([
+                'actor_user_id' => Auth::id(),
+                'event_type' => 'approved',
+                'old_status' => $oldStatus,
+                'new_status' => 'approved',
+                'notes' => 'Mitigation action approved by station command.',
+            ]);
+
+            $this->syncLinkedActionPlanAfterMitigation($action->fresh());
+            UserActivityLogger::log('approved station mitigation action', Auth::id(), $request);
+        });
+
+        return redirect()->route('station-admin.mitigations', [
+            'mitigation_action_id' => $action->getKey(),
+        ])->with('success', 'Mitigation action approved.');
+    }
+
     public function storeMitigation(Request $request)
     {
         $validated = $request->validate($this->mitigationValidationRules());

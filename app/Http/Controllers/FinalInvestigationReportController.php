@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FinalInvestigationReport;
 use App\Models\FullAddress;
 use App\Models\ProgressInvestigationReport;
+use App\Models\StationOfficer;
 use App\Services\FinalNarrativeDraftService;
 use App\Services\InvestigationReportImageService;
 use App\Support\HistoricalFireIncidentSynchronizer;
@@ -137,7 +138,7 @@ class FinalInvestigationReportController extends Controller
         if (! $this->canReviseReport($final)) {
             return response()->json([
                 'success' => false,
-                'message' => 'This report is already submitted for review and cannot be edited unless it is rejected for revision.',
+                'message' => 'Only the personnel who created this report can edit it while it is not approved.',
             ], 403);
         }
         if ($cached = $imageService->cachedSubmissionResponse($request, "final:update:{$id}")) {
@@ -260,11 +261,11 @@ class FinalInvestigationReportController extends Controller
             if (request()->expectsJson()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.',
+                    'message' => 'Only the personnel who created this report can delete it while it is not approved.',
                 ], 403);
             }
 
-            return back()->with('error', 'This report is already submitted for review and cannot be deleted unless it is rejected for revision.');
+            return back()->with('error', 'Only the personnel who created this report can delete it while it is not approved.');
         }
 
         $incidentId = (int) $finalInvestigationReport->progressInvestigation?->spotInvestigation?->incident_id;
@@ -353,14 +354,24 @@ class FinalInvestigationReportController extends Controller
     private function canReviseReport(FinalInvestigationReport $report): bool
     {
         if (! Schema::hasColumn('final_investigation_report', 'review_status')) {
-            return true;
+            return $this->isReportOwner((int) $report->station_officer_id);
         }
 
-        if (strtolower((string) (auth()->user()?->role?->role ?? '')) !== 'firefighter') {
-            return true;
+        return ($report->review_status ?? 'submitted') !== 'approved'
+            && $this->isReportOwner((int) $report->station_officer_id);
+    }
+
+    private function isReportOwner(int $stationOfficerId): bool
+    {
+        $userId = auth()->user()?->user_id;
+        if (! $userId || ! $stationOfficerId) {
+            return false;
         }
 
-        return ($report->review_status ?? 'submitted') === 'rejected';
+        return StationOfficer::query()
+            ->whereKey($stationOfficerId)
+            ->where('user_id', $userId)
+            ->exists();
     }
 
     private function markResubmittedAfterRevision(array $validated): array

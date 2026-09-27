@@ -772,9 +772,9 @@ class FirefighterController extends Controller
             ->withQueryString();
     }
 
-    protected function mapSpotReportStore($reports, string $currentOfficerName): array
+    protected function mapSpotReportStore($reports, string $currentOfficerName, ?int $currentStationOfficerId = null): array
     {
-        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName) {
+        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName, $currentStationOfficerId) {
             $incidentReferenceLabel = $this->buildIncidentReferenceLabel(
                 $this->resolveIncidentPrimaryLocation(
                     $report->incident?->marker?->title,
@@ -820,6 +820,7 @@ class FirefighterController extends Controller
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
                     'review_status' => $this->investigationReviewStatus($report),
+                    'can_revise' => $this->canCurrentOfficerReviseInvestigationReport($report, $currentStationOfficerId),
                     'review_comments' => $report->review_comments,
                     'reviewed_at' => optional($report->reviewed_at)->toIso8601String(),
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
@@ -829,9 +830,9 @@ class FirefighterController extends Controller
         })->all();
     }
 
-    protected function mapProgressReportStore($reports, string $currentOfficerName): array
+    protected function mapProgressReportStore($reports, string $currentOfficerName, ?int $currentStationOfficerId = null): array
     {
-        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName) {
+        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName, $currentStationOfficerId) {
             $incidentReferenceLabel = $this->buildIncidentReferenceLabel(
                 $this->resolveIncidentPrimaryLocation(
                     $report->spotInvestigation?->incident?->marker?->title,
@@ -868,6 +869,7 @@ class FirefighterController extends Controller
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
                     'review_status' => $this->investigationReviewStatus($report),
+                    'can_revise' => $this->canCurrentOfficerReviseInvestigationReport($report, $currentStationOfficerId),
                     'review_comments' => $report->review_comments,
                     'reviewed_at' => optional($report->reviewed_at)->toIso8601String(),
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
@@ -878,9 +880,9 @@ class FirefighterController extends Controller
         })->all();
     }
 
-    protected function mapFinalReportStore($reports, string $currentOfficerName): array
+    protected function mapFinalReportStore($reports, string $currentOfficerName, ?int $currentStationOfficerId = null): array
     {
-        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName) {
+        return collect($reports)->mapWithKeys(function ($report) use ($currentOfficerName, $currentStationOfficerId) {
             $incidentReferenceLabel = $this->buildIncidentReferenceLabel(
                 $this->resolveIncidentPrimaryLocation(
                     $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title,
@@ -922,6 +924,7 @@ class FirefighterController extends Controller
                     'noted_by_station_officer_id' => $report->noted_by_station_officer_id,
                     'approved_by_station_officer_id' => $report->approved_by_station_officer_id,
                     'review_status' => $this->investigationReviewStatus($report),
+                    'can_revise' => $this->canCurrentOfficerReviseInvestigationReport($report, $currentStationOfficerId),
                     'review_comments' => $report->review_comments,
                     'reviewed_at' => optional($report->reviewed_at)->toIso8601String(),
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
@@ -980,6 +983,13 @@ class FirefighterController extends Controller
             'url' => MediaPath::url($image->file_path),
             'size' => (int) $image->file_size,
         ])->values()->all();
+    }
+
+    protected function canCurrentOfficerReviseInvestigationReport($report, ?int $currentStationOfficerId): bool
+    {
+        return $currentStationOfficerId
+            && (int) ($report->station_officer_id ?? 0) === (int) $currentStationOfficerId
+            && ($this->investigationReviewStatus($report) !== 'approved');
     }
 
     protected function investigationReviewStatus($report): string
@@ -1722,19 +1732,20 @@ class FirefighterController extends Controller
         $context = $this->getStationShellContext($userId);
         $stationOfficerIds = $this->getStationOfficerIdsForStation($context['stationId']);
         $currentOfficerName = $context['currentOfficerName'];
+        $currentStationOfficerId = (int) ($context['stationOfficer']?->station_officer_id ?? 0);
 
         if ($tab === 'aar') {
             $reports = $this->loadAfterActivityReportsPaginator($context['stationId']);
             $store = $this->mapAfterActivityReportStore($reports->items(), $currentOfficerName);
         } elseif ($tab === 'progress') {
             $reports = $this->loadProgressReportsPaginator($stationOfficerIds);
-            $store = $this->mapProgressReportStore($reports->items(), $currentOfficerName);
+            $store = $this->mapProgressReportStore($reports->items(), $currentOfficerName, $currentStationOfficerId);
         } elseif ($tab === 'final') {
             $reports = $this->loadFinalReportsPaginator($stationOfficerIds);
-            $store = $this->mapFinalReportStore($reports->items(), $currentOfficerName);
+            $store = $this->mapFinalReportStore($reports->items(), $currentOfficerName, $currentStationOfficerId);
         } else {
             $reports = $this->loadSpotReportsPaginator($stationOfficerIds);
-            $store = $this->mapSpotReportStore($reports->items(), $currentOfficerName);
+            $store = $this->mapSpotReportStore($reports->items(), $currentOfficerName, $currentStationOfficerId);
         }
 
         return response()->json([
@@ -1745,6 +1756,7 @@ class FirefighterController extends Controller
                 'html' => view('firefighters.mystation-reports-table', [
                     'tab' => $tab,
                     'reports' => $reports,
+                    'currentStationOfficerId' => $currentStationOfficerId,
                 ])->render(),
             ],
         ]);

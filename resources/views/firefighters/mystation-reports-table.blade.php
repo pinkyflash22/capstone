@@ -42,7 +42,8 @@
                     @php
                         $hasFinal = (bool) $report->finalInvestigation;
                         $hasSecond = (bool) $report->secondProgressInvestigation;
-                        $canRevise = ($report->review_status ?: 'submitted') === 'rejected';
+                        $canRevise = ($report->review_status ?: 'submitted') !== 'approved'
+                            && (int) $report->station_officer_id === (int) ($currentStationOfficerId ?? 0);
                     @endphp
                     <tr id="progress-report-{{ $report->progress_investigation_report_id }}">
                         <td data-label="Incident">
@@ -94,7 +95,10 @@
             </thead>
             <tbody id="finalReportsTableBody">
                 @forelse($reports as $report)
-                    @php $canRevise = ($report->review_status ?: 'submitted') === 'rejected'; @endphp
+                    @php
+                        $canRevise = ($report->review_status ?: 'submitted') !== 'approved'
+                            && (int) $report->station_officer_id === (int) ($currentStationOfficerId ?? 0);
+                    @endphp
                     <tr id="final-report-{{ $report->final_investigation_report_id }}">
                         <td data-label="Incident">
                             <div class="table-title">{{ $report->progressInvestigation?->spotInvestigation?->incident?->marker?->title ?? 'Fire incident' }}</div>
@@ -145,7 +149,8 @@
                 @forelse($reports as $report)
                     @php
                         $hasProgress = (bool) $report->progressInvestigation;
-                        $canRevise = ($report->review_status ?: 'submitted') === 'rejected';
+                        $canRevise = ($report->review_status ?: 'submitted') !== 'approved'
+                            && (int) $report->station_officer_id === (int) ($currentStationOfficerId ?? 0);
                     @endphp
                     <tr id="spot-report-{{ $report->spot_investigation_report_id }}">
                         <td data-label="Incident">

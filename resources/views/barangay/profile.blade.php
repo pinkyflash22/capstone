@@ -4,6 +4,7 @@
     $profileBarangay = $barangay ?? ($user?->address?->barangay);
     $profileCity = $city ?? $profileBarangay?->city;
     $profileHall = $hall;
+    $profileHallImageUrl = \App\Support\MediaPath::url($profileHall?->marker?->image);
     $captainName = $connectedUsers->first(function ($connectedUser) {
         return strtolower((string) ($connectedUser->role->role ?? '')) === 'barangay captain';
     })?->full_name ?? auth()->user()->full_name;
@@ -47,6 +48,14 @@
             overflow: hidden;
         }
 
+        .barangay-profile-cover__banner.has-photo {
+            background-image:
+                linear-gradient(180deg, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.34)),
+                var(--barangay-profile-photo);
+            background-size: cover;
+            background-position: center;
+        }
+
         .barangay-profile-cover__banner::after {
             content: '';
             position: absolute;
@@ -56,6 +65,32 @@
                 radial-gradient(circle at 55% 25%, rgba(255,255,255,0.8), transparent 16%),
                 radial-gradient(circle at 75% 38%, rgba(255,255,255,0.65), transparent 20%);
             opacity: 0.9;
+        }
+
+        .barangay-profile-cover__banner.has-photo::after {
+            background:
+                linear-gradient(90deg, rgba(15, 23, 42, 0.28), transparent 58%),
+                radial-gradient(circle at 18% 82%, rgba(255,255,255,0.38), transparent 24%);
+            opacity: 1;
+        }
+
+        .barangay-profile-cover__photo-caption {
+            position: absolute;
+            right: 18px;
+            bottom: 16px;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-height: 30px;
+            padding: 0 11px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #475569;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
         }
 
         .barangay-profile-cover__content {
@@ -272,7 +307,14 @@
 
     <section class="barangay-profile-cover" data-barangay-profile-root data-refresh-url="{{ route('barangay.profile') }}">
         <div class="barangay-profile-cover__body">
-            <div class="barangay-profile-cover__banner"></div>
+            <div
+                class="barangay-profile-cover__banner {{ $profileHallImageUrl ? 'has-photo' : '' }}"
+                @if($profileHallImageUrl) style="--barangay-profile-photo: url('{{ $profileHallImageUrl }}')" @endif
+            >
+                @if($profileHallImageUrl)
+                    <span class="barangay-profile-cover__photo-caption"><i class="fa-solid fa-image"></i> Hall photo on file</span>
+                @endif
+            </div>
             <div class="barangay-profile-cover__content">
                 <div>
                     <span class="barangay-profile-cover__eyebrow">
@@ -468,6 +510,15 @@
                 setText('barangayProfileStatRiskAreas', String(stats.active_risk_records ?? 0));
                 setText('barangayProfileStatFireRecords', String(stats.fire_records ?? 0));
                 setText('barangayProfileStatChecklists', String(stats.checklist_items ?? 0));
+
+                const banner = document.querySelector('.barangay-profile-cover__banner');
+                if (banner && barangay.hall_image_url) {
+                    banner.classList.add('has-photo');
+                    banner.style.setProperty('--barangay-profile-photo', `url('${barangay.hall_image_url}')`);
+                    if (!banner.querySelector('.barangay-profile-cover__photo-caption')) {
+                        banner.insertAdjacentHTML('beforeend', '<span class="barangay-profile-cover__photo-caption"><i class="fa-solid fa-image"></i> Hall photo on file</span>');
+                    }
+                }
 
                 if (usersList) {
                     usersList.innerHTML = connectedUsers.length

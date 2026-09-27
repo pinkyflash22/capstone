@@ -1295,6 +1295,33 @@
         let activeRiskStep = 0;
         let furthestRiskStep = 0;
 
+        function notifyBarangayRisk(message, type = 'success') {
+            if (typeof window.PyroNotify?.notify === 'function') {
+                window.PyroNotify.notify(message, type);
+                return;
+            }
+
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 104px;
+                right: 24px;
+                z-index: 12000;
+                max-width: min(420px, calc(100vw - 32px));
+                padding: 14px 16px;
+                border-radius: 16px;
+                border: 1px solid ${type === 'error' ? '#fecaca' : '#bbf7d0'};
+                background: ${type === 'error' ? '#fef2f2' : '#f0fdf4'};
+                color: ${type === 'error' ? '#991b1b' : '#166534'};
+                box-shadow: 0 18px 38px rgba(15,23,42,.16);
+                font-size: .86rem;
+                font-weight: 800;
+            `;
+            document.body.appendChild(toast);
+            window.setTimeout(() => toast.remove(), 3800);
+        }
+
         function escapeRiskDetailHtml(value) {
             return String(value ?? '')
                 .replace(/&/g, '&amp;')
@@ -1557,6 +1584,61 @@
 
         document.getElementById('risk_area_photos')?.addEventListener('change', refreshBarangayRiskPhotoUploadState);
         refreshBarangayRiskPhotoUploadState();
+
+        riskForm?.addEventListener('submit', async function (event) {
+            if (!window.navigator.onLine) {
+                return;
+            }
+
+            event.preventDefault();
+
+            if (!validateRiskStep(activeRiskStep)) {
+                return;
+            }
+
+            const submitButton = document.getElementById('barangayRiskSubmitButton');
+            const originalLabel = submitButton?.innerHTML || '';
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+            }
+
+            try {
+                const response = await fetch(riskForm.action, {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: new FormData(riskForm),
+                    credentials: 'same-origin',
+                });
+                const payload = await response.json().catch(() => ({}));
+
+                if (!response.ok || payload.success === false) {
+                    const validationMessage = Object.values(payload.errors || {}).flat().find(Boolean);
+                    throw new Error(validationMessage || payload.message || 'Unable to submit the risk marker.');
+                }
+
+                notifyBarangayRisk(payload.message || 'Risk or hazard marker submitted successfully.', 'success');
+                closeRiskModal();
+                window.setTimeout(() => window.location.reload(), 850);
+            } catch (error) {
+                notifyBarangayRisk(error.message || 'Unable to submit the risk marker.', 'error');
+            } finally {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalLabel;
+                }
+            }
+        });
+
+        @if (session('success'))
+            notifyBarangayRisk(@json(session('success')), 'success');
+        @endif
+        @if ($errors->any())
+            notifyBarangayRisk(@json($errors->first()), 'error');
+        @endif
 
         const riskAreaRecords = @json($riskAreaMapPayload);
         const fallbackMarkerRecords = @json($fallbackMarkerMapPayload);

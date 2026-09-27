@@ -81,4 +81,13 @@
             <input id="{{ $prefix }}_lng" name="lng" type="text" value="{{ old('lng', $record['lng'] ?? '') }}" placeholder="120.3297000">
         </div>
     </div>
+
+    <div
+        id="{{ $prefix }}_fireReportMapPicker"
+        class="fire-report-map-picker"
+        data-fire-report-map-picker
+        data-prefix="{{ $prefix }}"
+        aria-label="Fire report map coordinate picker"
+    ></div>
+    <p class="fire-report-form__hint"><i class="fa-solid fa-map-pin text-orange-500 mr-1"></i>Tap the map to adjust the fire location before saving.</p>
 </section>

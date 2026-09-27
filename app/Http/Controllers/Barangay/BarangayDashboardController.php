@@ -2214,6 +2214,13 @@ class BarangayDashboardController extends Controller
         $hall = $context['hall'];
 
         if (! $hall) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Your barangay account is not linked to a barangay hall yet, so risk markers cannot be recorded.',
+                ], 422);
+            }
+
             return redirect()
                 ->route($returnRoute)
                 ->withErrors(['risk_area' => 'Your barangay account is not linked to a barangay hall yet, so risk markers cannot be recorded.']);
@@ -2521,6 +2528,7 @@ class BarangayDashboardController extends Controller
                         'hall_name' => $hall?->hall_name,
                         'hall_contact_number' => $hall?->contact_number,
                         'hall_email' => $hall?->email,
+                        'hall_image_url' => MediaPath::url($hall?->marker?->image),
                     ],
                     'captain_name' => $connectedUsers->first(function ($connectedUser) {
                         return strtolower((string) ($connectedUser->role->role ?? '')) === 'barangay captain';

@@ -615,6 +615,7 @@
     .fire-report-form__field textarea { min-height: 70px; }
     .fire-report-location-panel { padding: 9px; border-radius: 13px; }
     .fire-report-location-panel__header { margin-bottom: 7px; }
+    .fire-report-map-picker { height: 240px; margin-top: 10px; overflow: hidden; border: 1px solid rgba(226,232,240,.92); border-radius: 14px; background: #f8fafc; }
     .fire-report-location-btn, .fire-report-primary-btn, .fire-report-secondary-btn, .fire-report-danger-btn { min-height: 34px; padding: 0 12px; border-radius: 10px; font-size: .73rem; font-weight: 700; }
     .fire-report-danger-btn { border: none; background: #dc2626; color: #fff; }
     .fire-report-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; margin-bottom: 12px; }
@@ -661,6 +662,9 @@
         const summary = document.getElementById('fireReportsSummary');
         const visibleCount = document.getElementById('fireReportVisibleCount');
         const records = new Map();
+        const fireReportPickerMaps = new Map();
+        const fireReportDefaultLat = @json($hall?->marker?->lat ? (float) $hall->marker->lat : 15.8222);
+        const fireReportDefaultLng = @json($hall?->marker?->lng ? (float) $hall->marker->lng : 120.3297);
         let filterTimer = null;
 
         try {
@@ -676,6 +680,12 @@
 
             modal.classList.remove('hidden');
             body.classList.add('overflow-hidden');
+            window.setTimeout(() => {
+                modal.querySelectorAll('[data-fire-report-map-picker]').forEach((element) => {
+                    initFireReportPicker(element);
+                    fireReportPickerMaps.get(element.id)?.map.invalidateSize();
+                });
+            }, 120);
         }
 
         function closeModal(modal) {
@@ -725,6 +735,88 @@
             `).join('');
         }
 
+        function notifyFireReport(message, type = 'success') {
+            if (typeof window.PyroNotify?.notify === 'function') {
+                window.PyroNotify.notify(message, type);
+                return;
+            }
+
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position: fixed;
+                top: 104px;
+                right: 24px;
+                z-index: 12000;
+                max-width: min(420px, calc(100vw - 32px));
+                padding: 14px 16px;
+                border-radius: 16px;
+                border: 1px solid ${type === 'error' ? '#fecaca' : '#bbf7d0'};
+                background: ${type === 'error' ? '#fef2f2' : '#f0fdf4'};
+                color: ${type === 'error' ? '#991b1b' : '#166534'};
+                box-shadow: 0 18px 38px rgba(15,23,42,.16);
+                font-size: .86rem;
+                font-weight: 800;
+            `;
+            document.body.appendChild(toast);
+            window.setTimeout(() => toast.remove(), 3800);
+        }
+
+        function setFireReportPickerPosition(prefix, lat, lng, zoom = 16) {
+            const picker = document.getElementById(`${prefix}_fireReportMapPicker`);
+            const pickerState = picker ? fireReportPickerMaps.get(picker.id) : null;
+            const numericLat = Number(lat);
+            const numericLng = Number(lng);
+
+            if (!pickerState || !Number.isFinite(numericLat) || !Number.isFinite(numericLng)) {
+                return;
+            }
+
+            pickerState.marker.setLatLng([numericLat, numericLng]);
+            pickerState.map.setView([numericLat, numericLng], zoom, { animate: true });
+        }
+
+        function initFireReportPicker(element) {
+            if (!element || typeof L === 'undefined' || fireReportPickerMaps.has(element.id)) {
+                return;
+            }
+
+            const prefix = element.dataset.prefix;
+            const latInput = document.getElementById(`${prefix}_lat`);
+            const lngInput = document.getElementById(`${prefix}_lng`);
+            if (!prefix || !latInput || !lngInput) {
+                return;
+            }
+
+            const startingLat = Number(latInput.value || fireReportDefaultLat);
+            const startingLng = Number(lngInput.value || fireReportDefaultLng);
+            const map = L.map(element, { zoomControl: true, scrollWheelZoom: true }).setView([startingLat, startingLng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors',
+            }).addTo(map);
+
+            const marker = L.marker([startingLat, startingLng], { draggable: true }).addTo(map);
+
+            function updateInputs(lat, lng) {
+                latInput.value = Number(lat).toFixed(7);
+                lngInput.value = Number(lng).toFixed(7);
+                marker.setLatLng([lat, lng]);
+            }
+
+            map.on('click', (event) => updateInputs(event.latlng.lat, event.latlng.lng));
+            marker.on('dragend', () => {
+                const position = marker.getLatLng();
+                updateInputs(position.lat, position.lng);
+            });
+
+            if (latInput.value && lngInput.value) {
+                updateInputs(startingLat, startingLng);
+            }
+
+            fireReportPickerMaps.set(element.id, { map, marker });
+        }
+
         function renderPagination(page) {
             const current = Number(page.current_page || 1);
             const last = Math.max(1, Number(page.last_page || 1));
@@ -756,6 +848,7 @@
                 if (input) input.value = value ?? '';
             });
             openModal(editModal);
+            window.setTimeout(() => setFireReportPickerPosition('edit', fields.lat || fireReportDefaultLat, fields.lng || fireReportDefaultLng), 160);
         }
 
         function showRecord(record) {
@@ -847,6 +940,7 @@
                     const fix = await window.PyroLocation.getReliableLocationFix({ acceptBestAvailable: true });
                     latInput.value = Number(fix.lat).toFixed(7);
                     lngInput.value = Number(fix.lng).toFixed(7);
+                    setFireReportPickerPosition(buttonId.startsWith('edit_') ? 'edit' : 'create', fix.lat, fix.lng);
                 } catch (error) {
                     if (error?.locationReason !== 'cancelled') {
                         window.alert(error?.message || 'Unable to get your location. Enter the coordinates manually or try again.');
@@ -892,9 +986,9 @@
                     closeModal(form.closest('.fire-report-modal'));
                     if (form !== editForm && form !== deleteForm) form.reset();
                     await loadRecords(1);
-                    window.PyroNotify?.notify(payload.message || 'Fire report saved.', 'success');
+                    notifyFireReport(payload.message || 'Fire report saved.', 'success');
                 } catch (error) {
-                    window.PyroNotify?.notify(error.message || 'Unable to save the fire report.', 'error');
+                    notifyFireReport(error.message || 'Unable to save the fire report.', 'error');
                 } finally {
                     if (submitButton) {
                         submitButton.disabled = false;
