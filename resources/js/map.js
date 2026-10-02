@@ -2771,7 +2771,7 @@ function getMarkerCreateEndpoint() {
     return resolveCurrentUserMapId() !== 'guest' ? '/map/markers' : '/api/markers';
 }
 
-const canManageMarkers = ['admin', 'provincial admin', 'chief'].includes(roleName)
+const canManageMarkers = ['admin', 'provincial admin', 'chief', 'stationadmin'].includes(roleName)
     || [2, 3, 4].includes(Number(roleToken));
 window.currentDisplayedRouteId = null;
 
@@ -6177,12 +6177,12 @@ function openCurrentMapDetailEditor() {
     openEditModal(currentDetailsMarker);
 }
 
-function deleteCurrentMapDetailMarker() {
+function markCurrentMapDetailMarkerAsSpam() {
     if (!currentDetailsMarker?.marker_id) {
         return;
     }
 
-    deleteMarker(currentDetailsMarker.marker_id);
+    markMarkerAsSpam(currentDetailsMarker.marker_id);
 }
 
 function respondCurrentMapDetail() {
@@ -7365,7 +7365,7 @@ function generatePopupContent(coord, incidents) {
                         <i class="fas fa-edit"></i> Edit
                     </button>
                     <button id="delete${marker.marker_id}" style="flex: 1; background: #ef4444; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer;">
-                        <i class="fas fa-trash"></i> Delete
+                        <i class="fas fa-ban"></i> Spam
                     </button>
                 </div>
                 <button id="viewDetails${marker.marker_id}" style="width: 100%; background: #3b82f6; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer;">
@@ -7466,7 +7466,7 @@ function generatePopupContent(coord, incidents) {
                         <i class="fas fa-edit"></i> Edit
                     </button>
                     <button id="delete${marker.marker_id}" style="flex: 1; background: #ef4444; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer;">
-                        <i class="fas fa-trash"></i> Delete
+                        <i class="fas fa-ban"></i> Spam
                     </button>
                 </div>
                 ` : ''}
@@ -7525,7 +7525,7 @@ function generatePopupContent(coord, incidents) {
                         <i class="fas fa-edit"></i> Edit
                     </button>
                     <button id="delete${marker.marker_id}" style="flex: 1; background: #ef4444; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer;">
-                        <i class="fas fa-trash"></i> Delete
+                        <i class="fas fa-ban"></i> Spam
                     </button>
                 </div>
                 ` : ''}
@@ -7568,7 +7568,7 @@ function generatePopupContent(coord, incidents) {
                         <i class="fas fa-edit"></i> Edit
                     </button>
                     <button id="delete${marker.marker_id}" style="flex: 1; background: #ef4444; color: white; border: none; padding: ${buttonPadding}; border-radius: 8px; font-size: ${buttonFontSize}; font-weight: 500; cursor: pointer;">
-                        <i class="fas fa-trash"></i> Delete
+                        <i class="fas fa-ban"></i> Spam
                     </button>
                 </div>
                 ` : ''}
@@ -8069,8 +8069,8 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
                     Edit
                 </button>
                 <button id="delete${marker.marker_id}" class="responder-marker-popup-btn danger">
-                    <i class="fas fa-trash"></i>
-                    Delete
+                    <i class="fas fa-ban"></i>
+                    Spam
                 </button>
             </div>
         `
@@ -8469,9 +8469,9 @@ function buildResponderDetailsActionMarkup(marker, incident = null) {
                     <i class="fas fa-pen-to-square"></i>
                     Edit
                 </button>
-                <button type="button" class="responder-marker-popup-btn danger" onclick="window.deleteCurrentMapDetailMarker()">
-                    <i class="fas fa-trash"></i>
-                    Delete
+                <button type="button" class="responder-marker-popup-btn danger" onclick="window.markCurrentMapDetailMarkerAsSpam()">
+                    <i class="fas fa-ban"></i>
+                    Spam
                 </button>
             </div>
         `);
@@ -10451,7 +10451,7 @@ function getActionButtons(coord, incidents) {
                         <i class="fas fa-edit"></i> Edit
                     </button>
                     <button id="delete${marker.marker_id}" class="bg-red-600 text-white text-xs px-2 py-1.5 rounded" style="width: 40%;">
-                        <i class="fas fa-trash"></i> Delete
+                        <i class="fas fa-ban"></i> Spam
                     </button>
                 </div>` : '';
     }
@@ -10496,7 +10496,7 @@ function addPopupEventListeners(coord) {
             const deleteBtn = document.getElementById('delete' + marker.marker_id);
             const editBtn = document.getElementById('edit' + marker.marker_id);
             const respondBtn = document.getElementById('respond' + marker.marker_id);
-            if (deleteBtn) deleteBtn.addEventListener('click', () => deleteMarker(marker.marker_id));
+            if (deleteBtn) deleteBtn.addEventListener('click', () => markMarkerAsSpam(marker.marker_id));
             if (editBtn) editBtn.addEventListener('click', () => openEditModal(marker));
             if (respondBtn) respondBtn.addEventListener('click', () => respondIncident(marker));
         }
@@ -10778,8 +10778,8 @@ function removeOptimisticMapMarker(optimisticId) {
     optimisticMapMarkers.delete(optimisticId);
 }
 
-function deleteMarker(value) {
-    if (!confirm('Are you sure you want to delete this marker?')) return;
+function markMarkerAsSpam(value) {
+    if (!confirm('Mark this marker as spam and hide it from the map?')) return;
     fetch(`/api/markers/${value}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken }
@@ -10791,17 +10791,17 @@ function deleteMarker(value) {
     })
     .then(data => {
         if (data.success) {
-            showNotification(data.message || 'Marker deleted successfully!', 'success');
+            showNotification(data.message || 'Marker marked as spam and hidden from the map.', 'success');
             invalidateMarkerReferenceData();
-            refreshDynamicMapData({ reason: 'marker-deleted' });
+            refreshDynamicMapData({ reason: 'marker-spammed' });
             if (currentDetailsMarker && currentDetailsMarker.marker_id == value) closeDetailsPanel();
         } else {
-            showNotification(data.message || 'Failed to delete marker', 'error');
+            showNotification(data.message || 'Failed to mark marker as spam', 'error');
         }
     })
     .catch(err => {
-        console.error('Delete error:', err);
-        showNotification('Error deleting marker: ' + err.message, 'error');
+        console.error('Spam marker error:', err);
+        showNotification('Error marking marker as spam: ' + err.message, 'error');
     });
 }
 
@@ -13759,7 +13759,7 @@ window.openEditModal = function(marker) {
     openEditModal(marker);
 };
 window.openCurrentMapDetailEditor = openCurrentMapDetailEditor;
-window.deleteCurrentMapDetailMarker = deleteCurrentMapDetailMarker;
+window.markCurrentMapDetailMarkerAsSpam = markCurrentMapDetailMarkerAsSpam;
 window.respondCurrentMapDetail = respondCurrentMapDetail;
 window.routeCurrentMapDetail = routeCurrentMapDetail;
 

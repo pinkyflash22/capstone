@@ -13,6 +13,8 @@
 @endsection
 
 @section('content')
+    @php($communityRequestMinDate = \Carbon\Carbon::now('Asia/Manila')->addDay()->toDateString())
+
     @if(session('success'))
         <div class="panel-card" style="margin-bottom:16px;border-color:rgba(16,185,129,0.24);background:#ecfdf5;color:#065f46;">
             {{ session('success') }}
@@ -60,7 +62,7 @@
                 <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;">
                     <label>
                         <span style="display:block;font-weight:700;margin-bottom:6px;">Preferred date</span>
-                        <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" min="2026-08-10" style="width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+                        <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" min="{{ $communityRequestMinDate }}" style="width:100%;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
                     </label>
                     <label>
                         <span style="display:block;font-weight:700;margin-bottom:6px;">Start</span>

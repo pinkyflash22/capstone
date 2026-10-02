@@ -9,6 +9,7 @@ use App\Models\RiskAreaPhoto;
 use App\Models\StationOfficer;
 use App\Models\Status;
 use App\Services\BoundaryMatcherService;
+use App\Services\OperationalMapScope;
 use App\Support\MarkerFeedBuilder;
 use App\Support\MediaPath;
 use App\Support\UserActivityLogger;
@@ -16,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -153,6 +155,109 @@ class MarkerController extends Controller
             ->first();
 
         return $this->publicDisplayName($chiefOfficer?->user);
+    }
+
+    private function spamMarkerQuery(Request $request, OperationalMapScope $operationalScope)
+    {
+        $viewer = $request->user();
+        $query = Marker::query()
+            ->with([
+                'stations',
+                'hydrants.station',
+                'incidents.team',
+                'riskAreas.barangayHall.barangay',
+            ])
+            ->where('status', 'inactive');
+
+        if ($operationalScope->hasProvinceWideAccess($viewer)) {
+            return $query;
+        }
+
+        $stationIds = $operationalScope->stationIds($viewer);
+        $coveredBarangayIds = $operationalScope->coveredBarangayIds($viewer);
+
+        if ($stationIds->isEmpty() && $coveredBarangayIds->isEmpty()) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->where(function ($scope) use ($stationIds, $coveredBarangayIds) {
+            if ($stationIds->isNotEmpty()) {
+                $scope->orWhereHas('stations', fn ($stations) => $stations->whereIn('station_id', $stationIds->all()))
+                    ->orWhereHas('hydrants', fn ($hydrants) => $hydrants->whereIn('station_id', $stationIds->all()))
+                    ->orWhereHas('incidents', function ($incidents) use ($stationIds) {
+                        $incidents->whereIn('station_id', $stationIds->all())
+                            ->orWhereHas('team', fn ($teams) => $teams->whereIn('station_id', $stationIds->all()));
+                    })
+                    ->orWhereHas('riskAreas', fn ($riskAreas) => $riskAreas->whereIn('station_id', $stationIds->all()));
+            }
+
+            if ($coveredBarangayIds->isNotEmpty()) {
+                $scope->orWhereHas('riskAreas.barangayHall', fn ($halls) => $halls->whereIn('barangay_id', $coveredBarangayIds->all()));
+            }
+        });
+    }
+
+    private function markerSpamAuditUpdates(?int $userId): array
+    {
+        $updates = ['status' => 'inactive'];
+
+        if (Schema::hasColumn('markers', 'spammed_by')) {
+            $updates['spammed_by'] = $userId;
+        }
+
+        if (Schema::hasColumn('markers', 'spammed_at')) {
+            $updates['spammed_at'] = now();
+        }
+
+        return $updates;
+    }
+
+    private function markerSpamRestoreUpdates(): array
+    {
+        $updates = ['status' => 'active'];
+
+        if (Schema::hasColumn('markers', 'spammed_by')) {
+            $updates['spammed_by'] = null;
+        }
+
+        if (Schema::hasColumn('markers', 'spammed_at')) {
+            $updates['spammed_at'] = null;
+        }
+
+        return $updates;
+    }
+
+    public function spamIndex(Request $request, OperationalMapScope $operationalScope)
+    {
+        $markers = $this->spamMarkerQuery($request, $operationalScope)
+            ->orderByDesc('updated_at')
+            ->orderByDesc('marker_id')
+            ->paginate(15)
+            ->withQueryString();
+
+        $role = $operationalScope->role($request->user());
+        $isProvincial = $operationalScope->hasProvinceWideAccess($request->user());
+
+        return view('markers.spam-review', [
+            'markers' => $markers,
+            'isProvincial' => $isProvincial,
+            'roleName' => $role,
+        ]);
+    }
+
+    public function restoreSpam(Request $request, int $markerId, OperationalMapScope $operationalScope)
+    {
+        $marker = $this->spamMarkerQuery($request, $operationalScope)
+            ->whereKey($markerId)
+            ->firstOrFail();
+
+        $marker->update($this->markerSpamRestoreUpdates());
+
+        Cache::forget('map:markers:index:v2');
+        Cache::forget('map:markers:index:v3_public');
+        UserActivityLogger::log('restored spam marker', Auth::id(), $request);
+
+        return back()->with('success', 'Marker restored to the map.');
     }
 
     public function index(Request $request)
@@ -550,7 +655,7 @@ class MarkerController extends Controller
     public function destroy($id)
     {
         try {
-            \Log::info('Attempting to delete marker', ['marker_id' => $id]);
+            \Log::info('Attempting to mark marker as spam', ['marker_id' => $id]);
 
             $marker = Marker::find($id);
 
@@ -568,7 +673,6 @@ class MarkerController extends Controller
                 'title' => $marker->title,
             ]);
 
-            // Check for related records
             $stationCount = $marker->stations()->count();
             $hydrantCount = $marker->hydrants()->count();
             $incidentCount = $marker->incidents()->count();
@@ -579,61 +683,39 @@ class MarkerController extends Controller
                 'incidents' => $incidentCount,
             ]);
 
-            // Delete related records
-            if ($stationCount > 0) {
-                $marker->stations()->delete();
-            }
+            $updated = $marker->update($this->markerSpamAuditUpdates(Auth::id()));
 
-            if ($hydrantCount > 0) {
-                $marker->hydrants()->delete();
-            }
-
-            if ($incidentCount > 0) {
-                $marker->incidents()->delete();
-            }
-
-            // Delete multimedia if exists
-            if ($marker->multimedia) {
-                try {
-                    MediaPath::delete($marker->multimedia->path);
-                    $marker->multimedia->delete();
-                } catch (\Exception $e) {
-                    \Log::error('Error deleting multimedia', ['error' => $e->getMessage()]);
-                }
-            }
-
-            // Delete the marker
-            $deleted = $marker->delete();
-
-            if ($deleted) {
+            if ($updated) {
                 if (auth()->check() && $incidentCount > 0) {
-                    UserActivityLogger::log('deleted incident report', auth()->id(), request());
+                    UserActivityLogger::log('marked incident marker as spam', auth()->id(), request());
                 }
 
-                \Log::info('Marker deleted successfully');
+                Cache::forget('map:markers:index:v2');
+                Cache::forget('map:markers:index:v3_public');
+                \Log::info('Marker marked as spam successfully');
 
                 return response()->json([
                     'success' => true,
-                    'message' => 'Marker deleted successfully.',
+                    'message' => 'Marker marked as spam and hidden from the map.',
                 ], 200);
             } else {
-                \Log::error('Marker deletion failed - delete() returned false');
+                \Log::error('Marker spam update failed - update() returned false');
 
                 return response()->json([
                     'success' => false,
-                    'message' => 'Marker could not be deleted.',
+                    'message' => 'Marker could not be marked as spam.',
                 ], 500);
             }
 
         } catch (\Exception $e) {
-            \Log::error('Exception in marker deletion', [
+            \Log::error('Exception while marking marker as spam', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Error deleting marker: '.$e->getMessage(),
+                'message' => 'Error marking marker as spam: '.$e->getMessage(),
             ], 500);
         }
     }

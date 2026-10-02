@@ -1235,7 +1235,7 @@
                                     </label>
                                     <label>
                                         <span>Schedule date</span>
-                                        <input type="date" name="event_date" value="{{ optional($requestItem->preferred_date)->toDateString() }}" min="{{ now('Asia/Manila')->toDateString() }}">
+                                        <input type="date" name="event_date" value="{{ optional($requestItem->preferred_date)->toDateString() }}" min="{{ now('Asia/Manila')->addDay()->toDateString() }}">
                                     </label>
                                     <label>
                                         <span>Activity type</span>

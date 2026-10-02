@@ -561,6 +561,12 @@
         }
     }
 
+    async function flushChecklistProgressFor(checklistId) {
+        if (!checklistId || String(activeChecklistId) !== String(checklistId) || !checklistPendingItems.size) return true;
+        await saveChecklistProgress();
+        return checklistPendingItems.size === 0;
+    }
+
     function openChecklistEditor(payload = null) {
         const editor = document.getElementById('checklistEditor');
         const form = document.getElementById('checklistEditorForm');
@@ -709,6 +715,8 @@
         button.classList.add('is-loading');
         button.innerHTML = '<i class="fa-solid fa-spinner"></i>';
         try {
+            const progressSaved = await flushChecklistProgressFor(checklistId);
+            if (!progressSaved) throw new Error('Save checklist progress first, then approve.');
             const response = await checklistFetch(checklistEndpoint('confirm', checklistId), {
                 method: 'PATCH',
                 headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
@@ -794,8 +802,14 @@
         }
         const status = event.target.closest('[data-checklist-status]');
         if (status) {
-            if (checklistPendingItems.size) { showChecklistToast('Save item progress before changing the overall checklist status.', 'error'); return; }
             const notes = document.getElementById(`notes-${status.dataset.checklistId}`)?.value || '';
+            if (String(activeChecklistId) === String(status.dataset.checklistId) && checklistPendingItems.size) {
+                flushChecklistProgressFor(status.dataset.checklistId).then((saved) => {
+                    if (!saved) { showChecklistToast('Save checklist progress first, then update the status.', 'error'); return; }
+                    patchChecklist(checklistEndpoint('confirm', status.dataset.checklistId), {status:status.dataset.status,confirmation_notes:notes}, status, status.dataset.checklistId);
+                });
+                return;
+            }
             patchChecklist(checklistEndpoint('confirm', status.dataset.checklistId), {status:status.dataset.status,confirmation_notes:notes}, status, status.dataset.checklistId);
         }
     });

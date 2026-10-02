@@ -1,3 +1,5 @@
+@php($communityRequestMinDate = \Carbon\Carbon::now('Asia/Manila')->addDay()->toDateString())
+
 <div id="section-announcements" class="content-section announcements-page">
     <div class="citizen-announcements-shell">
         @if($errors->communityRequest->any())
@@ -171,7 +173,7 @@
                     </label>
                     <label>
                         <span>Preferred date</span>
-                        <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" min="{{ now()->toDateString() }}">
+                        <input type="date" name="preferred_date" value="{{ old('preferred_date') }}" min="{{ $communityRequestMinDate }}">
                     </label>
                     <label>
                         <span>Start time</span>

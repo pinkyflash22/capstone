@@ -267,7 +267,9 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
     Route::get('/map/markers/feed', [MarkerController::class, 'index'])->name('map.markers.feed');
     Route::get('/map/markers/latest', [MarkerController::class, 'latestForViewer'])->name('map.markers.latest');
     Route::middleware(['role:admin,provincial admin,stationadmin,chief'])->group(function () {
+        Route::get('/map/markers/spam', [ManagedMarkerController::class, 'spamIndex'])->name('map.markers.spam');
         Route::post('/map/markers', [ManagedMarkerController::class, 'store'])->name('map.markers.store');
+        Route::patch('/map/markers/{markerId}/restore', [ManagedMarkerController::class, 'restoreSpam'])->name('map.markers.restore');
         Route::delete('/map/markers/{markerId}', [ManagedMarkerController::class, 'destroy'])->name('map.markers.destroy');
         Route::post('/map/marker-details/incidents', [IncidentController::class, 'store'])->name('map.marker-details.incidents.store');
         Route::post('/map/marker-details/full-addresses', [AdminController::class, 'storeFullAddress'])->name('map.marker-details.addresses.store');
@@ -319,6 +321,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/dashboard', [AdminController::class, 'index'])->name('dashboard');
         Route::get('/api/dashboard-stats', [AdminController::class, 'dashboardStats'])->name('dashboard-stats');
         Route::get('/maps', [AdminController::class, 'maps'])->name('maps');
+        Route::get('/spam-markers', [ManagedMarkerController::class, 'spamIndex'])->name('spam-markers.index');
         Route::get('/alerts',[AdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[AdminController::class, 'reports'])->name('reports');
         Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');
@@ -454,6 +457,7 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         // Route::get('/request', [StationAdminController::class, 'fsic'])->name('fsic');
 
         Route::get('/maps', [StationAdminController::class, 'maps'])->name('maps');
+        Route::get('/spam-markers', [ManagedMarkerController::class, 'spamIndex'])->name('spam-markers.index');
         Route::get('/alerts',[StationAdminController::class, 'alerts'])->name('alerts');
         Route::get('/reports',[StationAdminController::class, 'reports'])->name('reports');
         Route::get('/spot-reports/{spotReportId}/sir.docx', [SpotInvestigationSirExportController::class, 'downloadWord'])->name('spot-reports.sir.word');

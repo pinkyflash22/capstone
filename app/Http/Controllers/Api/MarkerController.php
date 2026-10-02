@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Marker;
 use App\Support\MarkerFeedBuilder;
+use App\Support\UserActivityLogger;
 
 class MarkerController extends Controller
 {
@@ -69,15 +71,29 @@ class MarkerController extends Controller
         Cache::forget('map:markers:index:v3_public');
         return redirect()->back()->with('success', 'Marker updated!');
     }
-    public function destroy($id){
-         $marker = Marker::findOrFail($id);
-    $marker->delete();
-    Cache::forget('map:markers:index:v2');
-    Cache::forget('map:markers:index:v3_public');
+    public function destroy($id)
+    {
+        $marker = Marker::findOrFail($id);
+        $updates = ['status' => 'inactive'];
 
-    return response()->json([
-        'message' => 'Marker deleted successfully'
-    ]);
+        if (Schema::hasColumn('markers', 'spammed_by')) {
+            $updates['spammed_by'] = Auth::id();
+        }
+
+        if (Schema::hasColumn('markers', 'spammed_at')) {
+            $updates['spammed_at'] = now();
+        }
+
+        $marker->update($updates);
+
+        Cache::forget('map:markers:index:v2');
+        Cache::forget('map:markers:index:v3_public');
+        UserActivityLogger::log('marked marker as spam', Auth::id(), request());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Marker marked as spam and hidden from the map.',
+        ]);
     }
     public function latest()
     {

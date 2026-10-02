@@ -21,6 +21,7 @@
                 ['label' => 'Resources', 'route' => 'station-admin.resource-management.index', 'active' => 'resources', 'icon' => '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" fill="none"/><rect x="13" y="4" width="7" height="7" fill="none"/><rect x="8.5" y="13" width="7" height="7" fill="none"/></svg>'],
                 ['label' => 'Barangays', 'route' => 'station-admin.barangays.index', 'active' => 'barangays', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 21s7-4.6 7-11a7 7 0 1 0-14 0c0 6.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>'],
                 ['label' => 'Risk Reviews', 'route' => 'station-admin.risk-reviews.index', 'active' => 'risk-reviews', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M9.5 12l1.8 1.8L15 10.2"/></svg>'],
+                ['label' => 'Spam Markers', 'route' => 'station-admin.spam-markers.index', 'active' => 'spam-markers', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"/><path d="M6.8 6.8l10.4 10.4"/></svg>'],
                 ['label' => 'Mitigation Control', 'route' => 'station-admin.mitigations', 'active' => 'mitigations', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>'],
                 ['label' => 'Fire Risk Forecast', 'route' => 'station-admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>'],
                 ['label' => 'Weather Context', 'route' => 'station-admin.weather-context.index', 'active' => 'weather-context', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 17a4 4 0 1 1 1.2-7.8A5.5 5.5 0 0 1 18.8 11H19a3 3 0 0 1 0 6z"/><path d="M8 20l-1 2M13 20l-1 2M18 20l-1 2"/></svg>'],
@@ -47,6 +48,7 @@
     $mobileCenterActions = [
         ['label' => 'FSIC Records', 'description' => 'Review inspection records and certification activity.', 'route' => 'station-admin.fsic', 'active' => 'fsic', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14l-2-1-2 1-2-1-2 1-2-1-2 1V3z"/><path d="M14 3v4h4M9 11h6M9 15h6"/></svg>', 'mobile_icon' => 'folder_open'],
         ['label' => 'Risk Reviews', 'description' => 'Verify risk and hazard submissions for your station.', 'route' => 'station-admin.risk-reviews.index', 'active' => 'risk-reviews', 'mobile_icon' => 'fact_check'],
+        ['label' => 'Spam Markers', 'description' => 'Restore markers that were hidden from the operational map.', 'route' => 'station-admin.spam-markers.index', 'active' => 'spam-markers', 'mobile_icon' => 'block'],
         ['label' => 'Mitigation Control', 'description' => 'Track prevention plans through completion.', 'route' => 'station-admin.mitigations', 'active' => 'mitigations', 'mobile_icon' => 'task_alt'],
         ['label' => 'Executive Reports', 'description' => 'Open station performance and executive reports.', 'route' => 'station-admin.reports', 'active' => 'reports', 'icon' => '<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 11h6M9 15h4"/></svg>', 'mobile_icon' => 'description'],
         ['label' => 'Resources', 'description' => 'Manage personnel, apparatus, and equipment.', 'route' => 'station-admin.resource-management.index', 'active' => 'resources', 'icon' => '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" fill="none"/><rect x="13" y="4" width="7" height="7" fill="none"/><rect x="8.5" y="13" width="7" height="7" fill="none"/></svg>', 'mobile_icon' => 'inventory_2'],
@@ -65,6 +67,7 @@
         'dashboard' => '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
         'folder_open' => '<svg viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3zM3 11h18"/></svg>',
         'fact_check' => '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 9l1.5 1.5L12 8M14 9h3M8 15l1.5 1.5L12 14M14 15h3"/></svg>',
+        'block' => '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M6.8 6.8l10.4 10.4"/></svg>',
         'task_alt' => '<svg viewBox="0 0 24 24"><path d="M4 6l2 2 4-4M12 6h8M4 13l2 2 4-4M12 13h8M4 20l2 2 4-4M12 20h8"/></svg>',
         'description' => '<svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h5M9 12h6M9 16h6"/></svg>',
         'inventory_2' => '<svg viewBox="0 0 24 24"><path d="M4 7h16v14H4zM3 3h18v4H3zM9 11h6"/></svg>',

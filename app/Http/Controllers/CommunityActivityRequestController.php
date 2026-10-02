@@ -103,16 +103,18 @@ class CommunityActivityRequestController extends Controller
                 ->with('error', 'BFP has already reviewed this request. It can no longer be edited.');
         }
 
+        $minimumRequestDate = $this->minimumCommunityRequestDate();
+
         $validated = $request->validateWithBag('communityRequestEdit', [
             'request_type' => ['required', Rule::in(['orientation', 'seminar', 'drill', 'inspection', 'community_meeting', 'other'])],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'max:2000'],
-            'preferred_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'preferred_date' => ['nullable', 'date', 'after_or_equal:' . $minimumRequestDate],
             'preferred_start_time' => ['nullable', 'date_format:H:i', 'required_with:preferred_end_time'],
             'preferred_end_time' => ['nullable', 'date_format:H:i', 'after:preferred_start_time'],
             'contact_name' => ['nullable', 'string', 'max:255'],
             'contact_number' => ['nullable', 'string', 'max:60'],
-        ]);
+        ], $this->communityRequestDateMessages($minimumRequestDate));
 
         // Recheck in the UPDATE itself, so an already-reviewed request cannot
         // be changed by an old browser tab. Review and routing fields are never editable.
@@ -167,15 +169,17 @@ class CommunityActivityRequestController extends Controller
             return $this->reviewResponse($request, $scheduleRoute, false, 'This request has already been reviewed.');
         }
 
+        $minimumRequestDate = $this->minimumCommunityRequestDate();
+
         $validated = $request->validate([
             'event' => ['required', 'string', 'max:255'],
-            'event_date' => ['required', 'date', 'after_or_equal:today'],
+            'event_date' => ['required', 'date', 'after_or_equal:' . $minimumRequestDate],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
             'activity_type' => ['required', Rule::in(['operations', 'drill', 'community', 'inspection', 'command', 'logistics'])],
             'status' => ['nullable', Rule::in(['planned', 'confirmed', 'completed'])],
             'review_notes' => ['nullable', 'string'],
-        ]);
+        ], $this->communityRequestDateMessages($minimumRequestDate));
 
         $hasConflict = EventActivity::query()
             ->where('station_id', $stationId)
@@ -321,11 +325,13 @@ class CommunityActivityRequestController extends Controller
 
     private function createRequest(Request $request, $user, ?Barangay $barangay, string $submittedFrom): void
     {
+        $minimumRequestDate = $this->minimumCommunityRequestDate();
+
         $rules = [
             'request_type' => ['required', Rule::in(['orientation', 'seminar', 'drill', 'inspection', 'community_meeting', 'other'])],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string', 'max:2000'],
-            'preferred_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'preferred_date' => ['nullable', 'date', 'after_or_equal:' . $minimumRequestDate],
             'preferred_start_time' => ['nullable', 'date_format:H:i'],
             'preferred_end_time' => ['nullable', 'date_format:H:i', 'after:preferred_start_time'],
             'contact_name' => ['nullable', 'string', 'max:255'],
@@ -333,8 +339,8 @@ class CommunityActivityRequestController extends Controller
         ];
 
         $validated = $submittedFrom === 'citizen'
-            ? $request->validateWithBag('communityRequest', $rules)
-            : $request->validate($rules);
+            ? $request->validateWithBag('communityRequest', $rules, $this->communityRequestDateMessages($minimumRequestDate))
+            : $request->validate($rules, $this->communityRequestDateMessages($minimumRequestDate));
 
         $stationId = $this->resolveStationIdForBarangay($barangay?->barangay_id);
 
@@ -354,6 +360,21 @@ class CommunityActivityRequestController extends Controller
             'contact_number' => $validated['contact_number'] ?? $user->contact_number,
             'status' => 'pending',
         ]);
+    }
+
+    private function minimumCommunityRequestDate(): string
+    {
+        return Carbon::now('Asia/Manila')->addDay()->toDateString();
+    }
+
+    private function communityRequestDateMessages(string $minimumRequestDate): array
+    {
+        $minimumLabel = Carbon::parse($minimumRequestDate, 'Asia/Manila')->format('M d, Y');
+
+        return [
+            'preferred_date.after_or_equal' => "Choose {$minimumLabel} or later so BFP has at least 1 day to review the request.",
+            'event_date.after_or_equal' => "Schedule this approved request for {$minimumLabel} or later so BFP has at least 1 day to review it.",
+        ];
     }
 
     private function resolveBarangayForBarangayUser($user): ?Barangay

@@ -2,6 +2,7 @@
     $requestKey = $activityRequest->getKey();
     $editingFailed = $errors->communityRequestEdit->any() && (string) old('edit_request_id') === (string) $requestKey;
     $editValue = fn ($field, $default = null) => $editingFailed ? old($field, $default) : $default;
+    $communityRequestMinDate = \Carbon\Carbon::now('Asia/Manila')->addDay()->toDateString();
 @endphp
 <details class="community-request-review" @if($editingFailed) open @endif>
     <summary>View full request @if($activityRequest->canCitizenEdit()) &amp; edit @endif</summary>
@@ -32,7 +33,7 @@
                 </select></label>
                 <label>Title<input name="title" required maxlength="255" value="{{ $editValue('title', $activityRequest->title) }}"></label>
                 <label>Reason for request<textarea name="description" required maxlength="2000" rows="4">{{ $editValue('description', $activityRequest->description) }}</textarea></label>
-                <label>Preferred date<input type="date" name="preferred_date" min="{{ now()->toDateString() }}" value="{{ $editValue('preferred_date', $activityRequest->preferred_date?->format('Y-m-d')) }}"></label>
+                <label>Preferred date<input type="date" name="preferred_date" min="{{ $communityRequestMinDate }}" value="{{ $editValue('preferred_date', $activityRequest->preferred_date?->format('Y-m-d')) }}"></label>
                 <div class="community-request-review__facts">
                     <label>Start time<input type="time" name="preferred_start_time" value="{{ $editValue('preferred_start_time', substr($activityRequest->preferred_start_time ?? '', 0, 5)) }}"></label>
                     <label>End time<input type="time" name="preferred_end_time" value="{{ $editValue('preferred_end_time', substr($activityRequest->preferred_end_time ?? '', 0, 5)) }}"></label>

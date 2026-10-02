@@ -142,6 +142,11 @@ class MarkerFeedBuilder
     protected static function markerIsVisible(Marker $marker, $riskArea, ?User $viewer = null, array $visibility = []): bool
     {
         $category = strtolower(trim((string) ($marker->category ?? '')));
+        $markerStatus = strtolower(trim((string) ($marker->status ?? 'active')));
+
+        if ($markerStatus === 'inactive') {
+            return false;
+        }
 
         // A fire marker without an incident cannot be routed safely. Keep stale
         // marker rows out of every map feed until an administrator audits them.
@@ -168,7 +173,7 @@ class MarkerFeedBuilder
         }
 
         if (! in_array($category, ['risk', 'hazard'], true)) {
-            return strtolower(trim((string) ($marker->status ?? 'active'))) !== 'inactive';
+            return true;
         }
 
         if (! $riskArea) {

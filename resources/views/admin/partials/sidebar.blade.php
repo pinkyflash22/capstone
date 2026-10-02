@@ -22,6 +22,7 @@
                 ['label' => 'Landing Media', 'route' => 'landing-media.index', 'active' => 'landing-media', 'icon' => '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15l3-3 2 2 3-4 3 5M8 9h.01"/></svg>'],
                 ['label' => 'Barangays', 'route' => 'admin.barangays.index', 'active' => 'barangays', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 21s7-4.6 7-11a7 7 0 1 0-14 0c0 6.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>'],
                 ['label' => 'Risk Reviews', 'route' => 'admin.risk-reviews.index', 'active' => 'risk-reviews', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M9.5 12l1.8 1.8L15 10.2"/></svg>'],
+                ['label' => 'Spam Markers', 'route' => 'admin.spam-markers.index', 'active' => 'spam-markers', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z"/><path d="M6.8 6.8l10.4 10.4"/></svg>'],
                 ['label' => 'Mitigation Control', 'route' => 'admin.mitigations', 'active' => 'mitigations', 'icon' => '<svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V7z"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>'],
                 ['label' => 'Analytics', 'route' => 'admin.analytics', 'active' => 'analytics', 'icon' => '<svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M5 15l4-4 4 2 6-6"/></svg>'],
                 ['label' => 'Course Checklists', 'route' => 'admin.course-checklists', 'active' => 'course-checklists', 'icon' => '<svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><path d="M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>'],
@@ -39,6 +40,7 @@
     $mobileCenterActions = [
         ['label' => 'Resources', 'route' => 'admin.resource-management.index', 'active' => 'resources', 'mobile_icon' => 'inventory_2'],
         ['label' => 'Risk Reviews', 'route' => 'admin.risk-reviews.index', 'active' => 'risk-reviews', 'mobile_icon' => 'fact_check'],
+        ['label' => 'Spam Markers', 'route' => 'admin.spam-markers.index', 'active' => 'spam-markers', 'mobile_icon' => 'block'],
         ['label' => 'FSIC Records', 'route' => 'admin.fsic', 'active' => 'fsic', 'mobile_icon' => 'folder_open'],
         ['label' => 'Reports', 'route' => 'admin.reports', 'active' => 'reports', 'mobile_icon' => 'description'],
         ['label' => 'Management', 'route' => 'admin.management', 'active' => 'management', 'mobile_icon' => 'apartment'],
