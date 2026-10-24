@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Weather data comparison | PyroSense</title>
+<link rel="stylesheet" href="{{ asset('css/weather-demo.css') }}?v={{ substr(hash_file('sha256', public_path('css/weather-demo.css')), 0, 12) }}">
+<script defer src="{{ asset('js/weather-demo.js') }}?v={{ substr(hash_file('sha256', public_path('js/weather-demo.js')), 0, 12) }}"></script></head>
+<body><main>
+<header><div><div class="eyebrow">PYROSENSE • FORECAST & HISTORICAL WEATHER</div><h1>Three providers. The same weather questions.</h1><p>Urbiztondo demo coordinates: 15.8222° N, 120.3297° E • Asia/Manila • hourly data summarized by day</p></div><button id="screenshot" type="button">Screenshot view</button></header>
+<nav><a href="{{ route('gis-demo.mapping') }}">Mapping comparison</a><a href="{{ route('gis-demo.index') }}">Routing comparison</a><a href="{{ route('gis-demo.ai') }}">AI model comparison</a></nav>
+<section class="controls"><label>Dataset<select id="mode"><option value="forecast">Forecast: today + next 2 days</option><option value="history">Historical: selected date</option></select></label><label id="date-label">Historical date<input id="history-date" type="date" min="1940-01-01" max="{{ $historyMax }}" value="{{ $historyDefault }}" disabled></label><button id="load" type="button">Fetch weather comparison</button><span id="load-status" role="status">Ready</span></section>
+<div class="notice"><b id="dataset-label">Forecast comparison</b><span>Same requested location and dates; provider grids and source data can differ. Today's data may mix observations and forecast hours. Historical archive data is not a past forecast issued on that date.</span></div>
+<section class="providers" aria-label="Weather providers">
+@foreach (['openmeteo'=>['Open-Meteo','CURRENT PROVIDER','No key required for this demonstration','https://open-meteo.com/'], 'weatherapi'=>['WeatherAPI','ALTERNATIVE PROVIDER','One API key; history coverage depends on plan','https://www.weatherapi.com/signup.aspx'], 'visualcrossing'=>['Visual Crossing','ALTERNATIVE PROVIDER','One API key; account quota and plan apply','https://www.visualcrossing.com/sign-up/']] as $id=>$details)
+<article class="provider {{ $id }}"><div class="tag">{{ $details[1] }}</div><h2>{{ $details[0] }}</h2><p class="setup">{{ $details[2] }}</p><div id="{{ $id }}-status" class="provider-status" role="status">Waiting for request</div><div id="{{ $id }}-summary" class="summary">No data loaded</div><p id="{{ $id }}-note" class="note"></p><a href="{{ $details[3] }}" target="_blank" rel="noopener">{{ $id === 'openmeteo' ? 'Provider information' : 'Get an API key' }}</a></article>
+@endforeach
+</section>
+<section class="charts" aria-label="Weather comparison charts">
+@foreach (['temperature_mean'=>'Mean temperature (°C)', 'humidity_mean'=>'Mean relative humidity (%)', 'precipitation_total'=>'Total precipitation (mm)', 'wind_max'=>'Maximum hourly wind speed (km/h)'] as $field=>$label)
+<article class="chart-card"><h3>{{ $label }}</h3><div id="chart-{{ $field }}" class="chart" role="img" aria-label="{{ $label }} comparison">Waiting for data</div></article>
+@endforeach
+</section>
+<section class="table-section"><h2>Daily values and hourly coverage</h2><div class="table-scroll"><table><thead><tr><th>Date</th><th>Provider</th><th>Mean °C</th><th>Min °C</th><th>Max °C</th><th>Humidity %</th><th>Precip. mm</th><th>Max wind km/h</th><th>Hourly samples<br>T / RH / P / W</th></tr></thead><tbody id="weather-rows"><tr><td colspan="9">Fetch data to populate the table.</td></tr></tbody></table></div></section>
+<footer><p><b>Interpretation:</b> means, temperature extremes, precipitation sums and wind maxima are calculated from each provider's hourly samples. A variable requires 24 unique local hours; incomplete variables remain unavailable. A maximum hourly wind speed is not a wind gust. Missing data is never treated as zero.</p><p>Use coverage, variable availability, historical access and clarity for your evaluation. Differences between providers do not establish accuracy without an independent reference. No fire-risk model or database record is changed by this demo.</p><p>Weather data attribution: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> · <a href="https://www.weatherapi.com/" target="_blank" rel="noopener">Powered by WeatherAPI.com</a> · <a href="https://www.visualcrossing.com/" target="_blank" rel="noopener">Visual Crossing Weather</a>. <span id="fetched-at"></span></p></footer>
+</main></body></html>

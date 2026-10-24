@@ -1,0 +1,180 @@
+[
+    {
+        "provider": "openmeteo",
+        "mode": "forecast",
+        "success": true,
+        "start_date": "2026-10-18",
+        "end_date": "2026-10-20",
+        "requested_location": {
+            "latitude": 15.8222,
+            "longitude": 120.3297
+        },
+        "timezone": "Asia\/Manila",
+        "fetched_at": "2026-10-18T13:00:49+00:00",
+        "aggregation": "Daily summaries calculated from 24 hourly samples; incomplete variables stay null.",
+        "days": [
+            {
+                "date": "2026-10-18",
+                "hour_counts": {
+                    "temp": 24,
+                    "humidity": 24,
+                    "precip": 24,
+                    "wind": 24
+                },
+                "temperature_mean": 28.05,
+                "temperature_max": 34.1,
+                "temperature_min": 24.2,
+                "humidity_mean": 79.46,
+                "precipitation_total": 5.4,
+                "wind_max": 11.5
+            },
+            {
+                "date": "2026-10-19",
+                "hour_counts": {
+                    "temp": 24,
+                    "humidity": 24,
+                    "precip": 24,
+                    "wind": 24
+                },
+                "temperature_mean": 28.72,
+                "temperature_max": 33.6,
+                "temperature_min": 24.7,
+                "humidity_mean": 79.67,
+                "precipitation_total": 0.5,
+                "wind_max": 13.2
+            },
+            {
+                "date": "2026-10-20",
+                "hour_counts": {
+                    "temp": 24,
+                    "humidity": 24,
+                    "precip": 24,
+                    "wind": 24
+                },
+                "temperature_mean": 28.65,
+                "temperature_max": 33.7,
+                "temperature_min": 24.5,
+                "humidity_mean": 79.67,
+                "precipitation_total": 0,
+                "wind_max": 13.4
+            }
+        ],
+        "request_ms": 1180,
+        "http_status": 200,
+        "resolved_location": {
+            "latitude": 15.852372,
+            "longitude": 120.33994
+        },
+        "source_note": "Open-Meteo forecast model output.",
+        "status": "received",
+        "message": "Live provider data received. Null values indicate missing or incomplete hourly coverage."
+    },
+    {
+        "provider": "weatherapi",
+        "mode": "forecast",
+        "success": false,
+        "start_date": "2026-10-18",
+        "end_date": "2026-10-20",
+        "requested_location": {
+            "latitude": 15.8222,
+            "longitude": 120.3297
+        },
+        "timezone": "Asia\/Manila",
+        "fetched_at": "2026-10-18T13:00:50+00:00",
+        "aggregation": "Daily summaries calculated from 24 hourly samples; incomplete variables stay null.",
+        "days": [],
+        "status": "missing_key",
+        "message": "Add WEATHERAPI_KEY locally. Historical access and forecast length depend on your plan."
+    },
+    {
+        "provider": "visualcrossing",
+        "mode": "forecast",
+        "success": false,
+        "start_date": "2026-10-18",
+        "end_date": "2026-10-20",
+        "requested_location": {
+            "latitude": 15.8222,
+            "longitude": 120.3297
+        },
+        "timezone": "Asia\/Manila",
+        "fetched_at": "2026-10-18T13:00:50+00:00",
+        "aggregation": "Daily summaries calculated from 24 hourly samples; incomplete variables stay null.",
+        "days": [],
+        "status": "missing_key",
+        "message": "Add VISUAL_CROSSING_API_KEY locally. Access depends on your account quota and plan."
+    },
+    {
+        "provider": "openmeteo",
+        "mode": "history",
+        "success": true,
+        "start_date": "2026-02-26",
+        "end_date": "2026-02-26",
+        "requested_location": {
+            "latitude": 15.8222,
+            "longitude": 120.3297
+        },
+        "timezone": "Asia\/Manila",
+        "fetched_at": "2026-10-18T13:00:50+00:00",
+        "aggregation": "Daily summaries calculated from 24 hourly samples; incomplete variables stay null.",
+        "days": [
+            {
+                "date": "2026-02-26",
+                "hour_counts": {
+                    "temp": 24,
+                    "humidity": 24,
+                    "precip": 24,
+                    "wind": 24
+                },
+                "temperature_mean": 29.34,
+                "temperature_max": 36,
+                "temperature_min": 24.1,
+                "humidity_mean": 63.29,
+                "precipitation_total": 0,
+                "wind_max": 16.3
+            }
+        ],
+        "request_ms": 968,
+        "http_status": 200,
+        "resolved_location": {
+            "latitude": 15.852372,
+            "longitude": 120.33994
+        },
+        "source_note": "Open-Meteo archive\/reanalysis; not a historical forecast issued on that date.",
+        "status": "received",
+        "message": "Live provider data received. Null values indicate missing or incomplete hourly coverage."
+    },
+    {
+        "provider": "weatherapi",
+        "mode": "history",
+        "success": false,
+        "start_date": "2026-02-26",
+        "end_date": "2026-02-26",
+        "requested_location": {
+            "latitude": 15.8222,
+            "longitude": 120.3297
+        },
+        "timezone": "Asia\/Manila",
+        "fetched_at": "2026-10-18T13:00:51+00:00",
+        "aggregation": "Daily summaries calculated from 24 hourly samples; incomplete variables stay null.",
+        "days": [],
+        "status": "missing_key",
+        "message": "Add WEATHERAPI_KEY locally. Historical access and forecast length depend on your plan."
+    },
+    {
+        "provider": "visualcrossing",
+        "mode": "history",
+        "success": false,
+        "start_date": "2026-02-26",
+        "end_date": "2026-02-26",
+        "requested_location": {
+            "latitude": 15.8222,
+            "longitude": 120.3297
+        },
+        "timezone": "Asia\/Manila",
+        "fetched_at": "2026-10-18T13:00:51+00:00",
+        "aggregation": "Daily summaries calculated from 24 hourly samples; incomplete variables stay null.",
+        "days": [],
+        "status": "missing_key",
+        "message": "Add VISUAL_CROSSING_API_KEY locally. Access depends on your account quota and plan."
+    }
+]

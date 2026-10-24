@@ -60,6 +60,7 @@ use App\Http\Controllers\OTPController;
 // use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+require __DIR__.'/gis-demo.php';
 use App\Http\Controllers\HealthController;
 
 Route::get('/verify/after-activity-reports/{afterActivityReport}', [AfterActivityReportExportController::class, 'verify'])

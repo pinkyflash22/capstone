@@ -1,0 +1,172 @@
+{
+    "context": {
+        "location": "Urbiztondo, Pangasinan",
+        "purpose": "Documentation demonstration using saved input snapshots, not live operational advice.",
+        "weather_snapshot": {
+            "provider": "Open-Meteo",
+            "fetched_at": "2026-10-18T13:00:49+00:00",
+            "requested_location": {
+                "latitude": 15.8222,
+                "longitude": 120.3297
+            },
+            "days": [
+                {
+                    "date": "2026-10-18",
+                    "hour_counts": {
+                        "temp": 24,
+                        "humidity": 24,
+                        "precip": 24,
+                        "wind": 24
+                    },
+                    "temperature_mean": 28.05,
+                    "temperature_max": 34.1,
+                    "temperature_min": 24.2,
+                    "humidity_mean": 79.46,
+                    "precipitation_total": 5.4,
+                    "wind_max": 11.5
+                },
+                {
+                    "date": "2026-10-19",
+                    "hour_counts": {
+                        "temp": 24,
+                        "humidity": 24,
+                        "precip": 24,
+                        "wind": 24
+                    },
+                    "temperature_mean": 28.72,
+                    "temperature_max": 33.6,
+                    "temperature_min": 24.7,
+                    "humidity_mean": 79.67,
+                    "precipitation_total": 0.5,
+                    "wind_max": 13.2
+                },
+                {
+                    "date": "2026-10-20",
+                    "hour_counts": {
+                        "temp": 24,
+                        "humidity": 24,
+                        "precip": 24,
+                        "wind": 24
+                    },
+                    "temperature_mean": 28.65,
+                    "temperature_max": 33.7,
+                    "temperature_min": 24.5,
+                    "humidity_mean": 79.67,
+                    "precipitation_total": 0,
+                    "wind_max": 13.4
+                }
+            ],
+            "note": "Weather for the seeded sample station coordinates, not incident-site measurements. Historical snapshot: may be outdated."
+        },
+        "historical_records": [],
+        "numerical_incident_forecast": null,
+        "limitations": [
+            "Small, incomplete historical record set; some dates use the first day of the month as a placeholder.",
+            "No validated fire-incident probability or future incident-count prediction is supplied.",
+            "Weather is one factor; this input does not establish a causal weather\/fire relationship."
+        ]
+    },
+    "messages": [
+        {
+            "role": "system",
+            "content": "You assist a fire-risk documentation demonstration. Use only supplied facts. Do not invent probabilities, future incident counts, resources or verified locations. Weather alone does not establish fire risk. Give a concise rationale, not hidden reasoning. Return only a JSON object with keys summary (string), risk_factors (array of up to 3 strings), checklist (array of exactly 3 strings), limitations (array of at least 2 strings), numerical_forecast (null). Keep the entire answer under 180 words."
+        },
+        {
+            "role": "user",
+            "content": "Explain how the supplied weather and historical context could inform a forecast briefing, and identify the missing evidence needed for numerical forecasting.\nEvidence snapshot:\n{\"location\":\"Urbiztondo, Pangasinan\",\"purpose\":\"Documentation demonstration using saved input snapshots, not live operational advice.\",\"weather_snapshot\":{\"provider\":\"Open-Meteo\",\"fetched_at\":\"2026-10-18T13:00:49+00:00\",\"requested_location\":{\"latitude\":15.8222,\"longitude\":120.3297},\"days\":[{\"date\":\"2026-10-18\",\"hour_counts\":{\"temp\":24,\"humidity\":24,\"precip\":24,\"wind\":24},\"temperature_mean\":28.05,\"temperature_max\":34.1,\"temperature_min\":24.2,\"humidity_mean\":79.46,\"precipitation_total\":5.4,\"wind_max\":11.5},{\"date\":\"2026-10-19\",\"hour_counts\":{\"temp\":24,\"humidity\":24,\"precip\":24,\"wind\":24},\"temperature_mean\":28.72,\"temperature_max\":33.6,\"temperature_min\":24.7,\"humidity_mean\":79.67,\"precipitation_total\":0.5,\"wind_max\":13.2},{\"date\":\"2026-10-20\",\"hour_counts\":{\"temp\":24,\"humidity\":24,\"precip\":24,\"wind\":24},\"temperature_mean\":28.65,\"temperature_max\":33.7,\"temperature_min\":24.5,\"humidity_mean\":79.67,\"precipitation_total\":0,\"wind_max\":13.4}],\"note\":\"Weather for the seeded sample station coordinates, not incident-site measurements. Historical snapshot: may be outdated.\"},\"historical_records\":[],\"numerical_incident_forecast\":null,\"limitations\":[\"Small, incomplete historical record set; some dates use the first day of the month as a placeholder.\",\"No validated fire-incident probability or future incident-count prediction is supplied.\",\"Weather is one factor; this input does not establish a causal weather\/fire relationship.\"]}"
+        }
+    ],
+    "results": [
+        {
+            "success": false,
+            "requested_model": "deepseek\/deepseek-r1-distill-llama-70b",
+            "name": "DeepSeek-R1-Distill-Llama-70B",
+            "task": "forecast_explanation",
+            "prompt_sha256": "a458a20211e90fe6ec3e5b088ac515a645b028ec98bfb142ffd42a3878ee7174",
+            "requested_settings": {
+                "temperature": 0.2,
+                "max_tokens": 900
+            },
+            "created_at": "2026-10-18T21:22:20+08:00",
+            "status": "not_listed",
+            "message": "This exact model ID is not in the current OpenRouter catalog. No replacement was requested."
+        },
+        {
+            "success": true,
+            "requested_model": "openai\/gpt-4.1-mini",
+            "name": "GPT-4.1 Mini",
+            "task": "forecast_explanation",
+            "prompt_sha256": "a458a20211e90fe6ec3e5b088ac515a645b028ec98bfb142ffd42a3878ee7174",
+            "requested_settings": {
+                "temperature": 0.2,
+                "max_tokens": 900
+            },
+            "created_at": "2026-10-18T21:22:21+08:00",
+            "elapsed_ms": 4176,
+            "http_status": 200,
+            "returned_model": "openai\/gpt-4.1-mini",
+            "serving_provider": "OpenAI",
+            "finish_reason": "stop",
+            "usage": {
+                "prompt_tokens": 526,
+                "completion_tokens": 274,
+                "total_tokens": 800,
+                "cost": 0.0006488
+            },
+            "output": "{\n  \"summary\": \"The weather data for Urbiztondo, Pangasinan shows moderate temperatures around 28-34\u00b0C, high humidity near 79%, and decreasing precipitation over three days, with wind speeds up to 13.4 km\/h. While these conditions alone do not confirm fire risk, the drying trend and moderate winds could influence fire behavior if other risk factors are present. However, the absence of historical fire incident data and validated fire probability models limits the ability to produce a numerical fire risk forecast.\",\n  \"risk_factors\": [\n    \"Moderate to high temperatures with low precipitation on later days\",\n    \"Consistently high humidity around 79%\",\n    \"Moderate wind speeds up to 13.4 km\/h\"\n  ],\n  \"checklist\": [\n    \"Obtain comprehensive historical fire incident records for the area\",\n    \"Incorporate vegetation dryness and fuel load assessments\",\n    \"Use validated fire risk models linking weather and fire occurrence\"\n  ],\n  \"limitations\": [\n    \"Small, incomplete historical record set with placeholder dates\",\n    \"No validated fire-incident probability or future incident-count prediction supplied\",\n    \"Weather data is from a sample station, not incident-site measurements\",\n    \"Weather alone does not establish a causal relationship with fire risk\"\n  ],\n  \"numerical_forecast\": null\n}",
+            "status": "received",
+            "message": "Final answer received; human review is required.",
+            "format_compliant": true,
+            "word_count": 161,
+            "structured_output": {
+                "summary": "The weather data for Urbiztondo, Pangasinan shows moderate temperatures around 28-34\u00b0C, high humidity near 79%, and decreasing precipitation over three days, with wind speeds up to 13.4 km\/h. While these conditions alone do not confirm fire risk, the drying trend and moderate winds could influence fire behavior if other risk factors are present. However, the absence of historical fire incident data and validated fire probability models limits the ability to produce a numerical fire risk forecast.",
+                "risk_factors": [
+                    "Moderate to high temperatures with low precipitation on later days",
+                    "Consistently high humidity around 79%",
+                    "Moderate wind speeds up to 13.4 km\/h"
+                ],
+                "checklist": [
+                    "Obtain comprehensive historical fire incident records for the area",
+                    "Incorporate vegetation dryness and fuel load assessments",
+                    "Use validated fire risk models linking weather and fire occurrence"
+                ],
+                "limitations": [
+                    "Small, incomplete historical record set with placeholder dates",
+                    "No validated fire-incident probability or future incident-count prediction supplied",
+                    "Weather data is from a sample station, not incident-site measurements",
+                    "Weather alone does not establish a causal relationship with fire risk"
+                ],
+                "numerical_forecast": null
+            }
+        },
+        {
+            "success": true,
+            "requested_model": "meta-llama\/llama-3.3-70b-instruct",
+            "name": "Llama 3.3 70B Instruct",
+            "task": "forecast_explanation",
+            "prompt_sha256": "a458a20211e90fe6ec3e5b088ac515a645b028ec98bfb142ffd42a3878ee7174",
+            "requested_settings": {
+                "temperature": 0.2,
+                "max_tokens": 900
+            },
+            "created_at": "2026-10-18T21:22:25+08:00",
+            "elapsed_ms": 5072,
+            "http_status": 200,
+            "returned_model": "meta-llama\/llama-3.3-70b-instruct",
+            "serving_provider": "Novita",
+            "finish_reason": "stop",
+            "usage": {
+                "prompt_tokens": 529,
+                "completion_tokens": 89,
+                "total_tokens": 618,
+                "cost": 0.000107015
+            },
+            "output": "```json\n{\n  \"summary\": \"Weather data and historical context are insufficient for numerical forecasting\",\n  \"risk_factors\": [\"High temperature\", \"Low precipitation\", \"Wind\"],\n  \"checklist\": [\"Verify historical records\", \"Assess local conditions\", \"Consult fire incident data\"],\n  \"limitations\": [\"Incomplete historical records\", \"Lack of validated fire-incident probability\"],\n  \"numerical_forecast\": null\n}\n```",
+            "status": "received",
+            "message": "Final answer received; human review is required.",
+            "format_compliant": false,
+            "word_count": 42,
+            "structured_output": null
+        }
+    ]
+}

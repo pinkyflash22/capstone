@@ -827,6 +827,10 @@ function ensureCitizenMarkerStyles() {
         .shared-map-marker__icon {
             position: relative;
             display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-rows: minmax(0, 1fr);
+            min-width: 0;
+            min-height: 0;
             place-items: center;
             background: transparent;
             border: 0;
@@ -837,6 +841,10 @@ function ensureCitizenMarkerStyles() {
         .shared-map-marker__icon img {
             width: 100%;
             height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            min-width: 0;
+            min-height: 0;
             object-fit: contain;
             display: block;
             filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.24));
@@ -1746,7 +1754,7 @@ function createCitizenStaticImageIcon(categoryInput, marker = {}) {
             <span class="shared-map-marker" style="width:${size}px;height:${size}px;">
                 <span class="shared-map-marker__icon" style="width:${size}px;height:${size}px;">
                     ${safeImagePath
-                        ? `<img src="${safeImagePath}" alt="" draggable="false">`
+                        ? `<img src="${safeImagePath}" alt="" draggable="false" width="${size}" height="${size}" style="width:${size}px;height:${size}px;object-fit:contain;">`
                         : `<i class="fas ${fallback.icon}" style="color:${fallback.color};font-size:${Math.round(size * 0.58)}px;"></i>`}
                 </span>
             </span>

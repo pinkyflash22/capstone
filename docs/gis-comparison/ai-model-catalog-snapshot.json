@@ -1,0 +1,102 @@
+﻿[
+    {
+        "id":  "openai/gpt-4.1-mini",
+        "name":  "OpenAI: GPT-4.1 Mini",
+        "context_length":  1047576,
+        "supported_parameters":  [
+                                     "max_completion_tokens",
+                                     "max_tokens",
+                                     "response_format",
+                                     "seed",
+                                     "structured_outputs",
+                                     "temperature",
+                                     "tool_choice",
+                                     "tools",
+                                     "top_p"
+                                 ]
+    },
+    {
+        "id":  "microsoft/phi-4",
+        "name":  "Microsoft: Phi 4",
+        "context_length":  16384,
+        "supported_parameters":  [
+                                     "frequency_penalty",
+                                     "logit_bias",
+                                     "max_tokens",
+                                     "min_p",
+                                     "presence_penalty",
+                                     "repetition_penalty",
+                                     "response_format",
+                                     "seed",
+                                     "stop",
+                                     "structured_outputs",
+                                     "temperature",
+                                     "top_k",
+                                     "top_p"
+                                 ]
+    },
+    {
+        "id":  "meta-llama/llama-3.3-70b-instruct",
+        "name":  "Meta: Llama 3.3 70B Instruct",
+        "context_length":  131072,
+        "supported_parameters":  [
+                                     "frequency_penalty",
+                                     "logit_bias",
+                                     "logprobs",
+                                     "max_tokens",
+                                     "min_p",
+                                     "presence_penalty",
+                                     "repetition_penalty",
+                                     "response_format",
+                                     "seed",
+                                     "stop",
+                                     "structured_outputs",
+                                     "temperature",
+                                     "tool_choice",
+                                     "tools",
+                                     "top_k",
+                                     "top_logprobs",
+                                     "top_p"
+                                 ]
+    },
+    {
+        "id":  "qwen/qwen-2.5-72b-instruct",
+        "name":  "Qwen2.5 72B Instruct",
+        "context_length":  32768,
+        "supported_parameters":  [
+                                     "frequency_penalty",
+                                     "logit_bias",
+                                     "max_tokens",
+                                     "min_p",
+                                     "presence_penalty",
+                                     "repetition_penalty",
+                                     "response_format",
+                                     "seed",
+                                     "stop",
+                                     "structured_outputs",
+                                     "temperature",
+                                     "tool_choice",
+                                     "tools",
+                                     "top_k",
+                                     "top_p"
+                                 ]
+    },
+    {
+        "id":  "mistralai/mistral-large",
+        "name":  "Mistral Large",
+        "context_length":  128000,
+        "supported_parameters":  [
+                                     "frequency_penalty",
+                                     "max_tokens",
+                                     "presence_penalty",
+                                     "response_format",
+                                     "seed",
+                                     "stop",
+                                     "structured_outputs",
+                                     "temperature",
+                                     "tool_choice",
+                                     "tools",
+                                     "top_p"
+                                 ]
+    }
+]

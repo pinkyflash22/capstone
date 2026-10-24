@@ -1,0 +1,127 @@
+﻿{
+    "source":  "database/seeders/HistoricalDataSeeder.php",
+    "response_time_definition":  "Demo duration from report receipt to first responder arrival, in minutes.",
+    "response_time_notice":  "All response times are synthetic demo values, not measured BFP records. Fixed values preserve alignment across imports. Incident dates on the first day of a month may be placeholders; see source_notes. Missing incident times remain null.",
+    "incidents":  [
+                      {
+                          "incident_date":  "2023-01-01",
+                          "incident_time":  "17:38:00",
+                          "barangay":  "Poblacion",
+                          "incident_location":  "Barangay Poblacion, near station and near hydrant",
+                          "fire_cause":  "Open flame from rubbish fire",
+                          "response_time_minutes":  4.25,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "High density lightweight material or shanty house. Month-level record with no exact day provided; first day of month used as placeholder."
+                      },
+                      {
+                          "incident_date":  "2023-03-01",
+                          "incident_time":  "12:30:00",
+                          "barangay":  "Bayaoas",
+                          "incident_location":  "Sitio Bangul, Barangay Bayaoas",
+                          "fire_cause":  "Open flame from rubbish fire",
+                          "response_time_minutes":  15.50,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Low density substantial house, no near hydrant, far from station. Month-level record with no exact day provided; first day of month used as placeholder."
+                      },
+                      {
+                          "incident_date":  "2023-07-01",
+                          "incident_time":  "15:30:00",
+                          "barangay":  "Pasibi East",
+                          "incident_location":  "Barangay Pasibi East",
+                          "fire_cause":  "Electrical ignition caused by arcing",
+                          "response_time_minutes":  14.75,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Low density two storey or semi concrete residential house, no near hydrants, far from fire station. Month-level record with no exact day provided; first day of month used as placeholder."
+                      },
+                      {
+                          "incident_date":  "2023-08-01",
+                          "incident_time":  "07:40:00",
+                          "barangay":  "Dalanguiring",
+                          "incident_location":  "Sitio Valdez, Barangay Dalanguiring",
+                          "fire_cause":  "Open flame from cooking (LPG / gas stove)",
+                          "response_time_minutes":  16.25,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Low density two storey residential house, no near hydrants, far from station. Month-level record with no exact day provided; first day of month used as placeholder."
+                      },
+                      {
+                          "incident_date":  "2024-01-01",
+                          "incident_time":  "19:24:00",
+                          "barangay":  "Gueteb",
+                          "incident_location":  "Barangay Gueteb",
+                          "fire_cause":  "Open flame from kerosene lamp",
+                          "response_time_minutes":  17.50,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Low density shanty house, no near hydrant, far from station. Month-level record with no exact day provided; first day of month used as placeholder."
+                      },
+                      {
+                          "incident_date":  "2025-01-01",
+                          "incident_time":  null,
+                          "barangay":  "Poblacion",
+                          "incident_location":  "Barangay Poblacion, front of UIS",
+                          "fire_cause":  null,
+                          "response_time_minutes":  3.75,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Motorcycle fire. Month-level record with no exact day and time provided; first day of month used as placeholder."
+                      },
+                      {
+                          "incident_date":  "2025-02-01",
+                          "incident_time":  null,
+                          "barangay":  "Poblacion",
+                          "incident_location":  "Barangay Poblacion, Urbiztondo Integrated School storage",
+                          "fire_cause":  null,
+                          "response_time_minutes":  5.50,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Month-level record with no exact day and time provided; first day of month used as placeholder."
+                      },
+                      {
+                          "incident_date":  "2025-05-03",
+                          "incident_time":  "11:41:00",
+                          "barangay":  "Pasibi West",
+                          "incident_location":  "Barangay Pasibi West, A66CT Farm storage",
+                          "fire_cause":  "Electrical ignition overloading",
+                          "response_time_minutes":  9.25,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Large storage fire."
+                      },
+                      {
+                          "incident_date":  "2025-12-01",
+                          "incident_time":  null,
+                          "barangay":  "Real",
+                          "incident_location":  "Barangay Real",
+                          "fire_cause":  null,
+                          "response_time_minutes":  13.50,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Residential fire, no near fire hydrant, away from station. Month-level record with no exact day and time provided; first day of month used as placeholder."
+                      },
+                      {
+                          "incident_date":  "2026-01-01",
+                          "incident_time":  "05:38:00",
+                          "barangay":  "Bayaoas",
+                          "incident_location":  "Barangay Bayaoas",
+                          "fire_cause":  "Thrown cigarette butt",
+                          "response_time_minutes":  15.25,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Residential single and two family. No near hydrant and far away from station."
+                      },
+                      {
+                          "incident_date":  "2026-02-26",
+                          "incident_time":  "09:05:00",
+                          "barangay":  "Dalanguiring",
+                          "incident_location":  "Sitio Valdez, Barangay Dalanguiring",
+                          "fire_cause":  "Accidental unattended smoldering coconut leaves",
+                          "response_time_minutes":  10.75,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Involved storage."
+                      },
+                      {
+                          "incident_date":  "2026-03-25",
+                          "incident_time":  "14:28:00",
+                          "barangay":  "Angatel",
+                          "incident_location":  "Barangay Angatel",
+                          "fire_cause":  "Electrical ignition due to pinch wire",
+                          "response_time_minutes":  8.50,
+                          "response_time_source":  "synthetic",
+                          "source_notes":  "Residential single and two family."
+                      }
+                  ]
+}
