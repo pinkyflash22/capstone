@@ -259,7 +259,7 @@ class PredictedRiskAreaService
 
     protected function historicalIncidentEvidencePoints(?int $stationId): Collection
     {
-        return DB::table('historical_fire_incidents')
+        return \App\Models\HistoricalFireIncident::query()->toBase()
             ->join('incidents', 'historical_fire_incidents.incident_id', '=', 'incidents.incident_id')
             ->join('markers', 'incidents.marker_id', '=', 'markers.marker_id')
             ->leftJoin('teams', 'incidents.team_id', '=', 'teams.team_id')

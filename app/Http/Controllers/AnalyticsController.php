@@ -200,7 +200,7 @@ class AnalyticsController extends Controller
         
         try {
             $incidentTable = Schema::hasTable('incidents') ? 'incidents' : 'incident';
-            $incidentsQuery = DB::table($incidentTable);
+            $incidentsQuery = \App\Models\Scopes\ExcludeSpamIncidents::filter(DB::table($incidentTable), $incidentTable);
             $columns = Schema::getColumnListing($incidentTable);
             
             if (in_array('created_at', $columns)) {

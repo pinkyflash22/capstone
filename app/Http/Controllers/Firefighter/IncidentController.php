@@ -49,7 +49,7 @@ class IncidentController extends Controller
                 $incidentTable = Schema::hasTable('incidents') ? 'incidents' : 'incident';
 
                 // Get incidents assigned to this firefighter
-                $assignedIncidents = DB::table($incidentTable)
+                $assignedIncidents = \App\Models\Scopes\ExcludeSpamIncidents::filter(DB::table($incidentTable), $incidentTable)
                     ->join('incident_report', $incidentTable . '.incident_id', '=', 'incident_report.incident_id')
                     ->join('responded_team', 'incident_report.id', '=', 'responded_team.incident_id')
                     ->where('responded_team.personnel_id', $personnel->id)
@@ -68,7 +68,7 @@ class IncidentController extends Controller
                     ->get();
 
                 // Get completed incidents for this firefighter
-                $completedIncidents = DB::table($incidentTable)
+                $completedIncidents = \App\Models\Scopes\ExcludeSpamIncidents::filter(DB::table($incidentTable), $incidentTable)
                     ->join('incident_report', $incidentTable . '.incident_id', '=', 'incident_report.incident_id')
                     ->join('responded_team', 'incident_report.id', '=', 'responded_team.incident_id')
                     ->where('responded_team.personnel_id', $personnel->id)

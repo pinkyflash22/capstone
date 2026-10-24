@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\Schema;
 
 class IncidentReport extends Model
 {
+    use \App\Models\Concerns\ExcludesSpamIncidents;
+
       use HasFactory;
      protected $table = 'incident_report'; 
     protected $fillable = [

@@ -18,7 +18,7 @@
                 <div>
                     <p class="text-xs font-bold uppercase tracking-widest text-red-600">Map moderation</p>
                     <h1 class="text-2xl lg:text-3xl font-bold text-slate-900">Spam markers</h1>
-                    <p class="text-sm text-slate-500 mt-1">Review markers hidden from the operational map and restore legitimate reports.</p>
+                    <p class="text-sm text-slate-500 mt-1">Review explicitly marked spam. Restoring a marker returns its linked incidents and investigation reports to normal lists and totals.</p>
                 </div>
                 <a href="{{ $isProvincial ? route('admin.maps') : route('station-admin.maps') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
                     Back to map
@@ -87,7 +87,7 @@
                                             {{ $related ?: 'Marker only' }}
                                         </td>
                                         <td class="px-5 py-4 text-slate-600">
-                                            {{ optional($marker->spammed_at ?? $marker->updated_at)->diffForHumans() }}
+                                            {{ optional($marker->spammed_at)->diffForHumans() }}
                                         </td>
                                         <td class="px-5 py-4 text-right">
                                             <form method="POST" action="{{ route('map.markers.restore', $marker->marker_id) }}" onsubmit="return confirm('Restore this marker to the map?');">

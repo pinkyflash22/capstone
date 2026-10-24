@@ -164,10 +164,10 @@ class MarkerController extends Controller
             ->with([
                 'stations',
                 'hydrants.station',
-                'incidents.team',
+                'incidents' => fn ($incidents) => $incidents->withoutGlobalScope(\App\Models\Scopes\ExcludeSpamIncidents::class)->with('team'),
                 'riskAreas.barangayHall.barangay',
             ])
-            ->where('status', 'inactive');
+            ->spam();
 
         if ($operationalScope->hasProvinceWideAccess($viewer)) {
             return $query;
@@ -185,6 +185,7 @@ class MarkerController extends Controller
                 $scope->orWhereHas('stations', fn ($stations) => $stations->whereIn('station_id', $stationIds->all()))
                     ->orWhereHas('hydrants', fn ($hydrants) => $hydrants->whereIn('station_id', $stationIds->all()))
                     ->orWhereHas('incidents', function ($incidents) use ($stationIds) {
+                        $incidents->withoutGlobalScope(\App\Models\Scopes\ExcludeSpamIncidents::class);
                         $incidents->whereIn('station_id', $stationIds->all())
                             ->orWhereHas('team', fn ($teams) => $teams->whereIn('station_id', $stationIds->all()));
                     })
@@ -199,6 +200,10 @@ class MarkerController extends Controller
 
     private function markerSpamAuditUpdates(?int $userId): array
     {
+        if (! Schema::hasColumn('markers', 'spammed_at')) {
+            throw ValidationException::withMessages(['marker' => 'Spam moderation requires the marker spam audit fields to be installed.']);
+        }
+
         $updates = ['status' => 'inactive'];
 
         if (Schema::hasColumn('markers', 'spammed_by')) {
@@ -654,6 +659,9 @@ class MarkerController extends Controller
 
     public function destroy($id)
     {
+        // Validate before the generic error handler so callers receive a 422.
+        $spamUpdates = $this->markerSpamAuditUpdates(Auth::id());
+
         try {
             \Log::info('Attempting to mark marker as spam', ['marker_id' => $id]);
 
@@ -675,7 +683,7 @@ class MarkerController extends Controller
 
             $stationCount = $marker->stations()->count();
             $hydrantCount = $marker->hydrants()->count();
-            $incidentCount = $marker->incidents()->count();
+            $incidentCount = $marker->incidents()->withoutGlobalScope(\App\Models\Scopes\ExcludeSpamIncidents::class)->count();
 
             \Log::info('Related records count', [
                 'stations' => $stationCount,
@@ -683,7 +691,7 @@ class MarkerController extends Controller
                 'incidents' => $incidentCount,
             ]);
 
-            $updated = $marker->update($this->markerSpamAuditUpdates(Auth::id()));
+            $updated = $marker->update($spamUpdates);
 
             if ($updated) {
                 if (auth()->check() && $incidentCount > 0) {

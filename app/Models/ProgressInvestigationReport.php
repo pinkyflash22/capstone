@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProgressInvestigationReport extends Model
 {
+    use \App\Models\Concerns\ExcludesSpamIncidents;
+
     use HasFactory, HasInvestigationProofImages;
 
     public const STAGE_SINGLE = 'single';

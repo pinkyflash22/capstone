@@ -82,18 +82,18 @@ class AnalyticsController extends Controller
             }
             
             // Get incidents for these teams
-            $incidents7d = DB::table('incidents')
+            $incidents7d = \App\Models\Incident::query()->toBase()
                 ->whereIn('team_id', $teamIds)
                 ->where('created_at', '>=', Carbon::now()->subDays(7))
                 ->count();
             
-            $incidents30d = DB::table('incidents')
+            $incidents30d = \App\Models\Incident::query()->toBase()
                 ->whereIn('team_id', $teamIds)
                 ->where('created_at', '>=', Carbon::now()->subDays(30))
                 ->count();
             
             // Get hourly distribution
-            $hourlyResults = DB::table('incidents')
+            $hourlyResults = \App\Models\Incident::query()->toBase()
                 ->select(DB::raw('HOUR(created_at) as hour, COUNT(*) as count'))
                 ->whereIn('team_id', $teamIds)
                 ->where('created_at', '>=', Carbon::now()->subDays(30))
@@ -107,7 +107,7 @@ class AnalyticsController extends Controller
             }
             
             // Get daily distribution
-            $dailyResults = DB::table('incidents')
+            $dailyResults = \App\Models\Incident::query()->toBase()
                 ->select(DB::raw('DAYOFWEEK(created_at) as day, COUNT(*) as count'))
                 ->whereIn('team_id', $teamIds)
                 ->where('created_at', '>=', Carbon::now()->subDays(7))

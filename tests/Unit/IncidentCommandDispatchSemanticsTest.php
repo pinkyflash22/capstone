@@ -21,7 +21,22 @@ class IncidentCommandDispatchSemanticsTest extends TestCase
         $this->assertStringContainsString('No capable local response is available', $map);
         $this->assertStringNotContainsString('request-incident-backup', $firefighter);
         $this->assertStringNotContainsString('/firefighter/incidents/${incidentId}/backup', $firefighter);
+        $this->assertStringNotContainsString('/incidents/{incident}/backup', $apiRoutes);
+        $this->assertStringNotContainsString('requestIncidentBackup', file_get_contents(resource_path('views/firefighters/dashboard.blade.php')));
         $this->assertStringContainsString("middleware(['web', 'auth', 'role:provincial admin'])->prefix('/management')", $apiRoutes);
+    }
+
+    public function test_registered_dispatch_routes_require_command_authority(): void
+    {
+        $routes = app('router')->getRoutes();
+        $commandRoute = $routes->getByName('command.incidents.external-response');
+
+        $this->assertNotNull($commandRoute);
+        $this->assertContains('auth', $commandRoute->gatherMiddleware());
+        $this->assertContains('role:stationadmin,chief,provincial admin', $commandRoute->gatherMiddleware());
+        $uris = array_map(fn ($route) => $route->uri(), $routes->getRoutes());
+        $this->assertNotContains('firefighter/incidents/{incident}/backup', $uris);
+        $this->assertNotContains('api/incidents/{incident}/backup', $uris);
     }
 
     public function test_command_dispatch_validates_resources_and_records_an_audit_trail(): void

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class HistoricalFireIncident extends Model
 {
+    use \App\Models\Concerns\ExcludesSpamIncidents;
+
     use HasFactory;
 
     protected $primaryKey = 'historical_fire_incident_id';

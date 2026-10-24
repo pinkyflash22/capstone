@@ -31,6 +31,13 @@ class Marker extends Model
         'spammed_at' => 'datetime',
     ];
 
+    public function scopeSpam($query)
+    {
+        return \Illuminate\Support\Facades\Schema::hasColumn('markers', 'spammed_at')
+            ? $query->whereNotNull('markers.spammed_at')
+            : $query->whereRaw('1 = 0');
+    }
+
     public function stations()
     {
         return $this->hasMany(Station::class, 'marker_id', 'marker_id');

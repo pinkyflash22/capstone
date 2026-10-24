@@ -23,6 +23,8 @@ use Illuminate\Support\Facades\Cache;
 
 class Incident extends Model
 {
+    use \App\Models\Concerns\ExcludesSpamIncidents;
+
     use HasFactory;
 
     protected $primaryKey = 'incident_id';

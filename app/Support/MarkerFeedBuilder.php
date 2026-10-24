@@ -144,7 +144,7 @@ class MarkerFeedBuilder
         $category = strtolower(trim((string) ($marker->category ?? '')));
         $markerStatus = strtolower(trim((string) ($marker->status ?? 'active')));
 
-        if ($markerStatus === 'inactive') {
+        if ($marker->spammed_at !== null || $markerStatus === 'inactive') {
             return false;
         }
 

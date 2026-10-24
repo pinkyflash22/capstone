@@ -9,6 +9,8 @@ use App\Models\StationOfficer;
 
 class FinalInvestigationReport extends Model
 {
+    use \App\Models\Concerns\ExcludesSpamIncidents;
+
     use HasFactory, HasInvestigationProofImages;
 
     protected $table ='final_investigation_report';

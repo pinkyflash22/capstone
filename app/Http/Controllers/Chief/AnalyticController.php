@@ -1978,7 +1978,7 @@ class AnalyticController extends Controller
         $totalsByYear = collect();
 
         if (! empty($barangayIds)) {
-            $totalsByYear = DB::table('historical_fire_incidents')
+            $totalsByYear = \App\Models\HistoricalFireIncident::query()->toBase()
                 ->whereIn('barangay_id', $barangayIds)
                 ->whereMonth('incident_date', $targetMonth->month)
                 ->whereIn(DB::raw('EXTRACT(YEAR FROM incident_date)::int'), $comparisonYears->all())
@@ -2345,7 +2345,7 @@ class AnalyticController extends Controller
             ];
         }
 
-        $historicalRows = DB::table('historical_fire_incidents')
+        $historicalRows = \App\Models\HistoricalFireIncident::query()->toBase()
             ->whereIn('barangay_id', $barangayIds)
             ->whereYear('incident_date', '>=', $targetMonth->copy()->subYears(3)->year)
             ->orderByDesc('incident_date')
@@ -2391,7 +2391,7 @@ class AnalyticController extends Controller
         array $stationRecentFireSignal = [],
         int $coveredBarangayCount = 1
     ): ?array {
-        $barangayIncidents = DB::table('historical_fire_incidents')
+        $barangayIncidents = \App\Models\HistoricalFireIncident::query()->toBase()
             ->where('barangay_id', $barangay->barangay_id)
             ->whereYear('incident_date', '>=', $targetMonth->copy()->subYears(3)->year)
             ->orderByDesc('incident_date')
@@ -7129,7 +7129,7 @@ class AnalyticController extends Controller
             ->all();
 
         if (! empty($barangayIds) && Schema::hasTable('historical_fire_incidents')) {
-            $historicalQuery = DB::table('historical_fire_incidents')
+            $historicalQuery = \App\Models\HistoricalFireIncident::query()->toBase()
                 ->whereIn('barangay_id', $barangayIds)
                 ->where('incident_count', '>', 0)
                 ->whereNotNull('incident_time')
@@ -8025,7 +8025,7 @@ class AnalyticController extends Controller
     {
         $years = collect();
 
-        $historicalQuery = DB::table('historical_fire_incidents')
+        $historicalQuery = \App\Models\HistoricalFireIncident::query()->toBase()
             ->whereMonth('incident_date', $targetMonthStart->month)
             ->whereYear('incident_date', '<', $targetMonthStart->year)
             ->where('incident_count', '>', 0);
@@ -8056,7 +8056,7 @@ class AnalyticController extends Controller
 
     private function resolveHistoricalWeatherYears(int $stationId, Carbon $targetMonthStart, ?int $selectedBarangayId = null, $historicalWindow = '3'): array
     {
-        $query = DB::table('historical_fire_incidents')
+        $query = \App\Models\HistoricalFireIncident::query()->toBase()
             ->whereMonth('incident_date', $targetMonthStart->month)
             ->whereYear('incident_date', '<', $targetMonthStart->year)
             ->where(function ($weather) {
@@ -8141,7 +8141,7 @@ class AnalyticController extends Controller
             $periodStart = Carbon::parse($startDate);
             $periodEnd = Carbon::parse($endDate);
 
-            $monthlyIncidentCounts = DB::table('historical_fire_incidents')
+            $monthlyIncidentCounts = \App\Models\HistoricalFireIncident::query()->toBase()
                 ->where('barangay_id', $barangayId)
                 ->whereYear('incident_date', $year)
                 ->selectRaw('CAST(EXTRACT(MONTH FROM incident_date) AS INTEGER) as month_value, SUM(COALESCE(incident_count, 0)) as total_incidents, COUNT(*) as matched_row_count')
@@ -8432,7 +8432,7 @@ class AnalyticController extends Controller
 
     private function fetchHistoricalIncidentRows(int $stationId, Carbon $start, Carbon $end, ?int $selectedBarangayId = null)
     {
-        $query = DB::table('historical_fire_incidents')
+        $query = \App\Models\HistoricalFireIncident::query()->toBase()
             ->whereBetween('incident_date', [$start->toDateString(), $end->toDateString()])
             ->where('incident_count', '>', 0);
 
@@ -8452,7 +8452,7 @@ class AnalyticController extends Controller
 
     private function fetchHistoricalWeatherRows(int $stationId, Carbon $start, Carbon $end, ?int $selectedBarangayId = null)
     {
-        $query = DB::table('historical_fire_incidents')
+        $query = \App\Models\HistoricalFireIncident::query()->toBase()
             ->whereBetween('incident_date', [$start->toDateString(), $end->toDateString()]);
 
         $this->scopeHistoricalQueryToStation($query, $stationId, $selectedBarangayId);
@@ -8562,7 +8562,7 @@ class AnalyticController extends Controller
 
         $monthlyBuckets = array_fill(1, 12, []);
 
-        $rows = DB::table('historical_fire_incidents')
+        $rows = \App\Models\HistoricalFireIncident::query()->toBase()
             ->where('incident_count', '>', 0)
             ->when($selectedBarangayId, function ($query) use ($selectedBarangayId) {
                 $query->where('barangay_id', $selectedBarangayId);
@@ -8644,7 +8644,7 @@ class AnalyticController extends Controller
 
         $seasonBuckets = ['dry' => [], 'wet' => []];
 
-        $rows = DB::table('historical_fire_incidents')
+        $rows = \App\Models\HistoricalFireIncident::query()->toBase()
             ->where('incident_count', '>', 0)
             ->when($selectedBarangayId, function ($query) use ($selectedBarangayId) {
                 $query->where('barangay_id', $selectedBarangayId);
@@ -8761,7 +8761,7 @@ class AnalyticController extends Controller
                 return $prediction;
             }
 
-            $historicalRows = DB::table('historical_fire_incidents')
+            $historicalRows = \App\Models\HistoricalFireIncident::query()->toBase()
                 ->where('barangay_id', $barangayId)
                 ->where('incident_count', '>', 0)
                 ->whereMonth('incident_date', $targetMonthStart->month)
@@ -9241,7 +9241,7 @@ class AnalyticController extends Controller
     private function fetchHistoricalMonthlySeries(int $stationId, ?int $selectedBarangayId = null)
     {
         return $this->buildMonthlySeriesFromIncidentRows(
-            DB::table('historical_fire_incidents')
+            \App\Models\HistoricalFireIncident::query()->toBase()
                 ->when($selectedBarangayId, function ($query) use ($selectedBarangayId) {
                     $query->where('barangay_id', $selectedBarangayId);
                 }, function ($query) use ($stationId) {
@@ -9269,7 +9269,7 @@ class AnalyticController extends Controller
 
     private function fetchHistoricalWeatherSeries(int $stationId, ?int $selectedBarangayId = null)
     {
-        $query = DB::table('historical_fire_incidents')
+        $query = \App\Models\HistoricalFireIncident::query()->toBase()
             ->whereDate('incident_date', '>=', Carbon::now()->subMonths(24)->startOfMonth())
             ->orderBy('incident_date');
 

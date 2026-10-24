@@ -73,6 +73,7 @@ class MarkerController extends Controller
     }
     public function destroy($id)
     {
+        abort_unless(Schema::hasColumn('markers', 'spammed_at'), 409, 'Spam moderation requires the marker spam audit fields to be installed.');
         $marker = Marker::findOrFail($id);
         $updates = ['status' => 'inactive'];
 

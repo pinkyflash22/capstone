@@ -1132,14 +1132,6 @@ if (firefighterDashboardRoot && !window.__ffDashboardBooted) {
         });
     });
 
-    document.querySelectorAll('.request-backup-incident').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const incidentId = btn.dataset.incidentId;
-            const currentStatus = parseInt(btn.dataset.status);
-            await requestIncidentBackup(incidentId, currentStatus, btn);
-        });
-    });
-
     document.querySelectorAll('.call-command-incident').forEach(btn => {
         btn.addEventListener('click', async (event) => {
             event.preventDefault();
@@ -1507,53 +1499,6 @@ async function arriveAtIncident(incidentId, currentStatusId, triggerButton = nul
         showToast(error.message || 'Failed to confirm arrival', 'error');
     } finally {
         incidentArrivalRequestsInFlight.delete(normalizedIncidentId);
-    }
-}
-
-async function requestIncidentBackup(incidentId, currentStatusId, triggerButton = null) {
-    if (![2, 3].includes(Number(currentStatusId))) {
-        showToast('Backup can only be called during an active response', 'error');
-        return;
-    }
-
-    const confirmed = await showFirefighterConfirmationDialog({
-        title: 'Call backup?',
-        copy: 'An available backup team and apparatus will be dispatched if resources are available.',
-        confirmLabel: 'Call backup',
-        icon: 'fa-people-group'
-    });
-    if (!confirmed) return;
-
-    const pendingState = setIncidentActionPendingState(incidentId, {
-        buttonLabel: 'Calling backup...',
-        badgeLabel: 'CALLING BACKUP...'
-    });
-
-    try {
-        const response = await fetch(`/firefighter/incidents/${incidentId}/backup`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
-        });
-        const result = await response.json().catch(() => ({}));
-
-        if (!response.ok || !result.success) {
-            throw new Error(result.message || 'No backup team is available right now.');
-        }
-
-        showToast(result.message || 'Backup team dispatched.', 'success');
-        await Promise.all([
-            fetchAssignedIncidents(true),
-            refreshFirefighterLiveMap()
-        ]);
-        await refreshActiveResponseUnits(window.assignedIncidentsData || []);
-    } catch (error) {
-        restoreIncidentActionPendingState(incidentId, pendingState);
-        console.error('Error requesting incident backup:', error);
-        showToast(error.message || 'Failed to call backup', 'error');
     }
 }
 
@@ -2725,6 +2670,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (typeof window.closeFirefighterInsightsPanel === 'function') {
             window.closeFirefighterInsightsPanel();
+        } else {
+            const insightsPanel = document.getElementById('firefighterMobileInsightsPanel');
+            if (insightsPanel?.contains(document.activeElement)) {
+                document.activeElement?.blur?.();
+            }
+            insightsPanel?.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('menu-open');
         }
 
         syncFirefighterMapLayersPanel();
@@ -2745,33 +2697,6 @@ document.addEventListener('DOMContentLoaded', function () {
         mapLayersPanel.classList.remove('is-open');
         mapLayersPanel.setAttribute('aria-hidden', 'true');
         mapLayersPanel.setAttribute('inert', '');
-    }
-
-    function bindLeafletLayerTrigger() {
-        document.querySelectorAll('.firefighter-map-stage .leaflet-control-layers').forEach(function (control) {
-            const trigger = control.querySelector('.leaflet-control-layers-toggle') || control;
-            if (!trigger || control.dataset.ffSheetTriggerBound === 'true') {
-                return;
-            }
-
-            const openFromLeafletControl = function (event) {
-                if (window.innerWidth > 768) {
-                    return;
-                }
-
-                event.__ffMapLayerControlHandled = true;
-                event.preventDefault();
-                event.stopImmediatePropagation();
-                event.stopPropagation();
-                control.classList.remove('leaflet-control-layers-expanded');
-                openFirefighterMapLayersPanel();
-            };
-
-            trigger.addEventListener('click', openFromLeafletControl, true);
-            trigger.addEventListener('pointerdown', openFromLeafletControl, true);
-            trigger.addEventListener('touchstart', openFromLeafletControl, { capture: true, passive: false });
-            control.dataset.ffSheetTriggerBound = 'true';
-        });
     }
 
     function interceptLeafletLayerControl(event) {
@@ -2871,10 +2796,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    bindLeafletLayerTrigger();
-    window.setTimeout(bindLeafletLayerTrigger, 150);
-    window.setTimeout(bindLeafletLayerTrigger, 500);
-    window.addEventListener('load', bindLeafletLayerTrigger);
     syncFirefighterMobileLayerButtonBadge();
 });
 document.addEventListener('DOMContentLoaded', function () {

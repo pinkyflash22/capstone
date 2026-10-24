@@ -9641,10 +9641,11 @@ async function startSimulationForRoute(routeId) {
         updateTruckMarkerFromRealtimeLocation(routeId, realtimeLocation);
     }
 
+    const navigationNotice = 'Directions never dispatch resources or change incident status.';
     showToast(
         realtimeLocation
-            ? 'Live GPS navigation enabled. Movement follows this device.'
-            : 'Live GPS route ready. The marker will move when the assigned device moves.',
+            ? `Live GPS navigation enabled. Movement follows this device. ${navigationNotice}`
+            : `Live GPS route ready. The marker will move when the assigned device moves. ${navigationNotice}`,
         'success'
     );
 }
@@ -10779,7 +10780,7 @@ function removeOptimisticMapMarker(optimisticId) {
 }
 
 function markMarkerAsSpam(value) {
-    if (!confirm('Mark this marker as spam and hide it from the map?')) return;
+    if (!confirm('Mark this marker as spam? Linked incidents will be hidden from maps, alerts, reports, and totals until restored.')) return;
     fetch(`/api/markers/${value}`, {
         method: 'DELETE',
         headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken }
@@ -10849,7 +10850,7 @@ async function respondIncident(location) {
 }
 
 async function demoRespondToIncident(incidentId, markerId = null) {
-    showToast('Demo response only. Incident status and resources will not change.', 'info');
+    showToast('Demonstration only. This truck does not dispatch resources or update the incident status.', 'info');
     return calculateRouteToIncident(incidentId, markerId, {
         source: 'demo',
         response: true,

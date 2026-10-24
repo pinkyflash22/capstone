@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class SpotInvestigationReport extends Model
 {
+    use \App\Models\Concerns\ExcludesSpamIncidents;
+
     use HasFactory, HasInvestigationProofImages;
     protected $table = 'spot_investigation_report';
     protected $primaryKey = 'spot_investigation_report_id';
