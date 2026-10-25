@@ -2888,6 +2888,8 @@
                             <span class="material-symbols-rounded text-[18px]" aria-hidden="true">bolt</span>
                             Report
                         </button>
+                        <p id="fireSubmitError" class="col-span-2 hidden rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert"></p>
+                        <button type="button" id="retryFireSubmit" class="col-span-2 hidden rounded-xl border border-orange-300 bg-white px-4 py-3 text-sm font-semibold text-orange-800 transition hover:bg-orange-50">Retry submission</button>
                     </div>
                 </form>
             </div>
@@ -2975,6 +2977,7 @@
                                     Dense area
                                 </button>
                             </div>
+                            <p id="concernTypeError" class="mt-2 hidden text-xs font-medium text-red-700" role="alert"></p>
 
                             <input type="hidden" id="concernConditionDetail" value="">
                             <div class="mt-4">
@@ -2998,6 +3001,7 @@
 
                             <label for="concernNotesInput" class="mt-4 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Optional note</label>
                             <textarea id="concernNotesInput" rows="2" maxlength="500" class="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-amber-300 focus:bg-white focus:ring-2 focus:ring-amber-100" placeholder="Example: near sari-sari store, wires are exposed"></textarea>
+                            <p id="concernNotesError" class="mt-1 hidden text-xs font-medium text-red-700" role="alert"></p>
                         </div>
 
                         <div id="hazardLocationPanel" class="rounded-3xl border border-amber-100 bg-[#fffaf4] p-4 text-sm text-slate-700 shadow-sm">
@@ -3022,6 +3026,7 @@
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Location status</p>
                                 <p id="hazardLocationStatus" class="mt-2 text-sm text-slate-700">Safety concern reports will use your current location unless you pick another point on the map.</p>
                                 <p id="hazardLocationFreshness" class="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Location not updated yet</p>
+                                <p id="concernLocationError" class="mt-1 hidden text-xs font-medium text-red-700" role="alert"></p>
                             </div>
                         </div>
 
@@ -3032,15 +3037,18 @@
                             <div id="concernPhotoUploadStatus" class="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600" aria-live="polite">
                                 No photos selected yet. You can submit without photos, or add up to 3 images.
                             </div>
+                            <p id="concernPhotosError" class="mt-1 hidden text-xs font-medium text-red-700" role="alert"></p>
                         </div>
                     </div>
 
                     <div class="mt-4 flex flex-wrap justify-end gap-3">
+                        <p id="concernSubmitError" class="mr-auto hidden w-full rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert"></p>
                         <button type="button" class="rounded-2xl border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200" data-concern-modal-close>Cancel</button>
                         <button type="button" class="js-citizen-report-action inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#b45309] to-[#f59e0b] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_34px_rgba(217,119,6,0.24)] transition hover:brightness-105" data-report-kind="concern">
                             <span class="material-symbols-rounded text-[18px]" aria-hidden="true">send</span>
                             Submit Risk / Hazard
                         </button>
+                        <button type="button" id="retryConcernSubmit" class="hidden rounded-2xl border border-amber-300 bg-white px-5 py-3 text-sm font-semibold text-amber-800 transition hover:bg-amber-50">Retry submission</button>
                     </div>
                 </form>
             </div>
@@ -5067,6 +5075,18 @@ initializeCitizenLocationIfGranted();
             }
         });
 
+        document.addEventListener('keydown', function(event) {
+            if (event.key !== 'Escape') return;
+
+            const concernModal = document.getElementById('concernReportModal');
+            const fireModal = document.getElementById('fireIncidentModal');
+            if (concernModal && !concernModal.classList.contains('hidden')) {
+                cancelCitizenHazardReportFlow();
+            } else if (fireModal && !fireModal.classList.contains('hidden')) {
+                cancelCitizenFireReportFlow();
+            }
+        });
+
         document.getElementById('hazardUseCurrentLocationButton')?.addEventListener('click', function() {
             setCitizenHazardCurrentLocation();
         });
@@ -5611,8 +5631,29 @@ async function submitCitizenQuickReport(reportKind) {
 
     citizenReportSubmitInFlight = true;
     window.__citizenReportSubmitInFlight = true;
+    if (reportKind === 'fire') {
+        document.getElementById('fireSubmitError')?.classList.add('hidden');
+        document.getElementById('retryFireSubmit')?.classList.add('hidden');
+    } else {
+        document.getElementById('concernSubmitError')?.classList.add('hidden');
+        document.getElementById('retryConcernSubmit')?.classList.add('hidden');
+        ['concernTypeError', 'concernNotesError', 'concernLocationError', 'concernPhotosError'].forEach((id) => {
+            const fieldError = document.getElementById(id);
+            if (fieldError) {
+                fieldError.textContent = '';
+                fieldError.classList.add('hidden');
+            }
+        });
+    }
 
-    if (typeof window.PyroLocation?.getQuickLocationFix !== 'function') {
+    const hasManualFireLocation = reportKind === 'fire'
+        && citizenFireDraft.mode === 'picked'
+        && citizenFireDraft.selectedLat !== null
+        && citizenFireDraft.selectedLng !== null;
+
+    if (typeof window.PyroLocation?.getQuickLocationFix !== 'function'
+        && !citizenHasUsableCoords()
+        && !hasManualFireLocation) {
         if (reportKind === 'fire') {
             showIncidentToast?.('Location service is still loading. Choose the fire location on the map.', true);
             startCitizenFireMapPick();
@@ -5624,11 +5665,6 @@ async function submitCitizenQuickReport(reportKind) {
     }
 
     let freshLocationFix;
-    const hasManualFireLocation = reportKind === 'fire'
-        && citizenFireDraft.mode === 'picked'
-        && citizenFireDraft.selectedLat !== null
-        && citizenFireDraft.selectedLng !== null;
-
     if (hasManualFireLocation) {
         freshLocationFix = {
             lat: Number(citizenFireDraft.selectedLat),
@@ -5659,7 +5695,7 @@ async function submitCitizenQuickReport(reportKind) {
             false,
             3200
         );
-    } else {
+    } else if (typeof window.PyroLocation?.getQuickLocationFix === 'function') {
     showIncidentToast?.('Checking your current location...', false, 2200);
     try {
         freshLocationFix = await window.PyroLocation.getQuickLocationFix({
@@ -5680,6 +5716,15 @@ async function submitCitizenQuickReport(reportKind) {
         resetCitizenReportSubmissionState();
         return;
     }
+    } else {
+        freshLocationFix = {
+            lat: Number(window.userCoords.currentLatitude),
+            lng: Number(window.userCoords.currentLongitude),
+            accuracy: Number(window.userCoords.accuracy) || null,
+            timestamp: Date.now(),
+            source: 'cached',
+            accuracyWarning: true,
+        };
     }
 
     // A manually selected fire point remains valid even when GPS is unavailable.
@@ -5844,6 +5889,9 @@ async function submitCitizenQuickReport(reportKind) {
                 }
             );
             successMessage = window.latestIncidentSubmitMessage || 'Fire incident reported successfully.';
+            if (!success) {
+                throw new Error(window.latestIncidentSubmitMessage || 'The fire report could not be submitted. Please try again.');
+            }
         } else {
             const formData = new FormData();
             formData.append('report_kind', reportKind);
@@ -5871,11 +5919,16 @@ async function submitCitizenQuickReport(reportKind) {
             const payload = await response.json().catch(() => ({}));
 
             if (!response.ok) {
-                throw new Error(payload?.message || `Failed to submit ${reportKind} report.`);
+                const submissionError = new Error(payload?.message || `Failed to submit ${reportKind} report.`);
+                submissionError.validationErrors = payload?.errors || null;
+                throw submissionError;
             }
 
             success = Boolean(payload?.success);
             successMessage = payload?.message || `${reportKind.charAt(0).toUpperCase() + reportKind.slice(1)} report submitted successfully.`;
+            if (!success) {
+                throw new Error(successMessage || `Failed to submit ${reportKind} report.`);
+            }
             removeOptimisticCitizenConcernMarker(optimisticConcernMarkerId);
             window.citizenCombinedReports = Array.isArray(window.citizenCombinedReports) ? window.citizenCombinedReports : [];
             if (payload?.data?.report) {
@@ -5964,8 +6017,47 @@ async function submitCitizenQuickReport(reportKind) {
                     });
                 }, 3500);
             }
+            const errorNode = document.getElementById('fireSubmitError');
+            if (errorNode) {
+                errorNode.textContent = error.message || 'The fire report could not be submitted. Please try again.';
+                errorNode.classList.remove('hidden');
+            }
+            document.getElementById('retryFireSubmit')?.classList.remove('hidden');
+            showCitizenModal(document.getElementById('fireIncidentModal'));
         } else if (reportKind === 'concern') {
             removeOptimisticCitizenConcernMarker(optimisticConcernMarkerId);
+            const errorNode = document.getElementById('concernSubmitError');
+            const retryButton = document.getElementById('retryConcernSubmit');
+            const validationGroups = {
+                concern_type: ['concern_type', 'report_kind'],
+                concern_notes: ['notes', 'condition_detail'],
+                concern_location: ['lat', 'lng', 'user_lat', 'user_lng'],
+                concern_photos: ['photos', 'photos.0', 'photos.*'],
+            };
+            const validationFields = {
+                concern_type: document.getElementById('concernTypeError'),
+                concern_notes: document.getElementById('concernNotesError'),
+                concern_location: document.getElementById('concernLocationError'),
+                concern_photos: document.getElementById('concernPhotosError'),
+            };
+            const validationErrors = error?.validationErrors || {};
+            Object.entries(validationGroups).forEach(([group, keys]) => {
+                const messages = keys.flatMap((key) => validationErrors[key] || []);
+                const fieldNode = validationFields[group];
+                if (fieldNode) {
+                    fieldNode.textContent = messages.join(' ');
+                    fieldNode.classList.toggle('hidden', messages.length === 0);
+                }
+            });
+            const fieldMessages = Object.values(validationErrors).flat().filter(Boolean);
+            if (errorNode) {
+                errorNode.textContent = fieldMessages.length
+                    ? fieldMessages.join(' ')
+                    : (error.message || 'The report could not be submitted. Please try again.');
+                errorNode.classList.remove('hidden');
+            }
+            retryButton?.classList.remove('hidden');
+            showCitizenModal(document.getElementById('concernReportModal'));
         }
         showIncidentToast(`Failed to submit ${reportLabels[reportKind] || 'report'}: ${error.message}`, true);
     } finally {
@@ -5986,6 +6078,18 @@ document.querySelectorAll('.js-citizen-report-action').forEach((button) => {
         e.preventDefault();
         submitCitizenQuickReport(this.dataset.reportKind || 'fire');
     });
+});
+
+document.getElementById('retryConcernSubmit')?.addEventListener('click', function() {
+    document.getElementById('concernSubmitError')?.classList.add('hidden');
+    this.classList.add('hidden');
+    submitCitizenQuickReport('concern');
+});
+
+document.getElementById('retryFireSubmit')?.addEventListener('click', function() {
+    document.getElementById('fireSubmitError')?.classList.add('hidden');
+    this.classList.add('hidden');
+    submitCitizenQuickReport('fire');
 });
 
 window.updateIncidentReportLoading = function(stage, detail = '') {
