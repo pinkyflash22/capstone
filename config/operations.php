@@ -1,6 +1,9 @@
 <?php
 
 return [
+    'worker' => [
+        'name' => env('WORKER_NAME', 'unknown'),
+    ],
     'health' => [
         'cache_ttl_seconds' => (int) env('HEALTH_CACHE_TTL_SECONDS', 15),
         'worker_stale_seconds' => (int) env('WORKER_STALE_SECONDS', 600),

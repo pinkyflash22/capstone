@@ -39,13 +39,35 @@ class RunPredictiveAnalysisJob implements ShouldQueue
 
     public function handle(AnalyticController $controller): void
     {
-        AnalysisRunStatus::put($this->runId, $this->requestedBy, 'running', 20, 'Collecting station evidence and building the forecast.');
+        $jobStartedAt = microtime(true);
+        $queuedStatus = AnalysisRunStatus::get($this->runId) ?? [];
+        $queuedAt = isset($queuedStatus['queued_at']) ? strtotime((string) $queuedStatus['queued_at']) : false;
+        Log::info('Predictive analysis worker started a run.', [
+            'run_id' => $this->runId,
+            'worker_name' => config('operations.worker.name', 'unknown'),
+            'queue_connection' => $this->connection,
+            'queue' => $this->queue,
+            'attempt' => $this->attempts(),
+            'queue_wait_ms' => $queuedAt ? max(0, (int) round((microtime(true) - $queuedAt) * 1000)) : null,
+        ]);
+
+        AnalysisRunStatus::put($this->runId, $this->requestedBy, 'running', 20, 'Collecting station evidence and building the forecast.', [
+            'queued_at' => $queuedStatus['queued_at'] ?? null,
+            'started_at' => now()->toIso8601String(),
+        ]);
         Auth::onceUsingId($this->requestedBy);
 
         $request = Request::create('/internal/forecast-analysis', 'POST', $this->input);
         $request->setUserResolver(fn () => Auth::user());
+        $request->attributes->set('prediction_run_id', $this->runId);
         $response = $controller->runPredictionApiSynchronously($request);
         $payload = $response->getData(true);
+        Log::info('Predictive analysis worker finished a run.', [
+            'run_id' => $this->runId,
+            'duration_ms' => (int) round((microtime(true) - $jobStartedAt) * 1000),
+            'http_status' => $response->getStatusCode(),
+            'success' => (bool) ($payload['success'] ?? false),
+        ]);
 
         if ($response->getStatusCode() >= 400 || ! ($payload['success'] ?? false)) {
             $message = $payload['message'] ?? 'Analysis failed.';
@@ -65,6 +87,13 @@ class RunPredictiveAnalysisJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        Log::error('Predictive analysis job failed.', [
+            'run_id' => $this->runId,
+            'queue_connection' => $this->connection,
+            'queue' => $this->queue,
+            'attempt' => $this->attempts(),
+            'error' => $exception?->getMessage(),
+        ]);
         AnalysisRunStatus::put($this->runId, $this->requestedBy, 'failed', 100, 'Analysis stopped unexpectedly. Your previous saved forecast was kept.', [
             'details' => $exception?->getMessage(),
         ]);

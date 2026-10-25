@@ -423,6 +423,9 @@ class AnalyticController extends Controller
      */
     public function runAIPredictiveAnalysis(Request $request)
     {
+        $analysisStartedAt = microtime(true);
+        $runId = (string) $request->attributes->get('prediction_run_id', 'synchronous');
+
         try {
             @set_time_limit(300);
             @ini_set('max_execution_time', '300');
@@ -437,7 +440,18 @@ class AnalyticController extends Controller
             $analysisKind = $request->input('analysis_kind', $predictionScope === 'next_month' ? 'forecast' : 'actual_analysis');
 
             // Fetch REAL data from database
+            $dataCollectionStartedAt = microtime(true);
             $analysisData = $this->fetchRealTimeData($locationId, $days, $predictionScope, $selectedBarangayId, $historicalWindow);
+            Log::info('Prediction stage completed.', [
+                'run_id' => $runId,
+                'stage' => 'data_collection_and_local_modeling',
+                'duration_ms' => (int) round((microtime(true) - $dataCollectionStartedAt) * 1000),
+                'station_id' => $analysisData['station_id'] ?? null,
+                'barangay_id' => $selectedBarangayId,
+                'prediction_scope' => $predictionScope,
+                'incident_count' => $analysisData['total_incidents'] ?? null,
+                'barangay_prediction_count' => count($analysisData['barangay_predictions'] ?? []),
+            ]);
             $analysisData['analysis_kind'] = $analysisKind;
             $analysisData['replace_existing'] = $request->boolean('replace_existing');
 
@@ -447,16 +461,30 @@ class AnalyticController extends Controller
             $recommendationAiModel = null;
             $aiFailureMessage = null;
             try {
+                $predictionAiStartedAt = microtime(true);
                 $predictionAiResponse = $this->callAIApi(
                     $this->buildAIPredictionPrompt($analysisData),
                     'You are a fire risk forecasting analyst. Predict likely monthly fire activity, possible fire count, probable peak hours, and operational outlook using the provided station data.'
                 );
                 $predictionAiModel = $this->lastAiModelUsed;
+                Log::info('Prediction stage completed.', [
+                    'run_id' => $runId,
+                    'stage' => 'ai_prediction_request',
+                    'duration_ms' => (int) round((microtime(true) - $predictionAiStartedAt) * 1000),
+                    'model' => $predictionAiModel,
+                ]);
+                $recommendationAiStartedAt = microtime(true);
                 $recommendationAiResponse = $this->callAIApi(
                     $this->buildAIRecommendationPrompt($analysisData),
                     'You are a fire station operations strategist. Produce concrete, station-ready recommendations based on the provided incident, staffing, equipment, and weather context.'
                 );
                 $recommendationAiModel = $this->lastAiModelUsed;
+                Log::info('Prediction stage completed.', [
+                    'run_id' => $runId,
+                    'stage' => 'ai_recommendation_request',
+                    'duration_ms' => (int) round((microtime(true) - $recommendationAiStartedAt) * 1000),
+                    'model' => $recommendationAiModel,
+                ]);
                 Log::info('AI prediction response received', ['response' => substr($predictionAiResponse, 0, 300)]);
                 Log::info('AI recommendation response received', ['response' => substr($recommendationAiResponse, 0, 300)]);
             } catch (\Exception $aiError) {
@@ -526,6 +554,7 @@ class AnalyticController extends Controller
 
             // Store analysis in database (optional, catch errors)
             $analysisId = null;
+            $persistenceStartedAt = microtime(true);
             try {
                 DB::beginTransaction();
                 $analysisId = $this->storeAnalysis($locationId, $days, $structuredAnalysis, $analysisData);
@@ -601,6 +630,12 @@ class AnalyticController extends Controller
                 );
                 $structuredAnalysis['warnings'][] = 'Action-plan checklist could not be fully stored. Check checklist_debug for details.';
             }
+            Log::info('Prediction stage completed.', [
+                'run_id' => $runId,
+                'stage' => 'persist_analysis_and_recommendations',
+                'duration_ms' => (int) round((microtime(true) - $persistenceStartedAt) * 1000),
+                'analysis_saved' => (bool) $analysisId,
+            ]);
 
             if (! $analysisId) {
                 Log::error('Analysis completed but was not saved.', [
@@ -615,6 +650,15 @@ class AnalyticController extends Controller
                 ], 500);
             }
 
+            Log::info('Prediction analysis completed successfully.', [
+                'run_id' => $runId,
+                'duration_ms' => (int) round((microtime(true) - $analysisStartedAt) * 1000),
+                'analysis_id' => $analysisId,
+                'station_id' => $analysisData['station_id'] ?? null,
+                'barangay_id' => $selectedBarangayId,
+                'prediction_scope' => $predictionScope,
+            ]);
+
             return response()->json([
                 'success' => true,
                 'data' => $structuredAnalysis,
@@ -622,7 +666,10 @@ class AnalyticController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('AI Analysis error: '.$e->getMessage());
+            Log::error('AI Analysis error: '.$e->getMessage(), [
+                'run_id' => $runId,
+                'duration_ms' => (int) round((microtime(true) - $analysisStartedAt) * 1000),
+            ]);
             Log::error($e->getTraceAsString());
 
             return response()->json([
@@ -655,7 +702,9 @@ class AnalyticController extends Controller
         }
 
         $runId = (string) Str::uuid();
-        AnalysisRunStatus::put($runId, $userId, 'queued', 5, 'Analysis is queued. Your current saved forecast remains available.');
+        AnalysisRunStatus::put($runId, $userId, 'queued', 5, 'Analysis is queued. Your current saved forecast remains available.', [
+            'queued_at' => now()->toIso8601String(),
+        ]);
         AnalysisRunStatus::rememberActive($signature, $runId);
         RunPredictiveAnalysisJob::dispatch($runId, $userId, $validated);
 
@@ -953,7 +1002,13 @@ class AnalyticController extends Controller
         // Get station name
         $station = DB::table('stations')->where('station_id', $stationId)->first();
         $locationName = $station ? $station->station_name : 'My Station';
+        $weatherStartedAt = microtime(true);
         $weatherContext = $this->fetchMonthlyWeatherContext($station, $days, $locationName) ?? [];
+        Log::info('Prediction stage completed.', [
+            'stage' => 'weather_context',
+            'duration_ms' => (int) round((microtime(true) - $weatherStartedAt) * 1000),
+            'station_id' => $stationId,
+        ]);
 
         // Resolve teams through the station link first, then through assigned officers for legacy rows.
         $allPersons = StationOfficer::where('station_id', $stationId)->get();
@@ -1096,16 +1151,36 @@ class AnalyticController extends Controller
             $availableEquipment = 0;
         }
 
+        $predictionContextStartedAt = microtime(true);
         $predictionContext = $this->buildPredictionContext($stationId, $teamIds, $predictionScope);
+        Log::info('Prediction stage completed.', [
+            'stage' => 'prediction_context_queries',
+            'duration_ms' => (int) round((microtime(true) - $predictionContextStartedAt) * 1000),
+            'station_id' => $stationId,
+            'prediction_scope' => $predictionScope,
+        ]);
+        $barangayPredictionStartedAt = microtime(true);
         $barangayPredictions = $generatePredictions
             ? $this->buildBarangayPredictionData($stationId, $predictionContext, $weatherContext)
             : [];
+        Log::info('Prediction stage completed.', [
+            'stage' => 'barangay_model_predictions',
+            'duration_ms' => (int) round((microtime(true) - $barangayPredictionStartedAt) * 1000),
+            'station_id' => $stationId,
+            'barangay_count' => count($barangayPredictions),
+        ]);
         $barangayPredictions = $generatePredictions
             ? $this->attachBarangayHistoricalBaselines($stationId, $barangayPredictions, $predictionContext)
             : [];
+        $stationPredictionStartedAt = microtime(true);
         $modelPrediction = $generatePredictions
             ? $this->buildModelPredictionData($stationId, $predictionContext, $weatherContext, $barangayPredictions)
             : null;
+        Log::info('Prediction stage completed.', [
+            'stage' => 'station_model_aggregation',
+            'duration_ms' => (int) round((microtime(true) - $stationPredictionStartedAt) * 1000),
+            'station_id' => $stationId,
+        ]);
         $selectedBarangayPrediction = null;
 
         if ($selectedBarangayId) {
@@ -3156,6 +3231,7 @@ class AnalyticController extends Controller
                 continue;
             }
 
+            $modelRequestStartedAt = microtime(true);
             try {
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer '.$this->apiKey,
@@ -3178,6 +3254,7 @@ class AnalyticController extends Controller
                     'message' => $e->getMessage(),
                     'timeout' => $timeout,
                     'connect_timeout' => $connectTimeout,
+                    'duration_ms' => (int) round((microtime(true) - $modelRequestStartedAt) * 1000),
                 ]);
 
                 continue;
@@ -3187,7 +3264,9 @@ class AnalyticController extends Controller
                 $this->unavailableAiModels[$model] = true;
                 $errorBody = $response->body();
                 $errors[] = "{$model}: HTTP {$response->status()}";
-                Log::warning('OpenRouter API call failed for model '.$model.': '.$response->status().' - '.$errorBody);
+                Log::warning('OpenRouter API call failed for model '.$model.': '.$response->status().' - '.$errorBody, [
+                    'duration_ms' => (int) round((microtime(true) - $modelRequestStartedAt) * 1000),
+                ]);
 
                 continue;
             }
@@ -3198,12 +3277,19 @@ class AnalyticController extends Controller
             if (empty($content)) {
                 $this->unavailableAiModels[$model] = true;
                 $errors[] = "{$model}: empty response";
-                Log::warning('OpenRouter API returned empty content for model '.$model);
+                Log::warning('OpenRouter API returned empty content for model '.$model, [
+                    'duration_ms' => (int) round((microtime(true) - $modelRequestStartedAt) * 1000),
+                ]);
 
                 continue;
             }
 
             $this->lastAiModelUsed = $model;
+            Log::info('OpenRouter API call completed.', [
+                'model' => $model,
+                'duration_ms' => (int) round((microtime(true) - $modelRequestStartedAt) * 1000),
+                'http_status' => $response->status(),
+            ]);
             Log::info('AI API call successful with model '.$model.', response length: '.strlen($content));
 
             return $content;

@@ -24,7 +24,7 @@ class ResilientFileStore extends FileStore
             try {
                 return parent::put($key, $value, $seconds);
             } catch (Throwable $exception) {
-                $this->logSkippedWrite($exception);
+                $this->logSkippedWrite($exception, dirname($this->path($key)));
 
                 return false;
             }
@@ -47,7 +47,7 @@ class ResilientFileStore extends FileStore
             try {
                 return parent::add($key, $value, $seconds);
             } catch (Throwable $exception) {
-                $this->logSkippedWrite($exception);
+                $this->logSkippedWrite($exception, dirname($this->path($key)));
 
                 return false;
             }
@@ -70,12 +70,17 @@ class ResilientFileStore extends FileStore
         clearstatcache(true, $directory);
     }
 
-    protected function logSkippedWrite(Throwable $exception): void
+    protected function logSkippedWrite(Throwable $exception, string $targetDirectory): void
     {
         Log::warning('File cache write was skipped after directory repair failed.', [
             'cache_directory' => $this->getDirectory(),
             'cache_directory_exists' => is_dir($this->getDirectory()),
             'cache_directory_writable' => is_writable($this->getDirectory()),
+            'cache_target_directory' => $targetDirectory,
+            'cache_target_directory_exists' => is_dir($targetDirectory),
+            'cache_target_directory_writable' => is_writable($targetDirectory),
+            'configured_default_cache_store' => config('cache.default'),
+            'configured_file_cache_driver' => config('cache.stores.file.driver'),
             'error' => $exception->getMessage(),
         ]);
     }

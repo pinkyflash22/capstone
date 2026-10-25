@@ -34,7 +34,7 @@ WORKER_MAX_TIME_SECONDS="${WORKER_MAX_TIME:-300}"
 php artisan config:cache
 
 while true; do
-    php artisan ops:worker-heartbeat "$WORKER_NAME" || true
+    php artisan ops:worker-heartbeat "$WORKER_NAME" "$QUEUE_CONNECTION_NAME" "$QUEUE_NAMES" polling || true
     php artisan queue:work "$QUEUE_CONNECTION_NAME" \
         --queue="$QUEUE_NAMES" \
         --sleep=2 \

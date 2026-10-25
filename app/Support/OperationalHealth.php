@@ -52,6 +52,13 @@ class OperationalHealth
             'status' => $readiness['status'] === 'unavailable'
                 ? 'unavailable'
                 : ($hasDegradation ? 'degraded' : 'healthy'),
+            'runtime' => [
+                'cache_store' => config('cache.default'),
+                'cache_driver' => config('cache.stores.'.config('cache.default').'.driver'),
+                'prediction_status_store' => config('services.ai_prediction.training_status_cache_store'),
+                'prediction_queue_connection' => config('services.ai_prediction.training_queue_connection'),
+                'prediction_queue' => config('services.ai_prediction.training_queue'),
+            ],
             'checks' => $checks,
             'checked_at' => now()->toIso8601String(),
         ];
@@ -64,7 +71,15 @@ class OperationalHealth
                 return ['connection' => config('queue.default'), 'depth' => null];
             }
 
-            $depth = DB::table(config('queue.connections.database.table', 'jobs'))->count();
+            $jobsTable = config('queue.connections.database.table', 'jobs');
+            $depth = DB::table($jobsTable)->count();
+            $queueDepths = DB::table($jobsTable)
+                ->select('queue')
+                ->selectRaw('COUNT(*) AS pending_jobs')
+                ->groupBy('queue')
+                ->pluck('pending_jobs', 'queue')
+                ->map(fn ($count) => (int) $count)
+                ->all();
             $failed = Schema::hasTable(config('queue.failed.table', 'failed_jobs'))
                 ? DB::table(config('queue.failed.table', 'failed_jobs'))->count()
                 : 0;
@@ -75,7 +90,7 @@ class OperationalHealth
                 throw new \RuntimeException('Failed jobs require operator attention.');
             }
 
-            return ['connection' => 'database', 'depth' => $depth, 'failed' => $failed];
+            return ['connection' => 'database', 'depth' => $depth, 'depth_by_queue' => $queueDepths, 'failed' => $failed];
         });
     }
 
@@ -85,15 +100,34 @@ class OperationalHealth
             $heartbeats = (array) Cache::get('ops:worker-heartbeats', []);
             $staleAfter = config('operations.health.worker_stale_seconds');
             $fresh = collect($heartbeats)->filter(
-                fn ($timestamp) => is_numeric($timestamp) && now()->timestamp - (int) $timestamp <= $staleAfter
+                fn ($heartbeat) => now()->timestamp - $this->heartbeatTimestamp($heartbeat) <= $staleAfter
             );
 
             if ($fresh->isEmpty()) {
                 throw new \RuntimeException('No fresh queue-worker heartbeat was found.');
             }
 
-            return ['active' => $fresh->count(), 'registered' => count($heartbeats)];
+            return [
+                'active' => $fresh->count(),
+                'registered' => count($heartbeats),
+                'workers' => $fresh->map(fn ($heartbeat, $name) => [
+                    'name' => $name,
+                    'connection' => is_array($heartbeat) ? ($heartbeat['connection'] ?? null) : null,
+                    'queues' => is_array($heartbeat) ? ($heartbeat['queues'] ?? []) : [],
+                    'state' => is_array($heartbeat) ? ($heartbeat['state'] ?? 'legacy') : 'legacy',
+                    'heartbeat_at' => now()->setTimestamp($this->heartbeatTimestamp($heartbeat))->toIso8601String(),
+                ])->values()->all(),
+            ];
         });
+    }
+
+    private function heartbeatTimestamp(mixed $heartbeat): int
+    {
+        if (is_array($heartbeat)) {
+            return (int) ($heartbeat['at'] ?? 0);
+        }
+
+        return is_numeric($heartbeat) ? (int) $heartbeat : 0;
     }
 
     private function backupStatus(): array
