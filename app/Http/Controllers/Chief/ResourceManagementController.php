@@ -164,17 +164,16 @@ class ResourceManagementController extends Controller
         $accountBarangayIds = app(\App\Services\BoundaryManagementScope::class)->coveredBarangayIds($loggedInChief);
         $allusers = User::where(function ($query) use ($stationUserIds, $citizenRoleId, $accountBarangayIds) {
             $query->whereIn('user_id', $stationUserIds)
-                ->orWhere(function ($citizenQuery) use ($citizenRoleId, $accountBarangayIds) {
-                    $citizenQuery
-                        ->where('role_id', $citizenRoleId)
-                        ->whereHas('address', fn ($address) => $address->whereIn('barangay_id', $accountBarangayIds));
-                })
                 ->orWhereHas('barangayOfficer', fn ($officer) => $officer->whereIn('barangay_id', $accountBarangayIds))
                 ->orWhere(function ($account) use ($accountBarangayIds) {
                     $account->whereDoesntHave('barangayOfficer')
                         ->whereHas('role', fn ($role) => $role->whereIn(DB::raw('LOWER(role)'), ['barangay', 'barangay officer', 'barangay captain', 'barangay_officer']))
                         ->whereHas('address', fn ($address) => $address->whereIn('barangay_id', $accountBarangayIds));
                 });
+
+            if ($citizenRoleId !== null) {
+                $query->orWhere('role_id', $citizenRoleId);
+            }
         })->with('role', 'address.barangay.city.province', 'barangayOfficer', 'stations')->orderBy('last_name')->orderBy('first_name')->get();
         $users = $allusers->where('role_id', '!=', $citizenRoleId)->values();
         // $userOfficer = StationOfficer::where('s', $all);
