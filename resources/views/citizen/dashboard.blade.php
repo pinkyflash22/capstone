@@ -1757,7 +1757,7 @@
                 align-items: center !important;
                 justify-content: center !important;
                 padding: calc(12px + var(--safe-top)) 12px calc(12px + var(--safe-bottom)) !important;
-                z-index: 4900 !important;
+                z-index: 10000 !important;
                 pointer-events: auto !important;
             }
 
@@ -5652,7 +5652,7 @@ async function submitCitizenQuickReport(reportKind) {
         && citizenFireDraft.selectedLng !== null;
 
     if (typeof window.PyroLocation?.getQuickLocationFix !== 'function'
-        && !citizenHasUsableCoords()
+        && !window.citizenHasUsableCoords?.()
         && !hasManualFireLocation) {
         if (reportKind === 'fire') {
             showIncidentToast?.('Location service is still loading. Choose the fire location on the map.', true);
@@ -5728,7 +5728,7 @@ async function submitCitizenQuickReport(reportKind) {
     }
 
     // A manually selected fire point remains valid even when GPS is unavailable.
-    if (!hasManualFireLocation && !citizenHasUsableCoords()) {
+    if (!hasManualFireLocation && !window.citizenHasUsableCoords?.()) {
         showIncidentToast?.('Getting your location. Please wait and try again.', true);
         resetCitizenReportSubmissionState();
         return;
@@ -6116,7 +6116,7 @@ const CITIZEN_NEARBY_ALERT_SEEN_TTL_MS = 24 * 60 * 60 * 1000;
 function filterCitizenNearbyIncidents(incidents = []) {
     const latitude = Number(window.userCoords?.currentLatitude);
     const longitude = Number(window.userCoords?.currentLongitude);
-    if (!citizenHasUsableCoords()) {
+    if (!window.citizenHasUsableCoords?.()) {
         return [];
     }
 
@@ -6569,7 +6569,7 @@ window.persistCitizenOverviewOfflineData = function(data = {}) {
 };
 
 window.refreshCitizenOverviewData = async function(options = {}) {
-    if (!citizenHasUsableCoords()) {
+    if (!window.citizenHasUsableCoords?.()) {
         return;
     }
 
