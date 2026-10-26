@@ -5211,6 +5211,7 @@ class AnalyticController extends Controller
             $stationAnalyses = Analysis::query()
                 ->where('station_id', $stationOfficer->station_id)
                 ->latest('updated_at')
+                ->limit(100)
                 ->get();
 
             $latestAnalysis = $stationAnalyses->first(function (Analysis $analysis) use ($requestedScope, $stationOfficer) {
@@ -5267,19 +5268,6 @@ class AnalyticController extends Controller
                 ?? $this->scopeBarangayIdFromRawData($rawData);
             $daysAnalyzed = max(1, (int) ($rawData['days_analyzed'] ?? 30));
             $historicalWindow = (string) ($request->input('historical_window') ?: ($rawData['historical_window'] ?? '3'));
-            $liveScopedRawData = $this->fetchRealTimeData(
-                (int) $stationOfficer->station_id,
-                $daysAnalyzed,
-                $requestedScope['prediction_scope'],
-                $selectedBarangayId,
-                $historicalWindow,
-                false
-            );
-            $liveChartContext = $this->mergeLiveChartContext(
-                (int) $stationOfficer->station_id,
-                $liveScopedRawData['chart_context'] ?? ($rawData['chart_context'] ?? null),
-                $selectedBarangayId
-            );
 
             $savedBarangayPredictions = is_array($rawData['barangay_predictions'] ?? null)
                 ? array_values($rawData['barangay_predictions'])
@@ -5287,27 +5275,25 @@ class AnalyticController extends Controller
             $fallbackBarangayPredictions = ! empty($savedBarangayPredictions)
                 ? $savedBarangayPredictions
                 : array_values($latestPerBarangay);
-            $liveBarangayPredictionSet = is_array($liveScopedRawData['barangay_predictions'] ?? null)
-                ? array_values($liveScopedRawData['barangay_predictions'])
-                : [];
-
-            $liveSelectedPrediction = $liveScopedRawData['selected_barangay_prediction']
+            $savedSelectedPrediction = $rawData['selected_barangay_prediction']
                 ?? ($selectedBarangayId ? ($latestPerBarangay[$selectedBarangayId] ?? null) : null);
-            $liveBarangayPredictions = $selectedBarangayId && $liveSelectedPrediction
-                ? [$liveSelectedPrediction]
-                : (! empty($liveBarangayPredictionSet) ? $liveBarangayPredictionSet : $fallbackBarangayPredictions);
-            $liveModelPrediction = $liveScopedRawData['model_prediction'] ?? ($rawData['model_prediction'] ?? null);
-            $livePredictionContext = $liveScopedRawData['prediction_context'] ?? ($rawData['prediction_context'] ?? null);
-            $locationName = $liveScopedRawData['location_name'] ?? $latestAnalysis->sector;
-            $liveConfidenceInput = array_merge($liveScopedRawData, [
-                'chart_context' => $liveChartContext,
-                'barangay_predictions' => $liveBarangayPredictions,
-                'selected_barangay_prediction' => $liveSelectedPrediction,
-                'prediction_context' => $livePredictionContext,
+            $savedBarangayPredictionSet = $selectedBarangayId && $savedSelectedPrediction
+                ? [$savedSelectedPrediction]
+                : $fallbackBarangayPredictions;
+            $savedPredictionContext = $rawData['prediction_context'] ?? null;
+            $savedChartContext = $rawData['chart_context'] ?? [];
+            $locationName = $rawData['location_name'] ?? $latestAnalysis->sector;
+            $savedConfidenceInput = array_merge($rawData, [
+                'station_id' => (int) $stationOfficer->station_id,
+                'chart_context' => $savedChartContext,
+                'barangay_predictions' => $savedBarangayPredictionSet,
+                'selected_barangay_prediction' => $savedSelectedPrediction,
+                'prediction_context' => $savedPredictionContext,
                 'location_name' => $locationName,
+                'total_incidents' => (int) ($analysisSummary['total_incidents'] ?? $latestAnalysis->incident_count ?? 0),
             ]);
-            $liveConfidence = $this->calculateAnalysisConfidence(
-                $liveConfidenceInput,
+            $savedConfidence = $this->calculateAnalysisConfidence(
+                $savedConfidenceInput,
                 (bool) ($analysisSummary['ai_source'] ?? $analysisData['ai_source'] ?? false)
             );
 
@@ -5315,43 +5301,39 @@ class AnalyticController extends Controller
                 'analysis_id' => $latestAnalysis->analysis_id,
                 'analysis_revision' => max(1, (int) ($latestAnalysis->revision_number ?? 1)),
                 'location_name' => $locationName,
-                'hourly_data' => $liveScopedRawData['hourly_data'] ?? ($rawData['hourly_data'] ?? []),
-                'daily_data' => $liveScopedRawData['daily_data'] ?? ($rawData['daily_data'] ?? []),
-                'peak_hour' => $liveScopedRawData['peak_hour'] ?? ($rawData['peak_hour'] ?? null),
-                'avg_response_time' => $liveScopedRawData['avg_response_time'] ?? ($rawData['avg_response_time'] ?? null),
-                'total_personnel' => $liveScopedRawData['total_personnel'] ?? ($rawData['total_personnel'] ?? 0),
-                'available_personnel' => $liveScopedRawData['available_personnel'] ?? ($rawData['available_personnel'] ?? 0),
-                'total_equipment' => $liveScopedRawData['total_equipment'] ?? ($rawData['total_equipment'] ?? 0),
-                'available_equipment' => $liveScopedRawData['available_equipment'] ?? ($rawData['available_equipment'] ?? 0),
-                'risk_score' => $liveScopedRawData['risk_score'] ?? ($analysisSummary['risk_score'] ?? null),
-                'risk_factors' => $liveScopedRawData['risk_factors'] ?? ($rawData['risk_factors'] ?? ($analysisSummary['risk_factors'] ?? [])),
-                'weather_context' => $liveScopedRawData['weather_context'] ?? ($rawData['weather_context'] ?? null),
-                'mitigation_context' => $liveScopedRawData['mitigation_context'] ?? ($rawData['mitigation_context'] ?? null),
-                'model_metadata' => $this->buildScopedModelMetadataContext(
-                    (int) $stationOfficer->station_id,
-                    $selectedBarangayId,
-                    $rawData['model_metadata'] ?? ($analysisSummary['model_metadata'] ?? null)
-                ),
+                'hourly_data' => $rawData['hourly_data'] ?? [],
+                'daily_data' => $rawData['daily_data'] ?? [],
+                'peak_hour' => $rawData['peak_hour'] ?? null,
+                'avg_response_time' => $rawData['avg_response_time'] ?? null,
+                'total_personnel' => $rawData['total_personnel'] ?? 0,
+                'available_personnel' => $rawData['available_personnel'] ?? 0,
+                'total_equipment' => $rawData['total_equipment'] ?? 0,
+                'available_equipment' => $rawData['available_equipment'] ?? 0,
+                'risk_score' => $analysisSummary['risk_score'] ?? null,
+                'risk_factors' => $rawData['risk_factors'] ?? ($analysisSummary['risk_factors'] ?? []),
+                'weather_context' => $rawData['weather_context'] ?? null,
+                'mitigation_context' => $rawData['mitigation_context'] ?? null,
+                'model_metadata' => $rawData['model_metadata'] ?? ($analysisSummary['model_metadata'] ?? null),
                 'workflow_context' => $rawData['workflow_context'] ?? ($analysisSummary['workflow_context'] ?? null),
-                'model_prediction' => $liveModelPrediction,
-                'barangay_predictions' => array_values($liveBarangayPredictions),
-                'selected_barangay_prediction' => $liveSelectedPrediction,
-                'prediction_context' => $livePredictionContext,
+                'model_prediction' => $rawData['model_prediction'] ?? null,
+                'barangay_predictions' => array_values($savedBarangayPredictionSet),
+                'selected_barangay_prediction' => $savedSelectedPrediction,
+                'prediction_context' => $savedPredictionContext,
                 'prediction_scope' => $requestedScope['prediction_scope'],
                 'barangay_id' => $selectedBarangayId,
-                'chart_context' => $liveChartContext,
+                'chart_context' => $savedChartContext,
                 'evidence_provenance' => $rawData['evidence_provenance']
                     ?? ($analysisSummary['evidence_provenance'] ?? null),
                 'checklist_debug' => $rawData['checklist_debug'] ?? ($analysisSummary['checklist_debug'] ?? null),
                 'recommendations' => is_array($latestAnalysis->recommendations) ? $latestAnalysis->recommendations : [],
                 'predictions' => is_array($latestAnalysis->predictions) ? $latestAnalysis->predictions : null,
-                'risk_level' => $liveScopedRawData['risk_level'] ?? ($latestAnalysis->risk_level ?? ($analysisSummary['risk_level'] ?? null)),
-                'confidence_score' => $liveConfidence['score'],
-                'confidence_context' => $liveConfidence,
-                'total_incidents' => $liveScopedRawData['total_incidents'] ?? ($latestAnalysis->incident_count ?? ($analysisSummary['total_incidents'] ?? 0)),
-                'fire_incidents' => $liveScopedRawData['fire_incidents'] ?? ($analysisSummary['fire_incidents'] ?? 0),
-                'incidents_by_type' => $liveScopedRawData['incidents_by_type'] ?? ($analysisSummary['incidents_by_type'] ?? []),
-                'days_analyzed' => $liveScopedRawData['days_analyzed'] ?? $daysAnalyzed,
+                'risk_level' => $latestAnalysis->risk_level ?? ($analysisSummary['risk_level'] ?? null),
+                'confidence_score' => $savedConfidence['score'],
+                'confidence_context' => $savedConfidence,
+                'total_incidents' => (int) ($analysisSummary['total_incidents'] ?? $latestAnalysis->incident_count ?? 0),
+                'fire_incidents' => $analysisSummary['fire_incidents'] ?? 0,
+                'incidents_by_type' => $analysisSummary['incidents_by_type'] ?? [],
+                'days_analyzed' => $daysAnalyzed,
                 'historical_window' => $historicalWindow,
                 'is_dynamic_scope_fallback' => ! $this->scopeBarangayIdFromRawData($rawData) && (bool) $selectedBarangayId,
             ]);
