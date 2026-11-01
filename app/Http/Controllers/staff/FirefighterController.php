@@ -731,45 +731,125 @@ class FirefighterController extends Controller
             ->get();
     }
 
-    protected function loadSpotReportsPaginator($stationOfficerIds, int $perPage = 10)
+    protected function loadSpotReportsPaginator($stationOfficerIds, string $search = '', string $status = '', string $sort = 'newest', int $perPage = 10)
     {
-        return SpotInvestigationReport::query()
+        $query = SpotInvestigationReport::query()
             ->with(['incident.marker', 'investigator.user.role', 'progressInvestigation', 'notedBy.user', 'approvedBy.user', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
-            ->latest()
+            ->when($search, function ($query, $value) {
+                $query->where(function ($searchQuery) use ($value) {
+                    $searchQuery->where('owner', 'like', "%{$value}%")
+                        ->orWhere('occupancy', 'like', "%{$value}%")
+                        ->orWhereHas('incident.marker', fn ($markerQuery) => $markerQuery
+                            ->where('title', 'like', "%{$value}%")
+                            ->orWhere('description', 'like', "%{$value}%"))
+                        ->orWhereHas('investigator.user', function ($userQuery) use ($value) {
+                            $userQuery->where('first_name', 'like', "%{$value}%")
+                                ->orWhere('last_name', 'like', "%{$value}%");
+                        });
+                });
+            });
+
+        $this->applyStationReportReviewStatusFilter($query, $status);
+
+        return $query
+            ->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc')
             ->paginate($perPage)
             ->withQueryString();
     }
 
-    protected function loadProgressReportsPaginator($stationOfficerIds, int $perPage = 10)
+    protected function loadProgressReportsPaginator($stationOfficerIds, string $search = '', string $status = '', string $sort = 'newest', int $perPage = 10)
     {
-        return ProgressInvestigationReport::query()
+        $query = ProgressInvestigationReport::query()
             ->with(['spotInvestigation.incident.marker', 'fireOrigin', 'investigator.user.role', 'notedBy.user', 'approvedBy.user', 'finalInvestigation', 'secondProgressInvestigation', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
-            ->latest()
+            ->when($search, function ($query, $value) {
+                $query->where(function ($searchQuery) use ($value) {
+                    $searchQuery->where('fire_cause', 'like', "%{$value}%")
+                        ->orWhere('responsible_arson', 'like', "%{$value}%")
+                        ->orWhereHas('fireOrigin', fn ($originQuery) => $originQuery->where('origin', 'like', "%{$value}%"))
+                        ->orWhereHas('spotInvestigation.incident.marker', fn ($markerQuery) => $markerQuery
+                            ->where('title', 'like', "%{$value}%")
+                            ->orWhere('description', 'like', "%{$value}%"))
+                        ->orWhereHas('investigator.user', function ($userQuery) use ($value) {
+                            $userQuery->where('first_name', 'like', "%{$value}%")
+                                ->orWhere('last_name', 'like', "%{$value}%");
+                        });
+                });
+            });
+
+        $this->applyStationReportReviewStatusFilter($query, $status);
+
+        return $query
+            ->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc')
             ->paginate($perPage)
             ->withQueryString();
     }
 
-    protected function loadFinalReportsPaginator($stationOfficerIds, int $perPage = 10)
+    protected function loadFinalReportsPaginator($stationOfficerIds, string $search = '', string $status = '', string $sort = 'newest', int $perPage = 10)
     {
-        return FinalInvestigationReport::query()
+        $query = FinalInvestigationReport::query()
             ->with(['progressInvestigation.spotInvestigation.incident.marker', 'progressInvestigation.fireOrigin', 'investigator.user.role', 'notedBy.user', 'approvedBy.user', 'proofImages'])
             ->whereIn('station_officer_id', $stationOfficerIds)
-            ->latest()
+            ->when($search, function ($query, $value) {
+                $query->where(function ($searchQuery) use ($value) {
+                    $searchQuery->where('exact_address', 'like', "%{$value}%")
+                        ->orWhere('cause_of_fire', 'like', "%{$value}%")
+                        ->orWhere('establishment_burned', 'like', "%{$value}%")
+                        ->orWhereHas('progressInvestigation.spotInvestigation.incident.marker', fn ($markerQuery) => $markerQuery
+                            ->where('title', 'like', "%{$value}%")
+                            ->orWhere('description', 'like', "%{$value}%"))
+                        ->orWhereHas('investigator.user', function ($userQuery) use ($value) {
+                            $userQuery->where('first_name', 'like', "%{$value}%")
+                                ->orWhere('last_name', 'like', "%{$value}%");
+                        });
+                });
+            });
+
+        $this->applyStationReportReviewStatusFilter($query, $status);
+
+        return $query
+            ->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc')
             ->paginate($perPage)
             ->withQueryString();
     }
 
-    protected function loadAfterActivityReportsPaginator(int $stationId, int $perPage = 10)
+    protected function loadAfterActivityReportsPaginator(int $stationId, string $search = '', string $status = '', string $sort = 'newest', int $perPage = 10)
     {
-        return AfterActivityReport::query()
+        $query = AfterActivityReport::query()
             ->with(['eventActivity.communityActivityRequest', 'investigator.user.role', 'approvedBy.user', 'proofImages'])
             ->where('station_id', $stationId)
-            ->latest('activity_date')
-            ->latest('after_activity_report_id')
+            ->when($search, function ($query, $value) {
+                $query->where(function ($searchQuery) use ($value) {
+                    $searchQuery->where('activity_title', 'like', "%{$value}%")
+                        ->orWhere('activity_type', 'like', "%{$value}%")
+                        ->orWhere('activity_location', 'like', "%{$value}%")
+                        ->orWhereHas('investigator.user', function ($userQuery) use ($value) {
+                            $userQuery->where('first_name', 'like', "%{$value}%")
+                                ->orWhere('last_name', 'like', "%{$value}%");
+                        });
+                });
+            });
+
+        $this->applyStationReportReviewStatusFilter($query, $status);
+        $direction = $sort === 'oldest' ? 'asc' : 'desc';
+
+        return $query
+            ->orderBy('activity_date', $direction)
+            ->orderBy('after_activity_report_id', $direction)
             ->paginate($perPage)
             ->withQueryString();
+    }
+
+    protected function applyStationReportReviewStatusFilter($query, string $status): void
+    {
+        if ($status === 'submitted') {
+            $query->where(function ($statusQuery) {
+                $statusQuery->whereNull('review_status')->orWhere('review_status', 'submitted');
+            });
+        } elseif ($status !== '') {
+            $query->where('review_status', $status);
+        }
     }
 
     protected function mapSpotReportStore($reports, string $currentOfficerName, ?int $currentStationOfficerId = null): array
@@ -875,6 +955,25 @@ class FirefighterController extends Controller
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
                     'has_final' => (bool) $report->finalInvestigation,
                     'has_second' => (bool) $report->secondProgressInvestigation,
+                    'linked_reports' => array_values(array_filter([
+                        $report->spot_investigation_id ? [
+                            'type' => 'spot',
+                            'id' => $report->spot_investigation_id,
+                            'label' => 'Spot Report',
+                        ] : null,
+                        $report->parent_progress_investigation_id ? [
+                            'type' => 'progress',
+                            'id' => $report->parent_progress_investigation_id,
+                            'label' => '1st Progress Report',
+                        ] : null,
+                        [
+                            'type' => 'progress',
+                            'id' => $report->progress_investigation_report_id,
+                            'label' => $report->report_stage === ProgressInvestigationReport::STAGE_SINGLE
+                                ? 'Progress Report (Full)'
+                                : $report->report_stage_label,
+                        ],
+                    ])),
                 ],
             ];
         })->all();
@@ -928,6 +1027,30 @@ class FirefighterController extends Controller
                     'review_comments' => $report->review_comments,
                     'reviewed_at' => optional($report->reviewed_at)->toIso8601String(),
                     'proof_images' => $this->mapInvestigationProofImages($report->proofImages),
+                    'linked_reports' => array_values(array_filter([
+                        $report->progressInvestigation?->spot_investigation_id ? [
+                            'type' => 'spot',
+                            'id' => $report->progressInvestigation->spot_investigation_id,
+                            'label' => 'Spot Report',
+                        ] : null,
+                        $report->progressInvestigation?->parent_progress_investigation_id ? [
+                            'type' => 'progress',
+                            'id' => $report->progressInvestigation->parent_progress_investigation_id,
+                            'label' => '1st Progress Report',
+                        ] : null,
+                        $report->progress_investigation_id ? [
+                            'type' => 'progress',
+                            'id' => $report->progress_investigation_id,
+                            'label' => $report->progressInvestigation?->report_stage === ProgressInvestigationReport::STAGE_SINGLE
+                                ? 'Progress Report (Full)'
+                                : ($report->progressInvestigation?->report_stage_label ?: 'Progress Report'),
+                        ] : null,
+                        [
+                            'type' => 'final',
+                            'id' => $report->final_investigation_report_id,
+                            'label' => 'Final Report',
+                        ],
+                    ])),
                 ],
             ];
         })->all();
@@ -1724,9 +1847,16 @@ class FirefighterController extends Controller
 
     public function myStationReportsData(Request $request)
     {
-        $tab = $request->validate([
+        $filters = $request->validate([
             'tab' => ['nullable', Rule::in(['spot', 'progress', 'final', 'aar'])],
-        ])['tab'] ?? 'spot';
+            'search' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', Rule::in(['submitted', 'approved', 'rejected', 'changes_requested'])],
+            'sort' => ['nullable', Rule::in(['newest', 'oldest'])],
+        ]);
+        $tab = $filters['tab'] ?? 'spot';
+        $search = trim($filters['search'] ?? '');
+        $status = $filters['status'] ?? '';
+        $sort = $filters['sort'] ?? 'newest';
 
         $userId = Auth::user()->user_id;
         $context = $this->getStationShellContext($userId);
@@ -1735,16 +1865,16 @@ class FirefighterController extends Controller
         $currentStationOfficerId = (int) ($context['stationOfficer']?->station_officer_id ?? 0);
 
         if ($tab === 'aar') {
-            $reports = $this->loadAfterActivityReportsPaginator($context['stationId']);
+            $reports = $this->loadAfterActivityReportsPaginator($context['stationId'], $search, $status, $sort);
             $store = $this->mapAfterActivityReportStore($reports->items(), $currentOfficerName);
         } elseif ($tab === 'progress') {
-            $reports = $this->loadProgressReportsPaginator($stationOfficerIds);
+            $reports = $this->loadProgressReportsPaginator($stationOfficerIds, $search, $status, $sort);
             $store = $this->mapProgressReportStore($reports->items(), $currentOfficerName, $currentStationOfficerId);
         } elseif ($tab === 'final') {
-            $reports = $this->loadFinalReportsPaginator($stationOfficerIds);
+            $reports = $this->loadFinalReportsPaginator($stationOfficerIds, $search, $status, $sort);
             $store = $this->mapFinalReportStore($reports->items(), $currentOfficerName, $currentStationOfficerId);
         } else {
-            $reports = $this->loadSpotReportsPaginator($stationOfficerIds);
+            $reports = $this->loadSpotReportsPaginator($stationOfficerIds, $search, $status, $sort);
             $store = $this->mapSpotReportStore($reports->items(), $currentOfficerName, $currentStationOfficerId);
         }
 
@@ -1753,6 +1883,8 @@ class FirefighterController extends Controller
             'data' => [
                 'tab' => $tab,
                 'store' => $store,
+                'total' => $reports->total(),
+                'filters' => compact('search', 'status', 'sort'),
                 'html' => view('firefighters.mystation-reports-table', [
                     'tab' => $tab,
                     'reports' => $reports,

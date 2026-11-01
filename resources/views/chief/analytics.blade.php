@@ -3985,6 +3985,7 @@
         let currentSortedBarangayPredictions = [];
         let forecastNarrativeRuns = [];
         const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const analyticsApiPrefix = window.location.pathname.startsWith('/admin/') ? '/admin' : '/station-admin';
         let analyticsConfirmResolver = null;
         let analyticsConfirmOpener = null;
         const analyticsMobileQuery = window.matchMedia('(max-width: 768px)');
@@ -4307,7 +4308,7 @@
 
         async function loadStations() {
             try {
-                const response = await fetch('/station-admin/api/stations-for-analytics', {
+                const response = await fetch(`${analyticsApiPrefix}/api/stations-for-analytics`, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
                 const result = await response.json();
@@ -4534,7 +4535,7 @@
 
             body.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fa-solid fa-spinner fa-spin"></i> Loading revisions...</div>';
             try {
-                const response = await fetch(`/station-admin/api/analyses/${encodeURIComponent(currentAnalysisId)}/revisions`, {
+                const response = await fetch(`${analyticsApiPrefix}/api/analyses/${encodeURIComponent(currentAnalysisId)}/revisions`, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
                 const result = await response.json().catch(() => ({}));
@@ -4593,7 +4594,7 @@
             if (!confirmed || !currentAnalysisId) return;
 
             try {
-                const response = await fetch(`/station-admin/api/analyses/${encodeURIComponent(currentAnalysisId)}/rollback`, {
+                const response = await fetch(`${analyticsApiPrefix}/api/analyses/${encodeURIComponent(currentAnalysisId)}/rollback`, {
                     method: 'POST',
                     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
                     body: JSON.stringify({ revision_number: revisionNumber }),
@@ -4867,7 +4868,7 @@
 
         async function fetchScopedAnalysisSnapshot(predictionScope = 'current_month') {
             const query = buildAnalysisScopeQuery(predictionScope);
-            const response = await fetch(`/station-admin/api/analyses/latest-snapshot?${query}`, {
+            const response = await fetch(`${analyticsApiPrefix}/api/analyses/latest-snapshot?${query}`, {
                 headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
             });
 
@@ -4883,14 +4884,33 @@
             setScopedForecastLoading(true, 'Loading forecast scope...');
             try {
                 const result = await fetchScopedAnalysisSnapshot(predictionScope);
-                if (!result.success || !result.data) {
+                if (!result.success) {
+                    throw new Error(result.message || 'The saved forecast request failed.');
+                }
+
+                if (!result.data) {
+                    const scopeLabel = predictionScope === 'next_month' ? 'next-month forecast' : 'current-month analysis';
+                    setPredictionEmptyState(
+                        `No saved ${scopeLabel} is available for this selection.`,
+                        'Saved forecasts appear here when one exists for this station and barangay scope. Run an analysis to create a new snapshot.'
+                    );
                     if (notifyMissing) {
-                        showAnalyticsToast(`No saved ${predictionScope === 'next_month' ? 'next-month forecast' : 'current-month analysis'} exists for this selection yet.`, 'info');
+                        showAnalyticsToast(`No saved ${scopeLabel} exists for this selection yet.`, 'info');
                     }
                     return;
                 }
 
                 updateTargetMonthDisplay(result.data?.prediction_scope || 'current_month', result.data?.prediction_context || null);
+                if (result.data?.is_latest_saved_month_fallback) {
+                    const savedTargetMonth = result.data?.prediction_context?.target_period_label
+                        || result.data?.prediction_context?.target_month_label;
+                    showAnalyticsToast(
+                        savedTargetMonth
+                            ? `No saved analysis exists for the current target month. Showing the latest saved snapshot for ${savedTargetMonth}.`
+                            : 'No saved analysis exists for the current target month. Showing the latest saved snapshot for this scope.',
+                        'info'
+                    );
+                }
                 updateHeroModelLabel(formatAiModelLabel(result.data?.ai_models?.recommendation || result.data?.ai_models?.prediction) || result.data?.model_metadata?.dataset_kind || 'Latest saved model');
                 updateDashboardWithAIData(result);
                 const latestModelLabel = formatAiModelLabel(result.data?.ai_models?.recommendation || result.data?.ai_models?.prediction);
@@ -4901,6 +4921,11 @@
                 updateRecommendationScopeLabel();
             } catch (error) {
                 console.error('Latest analysis snapshot load error:', error);
+                setPredictionEmptyState(
+                    'Saved forecast could not be loaded.',
+                    error.message || 'Check the connection and try loading the saved analysis again.'
+                );
+                showAnalyticsToast(error.message || 'Unable to load the saved forecast.', 'error');
             } finally {
                 setScopedForecastLoading(false);
             }
@@ -5173,7 +5198,7 @@
             }
 
             try {
-                const response = await fetch(`/station-admin/api/analyses/history?${buildAnalysisScopeQuery(priorityAnalysisData?.prediction_scope || 'current_month')}`, {
+                const response = await fetch(`${analyticsApiPrefix}/api/analyses/history?${buildAnalysisScopeQuery(priorityAnalysisData?.prediction_scope || 'current_month')}`, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
                 if (!response.ok) {
@@ -5295,7 +5320,7 @@
             }
 
             try {
-                const response = await fetch(`/station-admin/api/analyses/${encodeURIComponent(analysisId)}`, {
+                const response = await fetch(`${analyticsApiPrefix}/api/analyses/${encodeURIComponent(analysisId)}`, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
                 if (!response.ok) {
@@ -5337,7 +5362,7 @@
             }
 
             try {
-                const response = await fetch(`/station-admin/api/action-plan-checklists?analysis_id=${encodeURIComponent(normalizedId)}&per_page=25&page=1`, {
+                const response = await fetch(`${analyticsApiPrefix}/api/action-plan-checklists?analysis_id=${encodeURIComponent(normalizedId)}&per_page=25&page=1`, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
                 if (!response.ok) {
@@ -5646,7 +5671,7 @@
             }
 
             try {
-                const response = await fetch(`/station-admin/api/analyses/history?${buildAnalysisScopeQuery(priorityAnalysisData?.prediction_scope || 'current_month')}`, {
+                const response = await fetch(`${analyticsApiPrefix}/api/analyses/history?${buildAnalysisScopeQuery(priorityAnalysisData?.prediction_scope || 'current_month')}`, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });
                 if (!response.ok) {
@@ -7712,7 +7737,7 @@
             replaceChiefAnalyticsFaIcons(modalBody);
             
             try {
-                const response = await fetch('/station-admin/api/explore-recommendation', {
+                const response = await fetch(`${analyticsApiPrefix}/api/explore-recommendation`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -8429,7 +8454,7 @@
                     page: String(normalizedPage),
                 });
                 if (analysisId) query.set('analysis_id', String(analysisId));
-                const url = `/station-admin/api/action-plan-checklists?${query.toString()}`;
+                const url = `${analyticsApiPrefix}/api/action-plan-checklists?${query.toString()}`;
                 const response = await fetch(url, {
                     headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrfToken }
                 });

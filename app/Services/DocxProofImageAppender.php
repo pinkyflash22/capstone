@@ -22,7 +22,7 @@ class DocxProofImageAppender
     private const MAX_HEIGHT_EMU = 3749040; // 4.1 inches; normally fits two photos per page
 
     /** @param Collection<int, InvestigationReportImage> $images */
-    public function append(ZipArchive $zip, Collection $images, string $heading = 'PHOTO DOCUMENTATION'): void
+    public function append(ZipArchive $zip, Collection $images, string $heading = 'PHOTO DOCUMENTATION', ?\Closure $readImage = null): void
     {
         if ($images->isEmpty()) {
             return;
@@ -52,8 +52,10 @@ class DocxProofImageAppender
 
         foreach ($images->values() as $index => $image) {
             try {
-                $bytes = Storage::disk(MediaPath::diskFor($image->file_path))
-                    ->get((string) MediaPath::stripPrefix($image->file_path));
+                $bytes = $readImage
+                    ? $readImage($image)
+                    : Storage::disk(MediaPath::diskFor($image->file_path))
+                        ->get((string) MediaPath::stripPrefix($image->file_path));
             } catch (Throwable $exception) {
                 report($exception);
                 $bytes = null;

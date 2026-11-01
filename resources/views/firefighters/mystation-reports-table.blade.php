@@ -1,3 +1,7 @@
+@php
+    $hasReportFilters = request()->filled('search') || request()->filled('status') || request('sort', 'newest') !== 'newest';
+@endphp
+
 @if($tab === 'aar')
     <div class="table-wrap">
         <table class="data-table">
@@ -19,7 +23,7 @@
                         </div></td>
                     </tr>
                 @empty
-                    <tr><td colspan="6"><div class="empty-box"><i class="fa-solid fa-box-open"></i><div>No After Activity Reports yet.</div></div></td></tr>
+                    <tr><td colspan="6"><div class="empty-box"><i class="fa-solid fa-box-open"></i><div>{{ $hasReportFilters ? 'No After Activity Reports match these filters.' : 'No After Activity Reports yet.' }}</div></div></td></tr>
                 @endforelse
             </tbody>
         </table>
@@ -56,8 +60,9 @@
                         <td data-label="Investigator">@include('firefighters.partials.person-trigger', ['personOfficer' => $report->investigator, 'contextLabel' => 'Progress report investigator'])</td>
                         <td data-label="Actions">
                             <div class="table-actions">
-                                <button type="button" class="table-action view" data-report-action="view" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}">View</button>
-                                <a class="table-action edit" href="{{ route('firefighter.progress-reports.pir.word', ['progressReportId' => $report->progress_investigation_report_id]) }}">Word</a>
+                                <button type="button" class="table-action table-action--icon view" data-report-action="view" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}" aria-label="View progress report" title="View report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"></path><circle cx="12" cy="12" r="2.75"></circle></svg></button>
+                                <a class="table-action table-action--icon download" href="{{ route('firefighter.progress-reports.pir.word', ['progressReportId' => $report->progress_investigation_report_id]) }}" aria-label="Download Progress Investigation Report Word document" title="Download Word document"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"></path><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path></svg></a>
+                                <button type="button" class="table-action table-action--icon print" data-report-action="print" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}" aria-label="Print Progress Investigation Report PDF" title="Print PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5"></path><path d="M5 17H3v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7h-2"></path><rect x="5" y="14" width="14" height="7" rx="1"></rect><path d="M17 11h.01"></path></svg></button>
                                 @if($canRevise && ! $hasFinal)
                                     <button type="button" class="table-action edit" data-report-action="edit" data-report-type="progress" data-report-id="{{ $report->progress_investigation_report_id }}">Edit</button>
                                 @endif
@@ -72,7 +77,7 @@
                         <td colspan="6">
                             <div class="empty-box">
                                 <i class="fa-solid fa-box-open"></i>
-                                <div>No progress reports yet.</div>
+                                <div>{{ $hasReportFilters ? 'No progress reports match these filters.' : 'No progress reports yet.' }}</div>
                             </div>
                         </td>
                     </tr>
@@ -110,8 +115,9 @@
                         <td data-label="Created">{{ optional($report->created_at)->format('M d, Y h:i A') ?: 'N/A' }}</td>
                         <td data-label="Actions">
                             <div class="table-actions">
-                                <button type="button" class="table-action view" data-report-action="view" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">View</button>
-                                <a class="table-action edit" href="{{ route('firefighter.final-reports.fir.word', ['finalReportId' => $report->final_investigation_report_id]) }}">Word</a>
+                                <button type="button" class="table-action table-action--icon view" data-report-action="view" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}" aria-label="View final report" title="View report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"></path><circle cx="12" cy="12" r="2.75"></circle></svg></button>
+                                <a class="table-action table-action--icon download" href="{{ route('firefighter.final-reports.fir.word', ['finalReportId' => $report->final_investigation_report_id]) }}" aria-label="Download Final Investigation Report Word document" title="Download Word document"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"></path><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path></svg></a>
+                                <button type="button" class="table-action table-action--icon print" data-report-action="print" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}" aria-label="Print Final Investigation Report PDF" title="Print PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5"></path><path d="M5 17H3v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7h-2"></path><rect x="5" y="14" width="14" height="7" rx="1"></rect><path d="M17 11h.01"></path></svg></button>
                                 @if($canRevise)
                                     <button type="button" class="table-action edit" data-report-action="edit" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">Edit</button>
                                     <button type="button" class="table-action delete" data-report-action="delete" data-report-type="final" data-report-id="{{ $report->final_investigation_report_id }}">Delete</button>
@@ -124,7 +130,7 @@
                         <td colspan="6">
                             <div class="empty-box">
                                 <i class="fa-solid fa-box-open"></i>
-                                <div>No final reports yet.</div>
+                                <div>{{ $hasReportFilters ? 'No final reports match these filters.' : 'No final reports yet.' }}</div>
                             </div>
                         </td>
                     </tr>
@@ -163,8 +169,9 @@
                         <td data-label="Occupancy">{{ ucfirst($report->occupancy ?? 'n/a') }}</td>
                         <td data-label="Actions">
                             <div class="table-actions">
-                                <button type="button" class="table-action view" data-report-action="view" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">View</button>
-                                <a class="table-action edit" href="{{ route('firefighter.spot-reports.sir.word', ['spotReportId' => $report->spot_investigation_report_id]) }}">Word</a>
+                                <button type="button" class="table-action table-action--icon view" data-report-action="view" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}" aria-label="View spot report" title="View report"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"></path><circle cx="12" cy="12" r="2.75"></circle></svg></button>
+                                <a class="table-action table-action--icon download" href="{{ route('firefighter.spot-reports.sir.word', ['spotReportId' => $report->spot_investigation_report_id]) }}" aria-label="Download Spot Investigation Report Word document" title="Download Word document"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"></path><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path></svg></a>
+                                <button type="button" class="table-action table-action--icon print" data-report-action="print" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}" aria-label="Print Spot Investigation Report PDF" title="Print PDF"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5"></path><path d="M5 17H3v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7h-2"></path><rect x="5" y="14" width="14" height="7" rx="1"></rect><path d="M17 11h.01"></path></svg></button>
                                 @if($canRevise)
                                     <button type="button" class="table-action edit" data-report-action="edit" data-report-type="spot" data-report-id="{{ $report->spot_investigation_report_id }}">Edit</button>
                                 @endif
@@ -179,7 +186,7 @@
                         <td colspan="6">
                             <div class="empty-box">
                                 <i class="fa-solid fa-box-open"></i>
-                                <div>No spot reports yet.</div>
+                                <div>{{ $hasReportFilters ? 'No spot reports match these filters.' : 'No spot reports yet.' }}</div>
                             </div>
                         </td>
                     </tr>

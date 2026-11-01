@@ -1,3 +1,5 @@
+import { initInvestigationDocumentPreviews, mountInvestigationDocumentPreview } from './investigation-document-preview';
+
 function bootFirefighterMyStationPage() {
     const root = document.querySelector('[data-ff-page-root="station"]');
     if (!root || root.dataset.ffStationBooted === 'true') {
@@ -5,6 +7,7 @@ function bootFirefighterMyStationPage() {
     }
 
     root.dataset.ffStationBooted = 'true';
+    const cleanupDocumentPreviews = initInvestigationDocumentPreviews();
 
     const config = window.firefighterMyStationConfig || {};
     const routes = config.routes || {};
@@ -23,6 +26,8 @@ function bootFirefighterMyStationPage() {
     let readinessRefreshTimer = null;
     let readinessRefreshInFlight = false;
     let lastReadinessRefreshAt = 0;
+    let managePreviewCleanup = null;
+    let manageReportTrail = [];
     const READINESS_REFRESH_INTERVAL_MS = Math.max(10000, Number(config.readinessRefreshIntervalMs) || 30000);
     const MAX_PROOF_UPLOAD_BYTES = 25 * 1024 * 1024;
     const MAX_PROOF_UPLOAD_FILES = 20;
@@ -33,6 +38,16 @@ function bootFirefighterMyStationPage() {
     const equipmentSection = document.getElementById('stationEquipmentSection');
     const reportsContainer = document.getElementById('stationReportsPanelContainer');
     const reportTabs = document.getElementById('reportTabs');
+    let reportFilterToolbar = document.getElementById('reportFilterToolbar');
+    if (!reportFilterToolbar && reportsContainer) {
+        reportsContainer.insertAdjacentHTML('beforebegin', buildReportFilterToolbarMarkup());
+        reportFilterToolbar = document.getElementById('reportFilterToolbar');
+    }
+    const reportSearchInput = reportFilterToolbar?.querySelector('[data-report-search]');
+    const reportStatusSelect = reportFilterToolbar?.querySelector('[data-report-status]');
+    const reportSortSelect = reportFilterToolbar?.querySelector('[data-report-sort]');
+    const reportFilterClear = reportFilterToolbar?.querySelector('[data-report-filter-clear]');
+    const reportFilterSummary = reportFilterToolbar?.querySelector('[data-report-filter-summary]');
     const manageReportModal = document.getElementById('manageReportModal');
     const manageReportModalTitle = document.getElementById('manageReportModalTitle');
     const manageReportModalBody = document.getElementById('manageReportModalBody');
@@ -43,6 +58,45 @@ function bootFirefighterMyStationPage() {
     const aarForm = document.getElementById('aarReportForm');
     const initialReportTab = config.activeReportTab || 'spot';
     let currentReportTab = initialReportTab;
+    const initialReportParams = new URLSearchParams(window.location.search);
+    let reportSearchQuery = (initialReportParams.get('report_search') || '').trim();
+    let reportStatusFilter = ['submitted', 'approved', 'changes_requested', 'rejected'].includes(initialReportParams.get('report_status'))
+        ? initialReportParams.get('report_status')
+        : '';
+    let reportSortOrder = initialReportParams.get('report_sort') === 'oldest' ? 'oldest' : 'newest';
+    let reportFilterTimer = null;
+
+    function buildReportFilterToolbarMarkup() {
+        return `
+            <div class="report-filter-toolbar" id="reportFilterToolbar">
+                <label class="report-search-control" for="reportSearchInput">
+                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="search" id="reportSearchInput" data-report-search placeholder="Search reports, locations, causes, or investigators" autocomplete="off">
+                </label>
+                <label class="report-select-control">
+                    <span>Status</span>
+                    <select data-report-status aria-label="Filter investigation reports by status">
+                        <option value="">All statuses</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="approved">Approved</option>
+                        <option value="changes_requested">Changes requested</option>
+                        <option value="rejected">Rejected</option>
+                    </select>
+                </label>
+                <label class="report-select-control">
+                    <span>Sort</span>
+                    <select data-report-sort aria-label="Sort investigation reports">
+                        <option value="newest">Newest first</option>
+                        <option value="oldest">Oldest first</option>
+                    </select>
+                </label>
+                <button type="button" class="report-filter-clear" data-report-filter-clear hidden>
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    Clear
+                </button>
+                <span class="report-filter-summary" data-report-filter-summary aria-live="polite"></span>
+            </div>`;
+    }
 
     function abortRequest(key) {
         const existing = requestControllers.get(key);
@@ -195,6 +249,12 @@ function bootFirefighterMyStationPage() {
 
     function buildFirRoute(reportId) {
         return String(routes.firTemplate || '').replace('__FINAL_REPORT_ID__', encodeURIComponent(reportId));
+    }
+
+    function buildSavedDocumentPreviewRoute(type, reportId) {
+        return String(routes.savedDocumentPreviewTemplate || '')
+            .replace('__TYPE__', encodeURIComponent(type))
+            .replace('__REPORT_ID__', encodeURIComponent(reportId));
     }
 
     function buildAarRoute(reportId) {
@@ -1198,9 +1258,48 @@ function bootFirefighterMyStationPage() {
         if (empty) empty.hidden = visible > 0;
     }
 
-    function syncReportsSummary(tab = currentReportTab) {
-        const loadedCount = Object.keys(reportStore[tab] || {}).length;
-        setSummaryMetric('reports', loadedCount, `${tab} reports loaded`);
+    function syncReportsSummary(tab = currentReportTab, total = null) {
+        const reportCount = Number.isFinite(Number(total)) ? Number(total) : Object.keys(reportStore[tab] || {}).length;
+        setSummaryMetric('reports', reportCount, `${tab} reports found`);
+    }
+
+    function hasActiveReportFilters() {
+        return reportSearchQuery !== '' || reportStatusFilter !== '' || reportSortOrder !== 'newest';
+    }
+
+    function syncReportFilterControls(total = null) {
+        if (reportSearchInput && reportSearchInput.value !== reportSearchQuery) reportSearchInput.value = reportSearchQuery;
+        if (reportStatusSelect) reportStatusSelect.value = reportStatusFilter;
+        if (reportSortSelect) reportSortSelect.value = reportSortOrder;
+        if (reportFilterClear) reportFilterClear.hidden = !hasActiveReportFilters();
+        if (reportFilterSummary && Number.isFinite(Number(total))) {
+            const count = Number(total);
+            reportFilterSummary.textContent = `${count} ${count === 1 ? 'report' : 'reports'} found`;
+        }
+    }
+
+    function buildReportsRequestUrl(tab, urlOverride = null) {
+        const url = new URL(urlOverride || routes.reports, window.location.origin);
+        url.searchParams.set('tab', tab);
+        if (!urlOverride) {
+            if (reportSearchQuery) url.searchParams.set('search', reportSearchQuery);
+            else url.searchParams.delete('search');
+            if (reportStatusFilter) url.searchParams.set('status', reportStatusFilter);
+            else url.searchParams.delete('status');
+            url.searchParams.set('sort', reportSortOrder);
+            url.searchParams.delete('page');
+        }
+        return url.toString();
+    }
+
+    function scheduleReportFilterReload({ immediate = false } = {}) {
+        window.clearTimeout(reportFilterTimer);
+        if (reportFilterSummary) reportFilterSummary.textContent = 'Updating reports...';
+        if (immediate) {
+            loadReports(currentReportTab);
+            return;
+        }
+        reportFilterTimer = window.setTimeout(() => loadReports(currentReportTab), 300);
     }
 
     async function loadOverview(force = false) {
@@ -1283,15 +1382,23 @@ function bootFirefighterMyStationPage() {
                 reportsContainer.innerHTML = buildLoadingCard(tab === 'aar' ? 'Loading After Activity Reports...' : `Loading ${tab} investigation reports...`);
             }
 
-            const url = urlOverride || `${routes.reports}?tab=${encodeURIComponent(tab)}`;
+            const url = buildReportsRequestUrl(tab, urlOverride);
             const result = await fetchStationSection('reports', url);
             reportsContainer.innerHTML = result?.data?.html || '';
             reportStore[tab] = result?.data?.store || {};
+            const total = Number(result?.data?.total ?? Object.keys(reportStore[tab]).length);
 
             const currentUrl = new URL(window.location.href);
             currentUrl.searchParams.set('report_tab', tab);
+            if (reportSearchQuery) currentUrl.searchParams.set('report_search', reportSearchQuery);
+            else currentUrl.searchParams.delete('report_search');
+            if (reportStatusFilter) currentUrl.searchParams.set('report_status', reportStatusFilter);
+            else currentUrl.searchParams.delete('report_status');
+            if (reportSortOrder !== 'newest') currentUrl.searchParams.set('report_sort', reportSortOrder);
+            else currentUrl.searchParams.delete('report_sort');
             window.history.replaceState(window.history.state || {}, '', currentUrl);
-            syncReportsSummary(tab);
+            syncReportFilterControls(total);
+            syncReportsSummary(tab, total);
         } catch (error) {
             if (error.name === 'AbortError') return;
             console.error('Station reports failed:', error);
@@ -1685,18 +1792,25 @@ function bootFirefighterMyStationPage() {
         updateModalOpenState();
     }
 
-    function openManageModal(title) {
+    function openManageModal(title, { documentPreview = false } = {}) {
+        managePreviewCleanup?.();
+        managePreviewCleanup = null;
         manageReportModalTitle.textContent = title;
+        manageReportModal.querySelector('.report-modal-panel')?.classList.toggle('report-modal-panel--document-viewer', documentPreview);
+        manageReportModalBody.classList.toggle('report-modal-body--document-viewer', documentPreview);
         manageReportModal.classList.add('active');
         updateModalOpenState();
         resetReportModalScroll(manageReportModal);
     }
 
     function closeManageModal() {
+        managePreviewCleanup?.();
+        managePreviewCleanup = null;
         manageReportModal.classList.remove('active');
         clearProofImagePreview(manageReportModalBody);
         manageReportModalBody.innerHTML = '';
         manageReportModalFooter.innerHTML = '';
+        manageReportTrail = [];
         updateModalOpenState();
     }
 
@@ -1809,15 +1923,25 @@ function bootFirefighterMyStationPage() {
         element.textContent = String(Math.max(0, Number.isNaN(count) ? 0 : count - 1));
     }
 
+    function reportActionIcon(icon) {
+        const icons = {
+            view: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z"></path><circle cx="12" cy="12" r="2.75"></circle></svg>',
+            download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"></path><path d="M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2"></path></svg>',
+            print: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5"></path><path d="M5 17H3v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7h-2"></path><rect x="5" y="14" width="14" height="7" rx="1"></rect><path d="M17 11h.01"></path></svg>',
+        };
+        return icons[icon] || '';
+    }
+
     function createActionButtons(type, report) {
         const reviewStatus = report.review_status || 'submitted';
         const canRevise = report.can_revise === true || (report.can_revise !== false && reviewStatus !== 'approved');
         const actions = [
-            `<button type="button" class="table-action view" data-report-action="view" data-report-type="${type}" data-report-id="${report.id}">View</button>`,
+            `<button type="button" class="table-action table-action--icon view" data-report-action="view" data-report-type="${type}" data-report-id="${report.id}" aria-label="View ${type} report" title="View report">${reportActionIcon('view')}</button>`,
         ];
 
         if (type === 'spot') {
-            actions.push(`<a class="table-action edit" href="${buildSirRoute(report.id)}">Word</a>`);
+            actions.push(`<a class="table-action table-action--icon download" href="${buildSirRoute(report.id)}" aria-label="Download Spot Investigation Report Word document" title="Download Word document">${reportActionIcon('download')}</a>`);
+            actions.push(`<button type="button" class="table-action table-action--icon print" data-report-action="print" data-report-type="${type}" data-report-id="${report.id}" aria-label="Print Spot Investigation Report PDF" title="Print PDF">${reportActionIcon('print')}</button>`);
             if (canRevise) {
                 actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
             }
@@ -1827,7 +1951,8 @@ function bootFirefighterMyStationPage() {
         }
 
         if (type === 'progress') {
-            actions.push(`<a class="table-action edit" href="${buildPirRoute(report.id)}">Word</a>`);
+            actions.push(`<a class="table-action table-action--icon download" href="${buildPirRoute(report.id)}" aria-label="Download Progress Investigation Report Word document" title="Download Word document">${reportActionIcon('download')}</a>`);
+            actions.push(`<button type="button" class="table-action table-action--icon print" data-report-action="print" data-report-type="${type}" data-report-id="${report.id}" aria-label="Print Progress Investigation Report PDF" title="Print PDF">${reportActionIcon('print')}</button>`);
             if (canRevise && !report.has_final) {
                 actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
             }
@@ -1837,7 +1962,8 @@ function bootFirefighterMyStationPage() {
         }
 
         if (type === 'final') {
-            actions.push(`<a class="table-action edit" href="${buildFirRoute(report.id)}">Word</a>`);
+            actions.push(`<a class="table-action table-action--icon download" href="${buildFirRoute(report.id)}" aria-label="Download Final Investigation Report Word document" title="Download Word document">${reportActionIcon('download')}</a>`);
+            actions.push(`<button type="button" class="table-action table-action--icon print" data-report-action="print" data-report-type="${type}" data-report-id="${report.id}" aria-label="Print Final Investigation Report PDF" title="Print PDF">${reportActionIcon('print')}</button>`);
             if (canRevise) {
                 actions.push(`<button type="button" class="table-action edit" data-report-action="edit" data-report-type="${type}" data-report-id="${report.id}">Edit</button>`);
                 actions.push(`<button type="button" class="table-action delete" data-report-action="delete" data-report-type="${type}" data-report-id="${report.id}">Delete</button>`);
@@ -1854,6 +1980,79 @@ function bootFirefighterMyStationPage() {
         }
 
         return `<div class="table-actions">${actions.join('')}</div>`;
+    }
+
+    async function printInvestigationReport(type, reportId, trigger) {
+        const previewUrl = buildSavedDocumentPreviewRoute(type, reportId);
+        if (!previewUrl) {
+            showToast('The PDF print route is unavailable.', 'error');
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            showToast('Allow pop-ups for this site so the PDF print window can open.', 'error');
+            return;
+        }
+        printWindow.document.write(`<!doctype html><html><head><title>Preparing report PDF</title>
+            <style>body{margin:0;display:grid;place-items:center;min-height:100vh;font:600 15px system-ui;color:#475569;background:#f8fafc}</style>
+            </head><body>Preparing the exact report template for printing...</body></html>`);
+        printWindow.document.close();
+
+        const originalHtml = trigger?.innerHTML || '';
+        if (trigger) {
+            trigger.disabled = true;
+            trigger.innerHTML = '<span class="table-action__spinner" aria-hidden="true"></span>';
+        }
+
+        let objectUrl = null;
+        try {
+            const response = await fetch(previewUrl, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/pdf' },
+            });
+            if (!response.ok) {
+                let message = 'The report PDF could not be prepared for printing.';
+                try {
+                    const error = await response.json();
+                    if (error?.message) message = error.message;
+                } catch (error) {
+                    // The renderer may return a non-JSON server error page.
+                }
+                throw new Error(message);
+            }
+
+            const pdf = await response.blob();
+            if (!String(pdf.type).toLowerCase().includes('pdf')) {
+                throw new Error('The server did not return a printable PDF.');
+            }
+
+            objectUrl = URL.createObjectURL(pdf);
+            await new Promise((resolve) => {
+                const fallback = window.setTimeout(resolve, 3500);
+                printWindow.addEventListener('load', () => {
+                    window.clearTimeout(fallback);
+                    window.setTimeout(resolve, 900);
+                }, { once: true });
+                printWindow.location.replace(objectUrl);
+            });
+
+            if (printWindow.closed) throw new Error('The PDF print window was closed.');
+            printWindow.focus();
+            printWindow.print();
+            showToast('The PDF is ready in the print dialog.', 'success');
+        } catch (error) {
+            if (!printWindow.closed) printWindow.close();
+            showToast(error.message || 'The report PDF could not be printed.', 'error');
+        } finally {
+            if (trigger) {
+                trigger.disabled = false;
+                trigger.innerHTML = originalHtml;
+            }
+            window.setTimeout(() => {
+                if (objectUrl) URL.revokeObjectURL(objectUrl);
+            }, 300000);
+        }
     }
 
     function reportReviewLabel(report) {
@@ -2128,7 +2327,103 @@ function bootFirefighterMyStationPage() {
         `;
     }
 
+    function normalizeLinkedReportTrail(type, report) {
+        let trail = Array.isArray(report.linked_reports) ? report.linked_reports : [];
+        if (!trail.length && type === 'progress') {
+            trail = [
+                report.spot_investigation_id && { type: 'spot', id: report.spot_investigation_id, label: 'Spot Report' },
+                report.parent_progress_investigation_id && { type: 'progress', id: report.parent_progress_investigation_id, label: '1st Progress Report' },
+                { type: 'progress', id: report.id, label: report.report_stage === 'single' ? 'Progress Report (Full)' : (report.report_stage_label || 'Progress Report') },
+            ];
+        } else if (!trail.length && type === 'final') {
+            const progress = reportStore.progress?.[report.progress_investigation_id];
+            trail = [
+                progress?.spot_investigation_id && { type: 'spot', id: progress.spot_investigation_id, label: 'Spot Report' },
+                progress?.parent_progress_investigation_id && { type: 'progress', id: progress.parent_progress_investigation_id, label: '1st Progress Report' },
+                report.progress_investigation_id && { type: 'progress', id: report.progress_investigation_id, label: progress?.report_stage === 'single' ? 'Progress Report (Full)' : (progress?.report_stage_label || 'Progress Report') },
+                { type: 'final', id: report.id, label: 'Final Report' },
+            ];
+        } else if (!trail.length) {
+            trail = [{ type, id: report.id, label: `${type.charAt(0).toUpperCase() + type.slice(1)} Report` }];
+        }
+
+        const seen = new Set();
+        return trail.filter((item) => item?.type && item?.id).filter((item) => {
+            const key = `${item.type}:${item.id}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    }
+
+    function savedDocumentDownloadRoute(type, reportId) {
+        if (type === 'spot') return buildSirRoute(reportId);
+        if (type === 'progress') return buildPirRoute(reportId);
+        return buildFirRoute(reportId);
+    }
+
+    function renderSavedReportDocument(type, reportId, label) {
+        managePreviewCleanup?.();
+        managePreviewCleanup = null;
+        const previewUrl = buildSavedDocumentPreviewRoute(type, reportId);
+        manageReportModalTitle.textContent = label;
+        const trailButtons = manageReportTrail.map((item, index) => {
+            const active = item.type === type && String(item.id) === String(reportId);
+            return `<button type="button" class="linked-report-button${active ? ' is-active' : ''}"
+                data-linked-report-preview data-report-type="${escapeHtml(item.type)}" data-report-id="${escapeHtml(item.id)}"
+                data-report-label="${escapeHtml(item.label)}" ${active ? 'aria-current="page" disabled' : ''}>
+                <span class="linked-report-button__step">${index + 1}</span>
+                <span>${escapeHtml(item.label)}</span>
+            </button>`;
+        }).join('');
+        manageReportModalBody.innerHTML = `
+            <div class="linked-report-viewer">
+                <nav class="linked-report-trail" aria-label="Linked investigation reports">
+                    <span class="linked-report-trail__label">Linked reports</span>
+                    <div class="linked-report-trail__buttons">${trailButtons}</div>
+                </nav>
+                <aside class="investigation-preview investigation-preview--stored" aria-label="Saved ${escapeHtml(label)} document preview"
+                    data-document-preview="${escapeHtml(type)}" data-preview-mode="stored" data-preview-url="${escapeHtml(previewUrl)}">
+                    <div class="investigation-preview__heading">
+                        <strong><i class="fa-regular fa-file-word" aria-hidden="true"></i> Report document preview</strong>
+                        <div class="investigation-preview__zoom" role="group" aria-label="Document preview zoom">
+                            <button type="button" data-preview-zoom="out" aria-label="Zoom out document preview" title="Zoom out">&minus;</button>
+                            <output data-preview-zoom-label aria-live="polite" aria-atomic="true">100%</output>
+                            <button type="button" data-preview-zoom="in" aria-label="Zoom in document preview" title="Zoom in">+</button>
+                            <button type="button" data-preview-zoom="reset" title="Reset preview zoom to 100%">Reset</button>
+                            <button type="button" data-preview-retry>Refresh</button>
+                        </div>
+                        <small>Rendered from the saved report using its downloadable Word template.</small>
+                        <div class="investigation-preview__status" role="status" aria-live="polite" data-preview-status>Preparing document preview...</div>
+                    </div>
+                    <div class="investigation-preview__scroll" tabindex="0" aria-label="Report document preview, scroll to read">
+                        <div class="investigation-preview__zoom-frame">
+                            <div class="investigation-preview__zoom-content" data-preview-pages></div>
+                        </div>
+                    </div>
+                </aside>
+            </div>`;
+        managePreviewCleanup = mountInvestigationDocumentPreview(manageReportModalBody.querySelector('[data-document-preview]'));
+        manageReportModalFooter.innerHTML = `
+            <a class="btn btn-outline report-document-action" href="${savedDocumentDownloadRoute(type, reportId)}" aria-label="Download ${escapeHtml(label)} as a DOCX file" title="Download DOCX">
+                ${reportActionIcon('download')}<span>DOCX</span>
+            </a>
+            <button type="button" class="btn btn-outline report-document-action" data-report-action="print" data-report-type="${escapeHtml(type)}" data-report-id="${escapeHtml(reportId)}" aria-label="Print ${escapeHtml(label)} as PDF" title="Print PDF">
+                ${reportActionIcon('print')}<span>Print PDF</span>
+            </button>
+            <button type="button" class="btn btn-outline" data-close-manage-modal>Close</button>`;
+        resetReportModalScroll(manageReportModal);
+    }
+
     async function openViewModal(type, report) {
+        if (type !== 'aar') {
+            const title = `${type.charAt(0).toUpperCase() + type.slice(1)} Investigation Report`;
+            manageReportTrail = normalizeLinkedReportTrail(type, report);
+            openManageModal(title, { documentPreview: true });
+            const active = manageReportTrail.find((item) => item.type === type && String(item.id) === String(report.id));
+            renderSavedReportDocument(type, report.id, active?.label || title);
+            return;
+        }
         openManageModal(type === 'aar' ? 'After Activity Report' : `${type.charAt(0).toUpperCase() + type.slice(1)} Investigation Report`);
         manageReportModalBody.innerHTML = renderViewDetails(type, report);
         const downloadButton = type === 'aar'
@@ -2712,9 +3007,23 @@ function bootFirefighterMyStationPage() {
             return;
         }
 
+        const linkedReportButton = event.target.closest('[data-linked-report-preview]');
+        if (linkedReportButton) {
+            renderSavedReportDocument(
+                linkedReportButton.dataset.reportType,
+                linkedReportButton.dataset.reportId,
+                linkedReportButton.dataset.reportLabel || 'Investigation Report'
+            );
+            return;
+        }
+
         const actionButton = event.target.closest('[data-report-action]');
         if (actionButton) {
             const { reportAction, reportType, reportId } = actionButton.dataset;
+            if (reportAction === 'print') {
+                await printInvestigationReport(reportType, reportId, actionButton);
+                return;
+            }
             const report = reportStore[reportType]?.[reportId];
             if (!report) return;
             if (reportAction === 'view') await openViewModal(reportType, report);
@@ -2742,6 +3051,33 @@ function bootFirefighterMyStationPage() {
     personnelSection?.addEventListener('input', handlePersonnelSearch);
     document.addEventListener('visibilitychange', handleReadinessVisibilityChange);
 
+    reportSearchInput?.addEventListener('input', (event) => {
+        reportSearchQuery = event.target.value.trim();
+        syncReportFilterControls();
+        scheduleReportFilterReload();
+    });
+
+    reportStatusSelect?.addEventListener('change', (event) => {
+        reportStatusFilter = event.target.value;
+        syncReportFilterControls();
+        scheduleReportFilterReload({ immediate: true });
+    });
+
+    reportSortSelect?.addEventListener('change', (event) => {
+        reportSortOrder = event.target.value === 'oldest' ? 'oldest' : 'newest';
+        syncReportFilterControls();
+        scheduleReportFilterReload({ immediate: true });
+    });
+
+    reportFilterClear?.addEventListener('click', () => {
+        reportSearchQuery = '';
+        reportStatusFilter = '';
+        reportSortOrder = 'newest';
+        syncReportFilterControls();
+        reportSearchInput?.focus();
+        scheduleReportFilterReload({ immediate: true });
+    });
+
     reportTabs?.addEventListener('click', (event) => {
         const tab = event.target.closest('.report-tab');
         if (!tab) return;
@@ -2766,6 +3102,7 @@ function bootFirefighterMyStationPage() {
     window.loadFirefighterStationEquipment = loadEquipment;
     window.loadFirefighterStationReports = () => loadReports(currentReportTab);
 
+    syncReportFilterControls();
     bindMobileReportPickers();
     bindForms();
     loadOverview();
@@ -2777,6 +3114,7 @@ function bootFirefighterMyStationPage() {
     handleReportDeepLink();
 
     window.__ffCurrentPageCleanup = function () {
+        cleanupDocumentPreviews();
         if (readinessRefreshTimer) window.clearInterval(readinessRefreshTimer);
         readinessRefreshTimer = null;
         cleanupRequests();

@@ -191,6 +191,35 @@
                         <button type="button" class="report-tab {{ $activeReportTab === 'aar' ? 'active' : '' }}" data-report-tab="aar">After Activity Report</button>
                     </div>
 
+                    <div class="report-filter-toolbar" id="reportFilterToolbar">
+                        <label class="report-search-control" for="reportSearchInput">
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <input type="search" id="reportSearchInput" data-report-search placeholder="Search reports, locations, causes, or investigators" autocomplete="off">
+                        </label>
+                        <label class="report-select-control">
+                            <span>Status</span>
+                            <select data-report-status aria-label="Filter investigation reports by status">
+                                <option value="">All statuses</option>
+                                <option value="submitted">Submitted</option>
+                                <option value="approved">Approved</option>
+                                <option value="changes_requested">Changes requested</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </label>
+                        <label class="report-select-control">
+                            <span>Sort</span>
+                            <select data-report-sort aria-label="Sort investigation reports">
+                                <option value="newest">Newest first</option>
+                                <option value="oldest">Oldest first</option>
+                            </select>
+                        </label>
+                        <button type="button" class="report-filter-clear" data-report-filter-clear hidden>
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            Clear
+                        </button>
+                        <span class="report-filter-summary" data-report-filter-summary aria-live="polite"></span>
+                    </div>
+
                     <div id="stationReportsPanelContainer" class="reports-shell-panel">
                         <div class="section-shell-card station-loading-card">
                             <i class="fa-solid fa-file-lines"></i>
@@ -232,7 +261,7 @@
     </div>
 
     <div class="report-modal" id="spotReportModal" role="dialog" aria-modal="true" aria-labelledby="spotReportModalTitle" data-report-state="idle">
-        <div class="report-modal-panel">
+        <div class="report-modal-panel report-modal-panel--preview">
             <div class="report-modal-header">
                 <div class="report-modal-title" id="spotReportModalTitle">
                     <span class="report-title-full">Create Spot Investigation Report</span>
@@ -241,6 +270,7 @@
                 <button type="button" class="report-close" data-close-report-modal="spot" aria-label="Close spot report form"><i class="fa-solid fa-times"></i></button>
             </div>
             <form id="spotReportForm">
+                <div class="investigation-editor">
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
                     <div class="form-grid" data-report-form-content>
@@ -402,6 +432,8 @@
                         </div>
                     </div>
                 </div>
+                @include('firefighters.partials.investigation-document-preview', ['previewType' => 'spot'])
+                </div>
                 <div class="report-modal-footer">
                     <button type="button" class="btn btn-outline" data-close-report-modal="spot">Cancel</button>
                     <button type="submit" class="btn btn-primary">
@@ -458,7 +490,7 @@
     </div>
 
     <div class="report-modal" id="progressReportModal" role="dialog" aria-modal="true" aria-labelledby="progressReportModalTitle" data-report-state="idle">
-        <div class="report-modal-panel">
+        <div class="report-modal-panel report-modal-panel--preview">
             <div class="report-modal-header">
                 <div class="report-modal-title" id="progressReportModalTitle">
                     <span class="report-title-full">Create Progress Investigation Report</span>
@@ -467,6 +499,7 @@
                 <button type="button" class="report-close" data-close-report-modal="progress" aria-label="Close progress report form"><i class="fa-solid fa-times"></i></button>
             </div>
             <form id="progressReportForm">
+                <div class="investigation-editor">
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
                     <div class="form-grid" data-report-form-content>
@@ -561,6 +594,8 @@
                         </div>
                     </div>
                 </div>
+                @include('firefighters.partials.investigation-document-preview', ['previewType' => 'progress'])
+                </div>
                 <div class="report-modal-footer">
                     <button type="button" class="btn btn-outline" data-close-report-modal="progress">Cancel</button>
                     <button type="submit" class="btn btn-primary">
@@ -574,7 +609,7 @@
     </div>
 
     <div class="report-modal" id="finalReportModal" role="dialog" aria-modal="true" aria-labelledby="finalReportModalTitle" data-report-state="idle">
-        <div class="report-modal-panel">
+        <div class="report-modal-panel report-modal-panel--preview">
             <div class="report-modal-header">
                 <div class="report-modal-title" id="finalReportModalTitle">
                     <span class="report-title-full">Create Final Investigation Report</span>
@@ -583,6 +618,7 @@
                 <button type="button" class="report-close" data-close-report-modal="final" aria-label="Close final report form"><i class="fa-solid fa-times"></i></button>
             </div>
             <form id="finalReportForm">
+                <div class="investigation-editor">
                 <div class="report-modal-body">
                     <input type="hidden" name="station_officer_id" value="{{ $stationOfficer->station_officer_id }}">
                     <div class="form-grid" data-report-form-content>
@@ -686,6 +722,8 @@
                         </div>
                     </div>
                 </div>
+                @include('firefighters.partials.investigation-document-preview', ['previewType' => 'final'])
+                </div>
                 <div class="report-modal-footer">
                     <button type="button" class="btn btn-outline" data-close-report-modal="final">Cancel</button>
                     <button type="submit" class="btn btn-primary">
@@ -724,6 +762,7 @@
                 equipment: @json(route('firefighter.my-station.equipment')),
                 reports: @json(route('firefighter.my-station.reports')),
                 modalData: @json(route('firefighter.my-station.modal-data')),
+                savedDocumentPreviewTemplate: @json(route('firefighter.my-station.saved-document-preview', ['type' => '__TYPE__', 'reportId' => '__REPORT_ID__'])),
                 spotNarrative: '/api/spot-investigation/draft-narrative',
                 progressNarrative: '/api/progress-investigation/draft-narrative',
                 finalNarrative: '/api/final-investigation/draft-narrative',

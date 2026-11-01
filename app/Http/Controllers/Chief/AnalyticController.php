@@ -5198,8 +5198,18 @@ class AnalyticController extends Controller
         try {
             $user = Auth::user();
             $stationOfficer = StationOfficer::where('user_id', $user->user_id)->first();
+            $isProvincialAdmin = strtolower(trim((string) ($user?->role?->role ?? ''))) === 'provincial admin';
+            $stationId = (int) ($stationOfficer?->station_id ?? 0);
 
-            if (! $stationOfficer) {
+            if (! $stationId && $isProvincialAdmin) {
+                $requestedStationId = (int) $request->input('station_id', 0);
+                $stationId = Station::query()
+                    ->where('station_id', $requestedStationId)
+                    ->value('station_id') ?? 0;
+                $stationId = (int) $stationId;
+            }
+
+            if (! $stationId) {
                 return response()->json([
                     'success' => true,
                     'data' => null,
@@ -5209,21 +5219,55 @@ class AnalyticController extends Controller
             $requestedScope = $this->scopeSignatureFromRequest($request);
 
             $stationAnalyses = Analysis::query()
-                ->where('station_id', $stationOfficer->station_id)
+                ->where('station_id', $stationId)
                 ->latest('updated_at')
                 ->limit(100)
                 ->get();
 
-            $latestAnalysis = $stationAnalyses->first(function (Analysis $analysis) use ($requestedScope, $stationOfficer) {
+            $matchesRequestedStationAndBarangay = function (Analysis $analysis) use ($requestedScope, $stationId) {
                 $candidateData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
                 $candidateRaw = $candidateData['raw_data'] ?? [];
                 $candidate = $this->scopeSignatureFromRawData($candidateRaw);
 
-                return (int) ($analysis->station_id ?? 0) === (int) $stationOfficer->station_id
-                    && $candidate['prediction_scope'] === $requestedScope['prediction_scope']
-                    && $candidate['barangay_id'] === $requestedScope['barangay_id']
-                    && $candidate['target_month_label'] === $requestedScope['target_month_label'];
+                return (int) ($analysis->station_id ?? 0) === $stationId
+                    && $candidate['barangay_id'] === $requestedScope['barangay_id'];
+            };
+            $matchesRequestedScope = function (Analysis $analysis) use ($matchesRequestedStationAndBarangay, $requestedScope) {
+                $analysisData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
+                $candidate = $this->scopeSignatureFromRawData($analysisData['raw_data'] ?? []);
+
+                return $matchesRequestedStationAndBarangay($analysis)
+                    && $candidate['prediction_scope'] === $requestedScope['prediction_scope'];
+            };
+            $latestAnalysis = $stationAnalyses->first(function (Analysis $analysis) use ($matchesRequestedScope, $requestedScope) {
+                if (! $matchesRequestedScope($analysis)) {
+                    return false;
+                }
+
+                $analysisData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
+                $candidate = $this->scopeSignatureFromRawData($analysisData['raw_data'] ?? []);
+
+                return $candidate['target_month_label'] === $requestedScope['target_month_label'];
             });
+            $usedLatestSavedMonthFallback = false;
+
+            if (! $latestAnalysis) {
+                $latestAnalysis = $stationAnalyses->first(function (Analysis $analysis) use ($matchesRequestedStationAndBarangay, $requestedScope) {
+                    if (! $matchesRequestedStationAndBarangay($analysis)) {
+                        return false;
+                    }
+
+                    $analysisData = is_array($analysis->analysis_data) ? $analysis->analysis_data : [];
+                    $candidate = $this->scopeSignatureFromRawData($analysisData['raw_data'] ?? []);
+
+                    return $candidate['target_month_label'] === $requestedScope['target_month_label'];
+                });
+
+                if (! $latestAnalysis) {
+                    $latestAnalysis = $stationAnalyses->first($matchesRequestedScope);
+                }
+                $usedLatestSavedMonthFallback = $latestAnalysis !== null;
+            }
 
             if (! $latestAnalysis) {
                 return response()->json([
@@ -5284,7 +5328,7 @@ class AnalyticController extends Controller
             $savedChartContext = $rawData['chart_context'] ?? [];
             $locationName = $rawData['location_name'] ?? $latestAnalysis->sector;
             $savedConfidenceInput = array_merge($rawData, [
-                'station_id' => (int) $stationOfficer->station_id,
+                'station_id' => $stationId,
                 'chart_context' => $savedChartContext,
                 'barangay_predictions' => $savedBarangayPredictionSet,
                 'selected_barangay_prediction' => $savedSelectedPrediction,
@@ -5335,6 +5379,7 @@ class AnalyticController extends Controller
                 'incidents_by_type' => $analysisSummary['incidents_by_type'] ?? [],
                 'days_analyzed' => $daysAnalyzed,
                 'historical_window' => $historicalWindow,
+                'is_latest_saved_month_fallback' => $usedLatestSavedMonthFallback,
                 'is_dynamic_scope_fallback' => ! $this->scopeBarangayIdFromRawData($rawData) && (bool) $selectedBarangayId,
             ]);
 

@@ -634,6 +634,10 @@ Route::middleware(['auth', 'prevent.back.history'])->group(function () {
         Route::get('/api/my-station/equipment', [FirefighterController::class, 'myStationEquipmentData'])->name('my-station.equipment');
         Route::get('/api/my-station/reports', [FirefighterController::class, 'myStationReportsData'])->name('my-station.reports');
         Route::get('/api/my-station/modal-data', [FirefighterController::class, 'myStationModalData'])->name('my-station.modal-data');
+        Route::post('/api/my-station/document-preview/{type}', App\Http\Controllers\staff\InvestigationDocumentPreviewController::class)
+            ->whereIn('type', ['spot', 'progress', 'final'])->middleware('throttle:60,1')->name('my-station.document-preview');
+        Route::get('/api/my-station/document-preview/{type}/{reportId}', [App\Http\Controllers\staff\InvestigationDocumentPreviewController::class, 'show'])
+            ->whereIn('type', ['spot', 'progress', 'final'])->whereNumber('reportId')->middleware('throttle:60,1')->name('my-station.saved-document-preview');
         Route::get('/api/notifications', [App\Http\Controllers\CommandNotificationController::class, 'index'])->name('notifications.index');
         Route::post('/api/notifications/read-all', [App\Http\Controllers\CommandNotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
         Route::post('/api/notifications/{notificationId}/read', [App\Http\Controllers\CommandNotificationController::class, 'markAsRead'])->name('notifications.read');

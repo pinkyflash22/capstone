@@ -306,7 +306,8 @@ class FinalInvestigationReportController extends Controller
         ]);
     }
 
-    private function mergeDerivedDefaults(array $validated, ProgressInvestigationReport $progressReport): array
+    // Shared by submission and the unsaved document preview; this only derives attributes.
+    public function mergeDerivedDefaults(array $validated, ProgressInvestigationReport $progressReport): array
     {
         $spot = $progressReport->spotInvestigation;
         $incident = $spot?->incident;

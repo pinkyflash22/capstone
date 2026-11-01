@@ -15,6 +15,10 @@ RUN apt-get update && apt-get install -y \
     npm \
     python3 \
     python3-pip \
+    python3-uno \
+    libreoffice-writer \
+    fonts-liberation \
+    fonts-crosextra-carlito \
     postgresql-client \
     libpq-dev \
     libzip-dev \

@@ -63,6 +63,14 @@ fi
 php artisan ai:restore-forecast-artifacts || true
 php artisan config:cache
 
+# Keep LibreOffice warm so investigation previews use the exact Word template
+# without paying the full office startup cost for every field update.
+LIBREOFFICE_PROFILE_PATH="/var/www/html/storage/framework/cache/libreoffice-preview-profile"
+mkdir -p "$LIBREOFFICE_PROFILE_PATH"
+chown -R www-data:www-data "$LIBREOFFICE_PROFILE_PATH"
+LIBREOFFICE_PROFILE_URI="file://$LIBREOFFICE_PROFILE_PATH"
+su -s /bin/sh www-data -c "nohup libreoffice -env:UserInstallation=$LIBREOFFICE_PROFILE_URI --headless --invisible --nologo --nodefault --nofirststartwizard '--accept=socket,host=127.0.0.1,port=2002;urp;StarOffice.ComponentContext' >/tmp/pyrosense-libreoffice.log 2>&1 </dev/null &" || true
+
 # Process only forecast-training jobs in this existing web service so Render's
 # paid background-worker service is not required. The database queue keeps the
 # HTTP request short and survives process restarts.

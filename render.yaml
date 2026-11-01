@@ -132,13 +132,13 @@ services:
         value: "240"
 
       - key: AI_TRAINING_QUEUE_CONNECTION
-        value: database
+        value: redis
 
       - key: AI_TRAINING_QUEUE
         value: forecast-training
 
       - key: AI_TRAINING_STATUS_CACHE_STORE
-        value: database
+        value: redis
 
       - key: AI_ARTIFACT_PERSISTENCE_ENABLED
         value: "true"
@@ -151,6 +151,9 @@ services:
 
       - key: DB_QUEUE_RETRY_AFTER
         value: "360"
+
+      - key: REDIS_QUEUE_RETRY_AFTER
+        value: "420"
 
       - key: RUN_FORECAST_QUEUE_WORKER
         value: "false"
@@ -233,7 +236,7 @@ services:
       - key: WORKER_NAME
         value: general
       - key: WORKER_QUEUE_CONNECTION
-        value: database
+        value: redis
       - key: WORKER_QUEUES
         value: default,notifications,emails
       - key: WORKER_TIMEOUT
@@ -296,9 +299,15 @@ services:
       - key: WORKER_QUEUES
         value: forecast-training
       - key: WORKER_TIMEOUT
-        value: "300"
+        value: "420"
       - key: WORKER_TRIES
         value: "2"
+      - key: AI_TRAINING_QUEUE_CONNECTION
+        value: redis
+      - key: AI_TRAINING_STATUS_CACHE_STORE
+        value: redis
+      - key: REDIS_QUEUE_RETRY_AFTER
+        value: "420"
       - key: AI_ARTIFACT_DISK
         value: supabase
       - key: SUPABASE_KEY
