@@ -3922,6 +3922,25 @@ function getPublicMarkerImageMap() {
     };
 }
 
+function getHydrantCondition(marker = {}) {
+    const condition = String(
+        marker?.condition
+        || marker?.hydrant?.condition
+        || marker?.hydrant_public?.condition
+        || 'high'
+    ).trim().toLowerCase();
+
+    return ['high', 'serviceable', 'low'].includes(condition) ? condition : 'high';
+}
+
+function getHydrantImagePath(marker = {}) {
+    return {
+        high: '/hydrant.png',
+        serviceable: '/hydrantgreen.png',
+        low: '/hydrantyellow.png'
+    }[getHydrantCondition(marker)];
+}
+
 // ============================================================================
 // HELPER FUNCTIONS FOR ICONS (keeping your existing icon functions)
 // ============================================================================
@@ -3929,6 +3948,9 @@ function getPublicMarkerImageMap() {
 function inferMarkerImagePath(marker = null, iconConfig = null) {
     const publicMarkerImageMap = getPublicMarkerImageMap();
     const explicitCategoryKey = getMarkerCategoryKey(marker);
+    if (explicitCategoryKey === 'hydrant') {
+        return getHydrantImagePath(marker || {});
+    }
     if (explicitCategoryKey && publicMarkerImageMap[explicitCategoryKey]) {
         return publicMarkerImageMap[explicitCategoryKey];
     }
@@ -5676,6 +5698,14 @@ async function openEditModal(marker) {
                             ${stationsOptions}
                         </select>
                     </div>
+                    <div class="edit-form-group">
+                        <label><i class="fas fa-gauge-high"></i> Hydrant Condition</label>
+                        <select id="editHydrantCondition">
+                            <option value="high" ${hydrantData.condition === 'high' ? 'selected' : ''}>High</option>
+                            <option value="serviceable" ${hydrantData.condition === 'serviceable' ? 'selected' : ''}>Serviceable</option>
+                            <option value="low" ${hydrantData.condition === 'low' ? 'selected' : ''}>Low</option>
+                        </select>
+                    </div>
                 `;
             }
         } catch (error) {
@@ -5843,6 +5873,7 @@ async function updateMarker(markerId) {
         } else if (categoryName.toLowerCase().includes('hydrant')) {
             const hydrantCode = document.getElementById('editHydrantCode')?.value;
             const hydrantStationId = document.getElementById('editHydrantStation')?.value;
+            const hydrantCondition = document.getElementById('editHydrantCondition')?.value || 'high';
             
             const hydrantResponse = await fetch(`/api/hydrant/marker/${markerId}`, {
                 method: 'PUT',
@@ -5853,7 +5884,8 @@ async function updateMarker(markerId) {
                 },
                 body: JSON.stringify({
                     hydrant_code: hydrantCode,
-                    station_id: hydrantStationId
+                    station_id: hydrantStationId,
+                    condition: hydrantCondition
                 })
             });
             if (!hydrantResponse.ok) {
@@ -6077,6 +6109,10 @@ async function showDetailsPanel(markerData, imagePath = null) {
                 <div class="details-info-item">
                     <span class="details-info-label">Assigned Station:</span>
                     <span class="details-info-value">${markerData.hydrant.station?.station_name || 'Not Assigned'}</span>
+                </div>
+                <div class="details-info-item">
+                    <span class="details-info-label">Condition:</span>
+                    <span class="details-info-value">${getHydrantCondition(markerData).toUpperCase()}</span>
                 </div>
             </div>
         `;
@@ -13071,7 +13107,8 @@ async function saveMarkerDetailsForCategory(markerId, context, jsonHeaders) {
                 hydrant_code: document.getElementById('hydrantCode')?.value,
                 station_id: document.getElementById('hydrantStation')?.value,
                 marker_id: markerId,
-                hydrant_type_id: document.getElementById('hydrantType')?.value || null
+                hydrant_type_id: document.getElementById('hydrantType')?.value || null,
+                condition: document.getElementById('hydrantCondition')?.value || 'high'
             })
         });
         await readJsonResponse(hydrantResponse, 'Failed to create hydrant');
@@ -13405,6 +13442,7 @@ setTimeout(() => {
                     const hydrantCode = document.getElementById('hydrantCode')?.value;
                     const hydrantStationId = document.getElementById('hydrantStation')?.value;
                     const hydrantTypeId = document.getElementById('hydrantType')?.value;
+                    const hydrantCondition = document.getElementById('hydrantCondition')?.value || 'high';
                     
                     if (!hydrantCode) { throw new Error('Please enter hydrant code'); }
                     if (!hydrantStationId) { throw new Error('Please select the station this hydrant belongs to'); }
@@ -13412,7 +13450,7 @@ setTimeout(() => {
                     const hydrantResponse = await fetch('/api/hydrant', {
                         method: 'POST',
                         headers: jsonHeaders,
-                        body: JSON.stringify({ hydrant_code: hydrantCode, station_id: hydrantStationId, marker_id: markerId, hydrant_type_id: hydrantTypeId || null })
+                        body: JSON.stringify({ hydrant_code: hydrantCode, station_id: hydrantStationId, marker_id: markerId, hydrant_type_id: hydrantTypeId || null, condition: hydrantCondition })
                     });
                     await readJsonResponse(hydrantResponse, 'Failed to create hydrant');
                 } else if (categoryName.toLowerCase() === 'school') {

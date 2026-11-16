@@ -2223,6 +2223,15 @@
             @endforeach
         </select>
     </div>
+
+    <div class="form-row">
+        <label><i class="fa-solid fa-gauge-high"></i> Hydrant Condition *</label>
+        <select id="hydrantCondition" class="w-full">
+            <option value="high">High</option>
+            <option value="serviceable">Serviceable</option>
+            <option value="low">Low</option>
+        </select>
+    </div>
 </div>
 
 <!-- School Fields -->

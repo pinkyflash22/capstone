@@ -13,6 +13,7 @@ class Hydrant extends Model
     protected $fillable = [
         'hydrant_code',
         'type',
+        'condition',
         'marker_id',
         'station_id',
     ];

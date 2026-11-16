@@ -346,6 +346,7 @@ function syncPublicDirectoryResources(category, records) {
         lat: record.lat,
         lng: record.lng,
         status: record.status,
+        condition: record.condition,
         updated_at: record.updated_at,
         category,
         ...(category === 'station' ? {
@@ -984,7 +985,7 @@ function getLandingVisitorCoords(maxAgeMs = 10 * 60 * 1000) {
 
 function landingPreviewIcon(marker = {}) {
     const category = normalizeLandingCategory(marker);
-    const asset = landingPreviewAsset(category);
+    const asset = landingPreviewAsset(category, marker);
     const size = category === 'fire' ? 40 : 34;
 
     return L.icon({
@@ -996,10 +997,16 @@ function landingPreviewIcon(marker = {}) {
     });
 }
 
-function landingPreviewAsset(category) {
+function landingPreviewAsset(category, marker = {}) {
+    if (category === 'hydrant') {
+        const condition = String(marker.condition || marker.hydrant_public?.condition || marker.hydrant?.condition || 'high').toLowerCase();
+        return condition === 'serviceable'
+            ? '/hydrantgreen.png'
+            : (condition === 'low' ? '/hydrantyellow.png' : '/hydrant.png');
+    }
+
     return {
         station: '/station.png',
-        hydrant: '/hydrant.png',
         barangay: '/hall.png',
         fire: '/fire.png',
         risk: '/hazard.png',
@@ -1064,7 +1071,7 @@ function landingResourcePopup(marker = {}) {
         <div class="landing-preview-popup">
             <div class="landing-preview-popup__head">
                 <span class="landing-preview-popup__icon" style="--preview-accent:${meta.color}">
-                    <img src="${landingPreviewAsset(category)}" alt="" loading="lazy">
+                    <img src="${landingPreviewAsset(category, marker)}" alt="" loading="lazy">
                 </span>
                 <div class="landing-preview-popup__title">
                     <strong>${title}</strong>
@@ -1111,6 +1118,7 @@ function landingResourceRows(marker = {}, category = 'other') {
     } else if (category === 'hydrant') {
         add('Code', marker.hydrant_public?.code || marker.hydrant?.hydrant_code);
         add('Type', marker.hydrant_public?.type || marker.hydrant?.type);
+        add('Condition', marker.condition || marker.hydrant_public?.condition || marker.hydrant?.condition);
         add('Station', marker.hydrant_public?.station_name);
     } else if (category === 'barangay') {
         add('Contact', marker.barangay_public?.contact_number);

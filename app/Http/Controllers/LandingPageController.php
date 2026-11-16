@@ -110,6 +110,7 @@ class LandingPageController extends Controller
     public function getHydrants()
     {
         $hydrants = Marker::where('category', 'hydrant')
+            ->with('hydrants:hydrant_id,marker_id,condition')
             ->select('marker_id', 'title', 'description', 'lat', 'lng', 'status', 'updated_at')
             ->get()
             ->map(function ($hydrant) {
@@ -120,6 +121,7 @@ class LandingPageController extends Controller
                     'lat' => (float) $hydrant->lat,
                     'lng' => (float) $hydrant->lng,
                     'status' => $hydrant->status,
+                    'condition' => $hydrant->hydrants->first()?->condition ?? 'high',
                     'updated_at' => optional($hydrant->updated_at)->toISOString(),
                 ];
             });

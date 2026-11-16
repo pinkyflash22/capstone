@@ -1724,7 +1724,12 @@ function inferCitizenSharedMarkerAsset(categoryKey, marker = {}) {
     ].filter(Boolean).join(' ').toLowerCase();
 
     if (categoryKey === 'station') return '/station.png';
-    if (categoryKey === 'hydrant') return '/hydrant.png';
+    if (categoryKey === 'hydrant') {
+        const condition = String(marker?.condition || marker?.hydrant?.condition || marker?.hydrant_public?.condition || 'high').toLowerCase();
+        if (condition === 'serviceable') return '/hydrantgreen.png';
+        if (condition === 'low') return '/hydrantyellow.png';
+        return '/hydrant.png';
+    }
     if (categoryKey === 'barangay') return '/hall.png';
     if (categoryKey === 'fire') return '/fire.png';
     if (categoryKey === 'risk' || categoryKey === 'hazard') return '/hazard.png';
@@ -2239,8 +2244,8 @@ function buildCitizenPopupRows(marker, incident, markerPresentation, markerCateg
     } else if (isCitizenHydrantCategory(markerCategory)) {
         appendCitizenPopupRow(rows, 'Hydrant code', marker?.hydrant_public?.code);
         appendCitizenPopupRow(rows, 'Type', marker?.hydrant_public?.type);
+        appendCitizenPopupRow(rows, 'Condition', marker?.hydrant_public?.condition || marker?.hydrant?.condition);
         appendCitizenPopupRow(rows, 'Location', marker?.location, marker?.address);
-        appendCitizenPopupRow(rows, 'Condition', marker?.operational_status, marker?.condition);
         appendCitizenPopupRow(rows, 'Access', marker?.accessibility, marker?.access);
         appendCitizenPopupRow(rows, 'Last checked', formatCitizenPopupDate(marker?.last_inspection_at || marker?.inspected_at || marker?.updated_at));
     } else if (markerCategory === 'barangay') {

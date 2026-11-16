@@ -1251,6 +1251,15 @@
         <label><i class="fa-solid fa-tag"></i> Hydrant Type</label>
         <input type="text" value="Managed from hydrant records" disabled>
     </div>
+
+    <div class="form-row">
+        <label><i class="fa-solid fa-gauge-high"></i> Hydrant Condition *</label>
+        <select id="hydrantCondition" class="w-full">
+            <option value="high">High</option>
+            <option value="serviceable">Serviceable</option>
+            <option value="low">Low</option>
+        </select>
+    </div>
 </div>
 
 <!-- School Fields -->

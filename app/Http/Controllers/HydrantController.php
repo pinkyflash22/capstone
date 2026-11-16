@@ -11,6 +11,8 @@ use Illuminate\Validation\Rule;
 
 class HydrantController extends Controller
 {
+    private const CONDITIONS = ['high', 'serviceable', 'low'];
+
     public function index()
     {
         $hydrants = Hydrant::with( 'marker', 'station')
@@ -41,6 +43,7 @@ class HydrantController extends Controller
             'hydrant_type_id' => 'nullable|exists:hydrant_types,hydrant_type_id',
             'marker_id' => 'required|exists:markers,marker_id',
             'station_id' => 'required|exists:stations,station_id',
+            'condition' => ['required', Rule::in(self::CONDITIONS)],
         ]);
 
        $hydrantData = Hydrant::create($validated);
@@ -74,6 +77,7 @@ class HydrantController extends Controller
             'hydrant_type_id' => 'nullable|exists:hydrant_types,hydrant_type_id',
             'marker_id' => 'required|exists:markers,marker_id',
             'station_id' => 'required|exists:stations,station_id',
+            'condition' => ['required', Rule::in(self::CONDITIONS)],
         ]);
 
         $hydrant->update($validated);
@@ -112,6 +116,7 @@ class HydrantController extends Controller
             ],
             'station_id' => 'nullable|exists:stations,station_id',
             'hydrant_type_id' => 'nullable|exists:hydrant_types,hydrant_type_id',
+            'condition' => ['sometimes', Rule::in(self::CONDITIONS)],
         ]);
 
         $hydrant->update($validated);

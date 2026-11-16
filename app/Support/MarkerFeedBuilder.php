@@ -77,10 +77,12 @@ class MarkerFeedBuilder
             'hydrant' => $hydrant ? [
                 'hydrant_code' => static::publicValue($hydrant->hydrant_code),
                 'type' => static::publicValue($hydrant->type),
+                'condition' => static::publicValue($hydrant->condition ?? 'high'),
             ] : null,
             'hydrant_public' => $hydrant ? [
                 'code' => static::publicValue($hydrant->hydrant_code),
                 'type' => static::publicValue($hydrant->type),
+                'condition' => static::publicValue($hydrant->condition ?? 'high'),
                 'station_name' => static::publicValue($hydrant->station?->station_name),
             ] : null,
             'incident_public' => $incident ? [

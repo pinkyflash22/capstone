@@ -5,7 +5,7 @@ const DEFAULT_ZOOM = 13;
 const USER_FOCUS_ZOOM = 16;
 const BARANGAY_GROUP_ICON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;"><circle cx="8" cy="9" r="2"></circle><circle cx="16" cy="9" r="2"></circle><circle cx="12" cy="7" r="2"></circle><path d="M4 18a4 4 0 0 1 8 0"></path><path d="M12 18a4 4 0 0 1 8 0"></path><path d="M8 16a4 4 0 0 1 8 0"></path></svg>';
 
-function getCategoryVisual(category) {
+function getCategoryVisual(category, marker = {}) {
     const normalized = String(category || '').trim().toLowerCase();
 
     switch (normalized) {
@@ -20,7 +20,13 @@ function getCategoryVisual(category) {
         case 'hazard':
             return { color: '#d97706', icon: 'fa-radiation', image: '/hazard.png', label: 'Hazard' };
         case 'hydrant':
-            return { color: '#ef4444', icon: 'fa-fire-extinguisher', image: '/hydrant.png', label: 'Hydrant' };
+            const condition = String(marker.condition || marker.hydrant?.condition || marker.hydrant_public?.condition || 'high').toLowerCase();
+            return {
+                color: condition === 'serviceable' ? '#16a34a' : (condition === 'low' ? '#eab308' : '#ef4444'),
+                icon: 'fa-fire-extinguisher',
+                image: condition === 'serviceable' ? '/hydrantgreen.png' : (condition === 'low' ? '/hydrantyellow.png' : '/hydrant.png'),
+                label: 'Hydrant'
+            };
         case 'school':
             return { color: '#eab308', icon: 'fa-school', label: 'School' };
         case 'bridge':
@@ -45,7 +51,7 @@ function normalizeIncidentStatus(marker = {}) {
 }
 
 function buildIcon(category, emphasized = false, marker = {}) {
-    const visual = getCategoryVisual(category);
+    const visual = getCategoryVisual(category, marker);
     const normalizedCategory = String(category || '').trim().toLowerCase();
     const sizes = { fire: 42, station: 43, hydrant: 38, school: 43, barangay: 43, risk: 36, hazard: 36 };
     const size = (sizes[normalizedCategory] || 32) + (emphasized ? 4 : 0);
@@ -125,7 +131,8 @@ function getLayerKey(category) {
 }
 
 function createPopupContent(marker, highlighted = false) {
-    const visual = getCategoryVisual(marker.category);
+    const visual = getCategoryVisual(marker.category, marker);
+    const hydrantCondition = String(marker.condition || marker.hydrant?.condition || marker.hydrant_public?.condition || '').trim();
 
     return `
         <div style="min-width:220px;">
@@ -139,6 +146,7 @@ function createPopupContent(marker, highlighted = false) {
             <p style="margin:8px 0 0;color:#475569;font-size:0.84rem;line-height:1.5;">
                 ${escapeHtml(marker.description || marker.meta || 'No description provided.')}
             </p>
+            ${hydrantCondition ? `<div style="margin-top:8px;color:#475569;font-size:0.8rem;"><strong>Condition:</strong> ${escapeHtml(hydrantCondition)}</div>` : ''}
             <div style="margin-top:10px;color:#94a3b8;font-size:0.74rem;">
                 ${escapeHtml(marker.lat)}, ${escapeHtml(marker.lng)}
             </div>
@@ -289,7 +297,7 @@ async function loadDashboardMap() {
             latestPinsElement.innerHTML = '<span class="tag deferred">No latest pins yet</span>';
         } else {
             latestPins.forEach((pin) => {
-                const visual = getCategoryVisual(pin.category);
+                const visual = getCategoryVisual(pin.category, pin);
                 const chip = document.createElement('span');
                 chip.className = pin.category === 'fire'
                     ? 'pin-tag pin-tag--fire'
