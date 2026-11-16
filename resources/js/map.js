@@ -4711,6 +4711,24 @@ styleElement.textContent = `
         color: #4b5563;
     }
 
+    .responder-marker-popup-chip.condition.high {
+        background: #fee2e2;
+        color: #b91c1c;
+        border-color: #fecaca;
+    }
+
+    .responder-marker-popup-chip.condition.serviceable {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #bbf7d0;
+    }
+
+    .responder-marker-popup-chip.condition.low {
+        background: #fef9c3;
+        color: #854d0e;
+        border-color: #fde68a;
+    }
+
     .responder-marker-popup-title {
         display: block;
         font-size: 14px;
@@ -6700,6 +6718,7 @@ function buildMarkerStateSignature(coordinates, incidents) {
                 marker.updated_at ?? marker.created_at ?? '',
                 marker.lat ?? '',
                 marker.lng ?? '',
+                getMarkerCategoryKey(marker) === 'hydrant' ? getHydrantCondition(marker) : '',
                 visibility.visible ? 'visible' : 'hidden',
                 linkedIncident?.incident_id ?? '',
                 linkedIncident?.incident_status_id ?? linkedIncident?.status ?? '',
@@ -7082,7 +7101,18 @@ async function updateCoordinate(data, options = {}) {
                 if (!visibility.visible) {
                     continue;
                 }
-                markersToProcess.push({ ...item.marker, incident_id: item.incident_id, incident_status: item.incident_status_id });
+                const marker = { ...item.marker, incident_id: item.incident_id, incident_status: item.incident_status_id };
+                if (isHydrantMarker(marker)) {
+                    const hydrant = hydrantByMarkerId.get(String(marker.marker_id));
+                    if (hydrant) {
+                        marker.hydrant = { ...(marker.hydrant || {}), ...hydrant };
+                        if (hydrant.station_id) {
+                            const station = stationByStationId.get(String(hydrant.station_id));
+                            if (station) marker.hydrant.station = station;
+                        }
+                    }
+                }
+                markersToProcess.push(marker);
             } else if (item.lat && item.lng) {
                 if (!shouldDisplayMarker(item)) {
                     continue;
@@ -7970,6 +8000,10 @@ window.closeIncidentCommandPanel = closeIncidentCommandPanel;
 function buildResponderPopupContent(marker, incident, imagePath = null, options = {}) {
     const markerPresentation = getResponderPopupPresentation(marker);
     const statusMeta = getResponderPopupStatusMeta(marker.incident_status || incident?.status);
+    const hydrantCondition = isHydrantMarker(marker) ? getHydrantCondition(marker) : '';
+    const hydrantConditionLabel = hydrantCondition
+        ? hydrantCondition.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+        : '';
     const targetIncidentId = incident?.incident_id ?? getMarkerIncidentId(marker);
     const loadingMarkup = options.isLoadingDetails && isIncidentMarker(marker)
         ? buildIncidentPopupLoadingMarkup(options.loadingMessage || 'Loading latest incident details...')
@@ -8088,6 +8122,7 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
             : isHydrantMarker(marker)
                 ? [
                     { label: 'Hydrant', value: compactValue(marker.hydrant?.hydrant_code, marker.hydrant_code, marker.title) },
+                    { label: 'Condition', value: hydrantConditionLabel },
                     { label: 'Station', value: compactValue(marker.hydrant?.station?.name, marker.station?.name) },
                     { label: 'Location', value: locationValue }
                 ]
@@ -8213,6 +8248,12 @@ function buildResponderPopupContent(marker, incident, imagePath = null, options 
                             <span class="responder-marker-popup-chip status ${statusMeta.className}">
                                 <i class="fas ${statusMeta.icon}"></i>
                                 ${escapeHtml(statusMeta.label)}
+                            </span>
+                        ` : ''}
+                        ${hydrantConditionLabel ? `
+                            <span class="responder-marker-popup-chip condition ${escapeHtml(hydrantCondition)}">
+                                <i class="fas fa-gauge-high"></i>
+                                ${escapeHtml(hydrantConditionLabel)}
                             </span>
                         ` : ''}
                     </div>

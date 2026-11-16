@@ -1058,6 +1058,12 @@ function landingResourcePopup(marker = {}) {
     const status = marker.status
         ? `<span class="landing-preview-popup__status">${escapeLandingHtml(marker.status)}</span>`
         : '';
+    const hydrantCondition = category === 'hydrant'
+        ? String(marker.condition || marker.hydrant_public?.condition || marker.hydrant?.condition || 'high').toLowerCase()
+        : '';
+    const conditionChip = hydrantCondition
+        ? `<span class="landing-preview-popup__status" style="background:${hydrantCondition === 'serviceable' ? '#dcfce7' : (hydrantCondition === 'low' ? '#fef9c3' : '#fee2e2')};color:${hydrantCondition === 'serviceable' ? '#166534' : (hydrantCondition === 'low' ? '#854d0e' : '#b91c1c')};">Condition: ${escapeLandingHtml(hydrantCondition)}</span>`
+        : '';
     const rows = landingResourceRows(marker, category)
         .map((row) => `
             <div class="landing-preview-popup__row">
@@ -1083,6 +1089,7 @@ function landingResourcePopup(marker = {}) {
                     ${escapeLandingHtml(meta.label)}
                 </span>
                 ${status}
+                ${conditionChip}
             </div>
             ${rows ? `<div class="landing-preview-popup__rows">${rows}</div>` : ''}
         </div>

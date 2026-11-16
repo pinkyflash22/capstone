@@ -146,7 +146,7 @@ function createPopupContent(marker, highlighted = false) {
             <p style="margin:8px 0 0;color:#475569;font-size:0.84rem;line-height:1.5;">
                 ${escapeHtml(marker.description || marker.meta || 'No description provided.')}
             </p>
-            ${hydrantCondition ? `<div style="margin-top:8px;color:#475569;font-size:0.8rem;"><strong>Condition:</strong> ${escapeHtml(hydrantCondition)}</div>` : ''}
+            ${hydrantCondition ? `<span style="display:inline-flex;margin-top:8px;padding:4px 9px;border-radius:999px;background:${hydrantCondition === 'serviceable' ? '#dcfce7' : (hydrantCondition === 'low' ? '#fef9c3' : '#fee2e2')};color:${hydrantCondition === 'serviceable' ? '#166534' : (hydrantCondition === 'low' ? '#854d0e' : '#b91c1c')};font-size:0.72rem;font-weight:800;text-transform:capitalize;">Condition: ${escapeHtml(hydrantCondition)}</span>` : ''}
             <div style="margin-top:10px;color:#94a3b8;font-size:0.74rem;">
                 ${escapeHtml(marker.lat)}, ${escapeHtml(marker.lng)}
             </div>

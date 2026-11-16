@@ -121,7 +121,7 @@ class MarkerFeedBuilder
                     ->all(),
             ] : null,
             'created_at' => $marker->created_at,
-            'updated_at' => collect([$marker->updated_at, $riskArea?->updated_at, $incident?->updated_at])
+            'updated_at' => collect([$marker->updated_at, $hydrant?->updated_at, $riskArea?->updated_at, $incident?->updated_at])
                 ->filter()
                 ->sortByDesc(fn ($date) => $date->timestamp)
                 ->first(),

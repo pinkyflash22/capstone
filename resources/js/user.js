@@ -2514,6 +2514,14 @@ export async function loadMarkers() {
             const incidentStatus = String(incident?.status || 'reported').toLowerCase();
             const statusLabel = getCitizenPopupStatusLabel(incident, usermark) || (incident ? 'Reported' : '');
             const statusMeta = getCitizenStatusMeta(statusLabel || incidentStatus, incident);
+            const hydrantCondition = isCitizenHydrantCategory(markerCategory)
+                ? String(usermark?.condition || usermark?.hydrant?.condition || usermark?.hydrant_public?.condition || 'high').toLowerCase()
+                : '';
+            const hydrantConditionMeta = hydrantCondition === 'serviceable'
+                ? { className: 'ok', icon: 'fa-circle-check' }
+                : (hydrantCondition === 'low'
+                    ? { className: 'warning', icon: 'fa-triangle-exclamation' }
+                    : { className: 'danger', icon: 'fa-gauge-high' });
             const popupTitle = getCitizenPopupTitle(usermark, incident, markerPresentation, markerCategory);
             const popupDescription = getCitizenUsefulValue(
                 incident?.public_description,
@@ -2538,6 +2546,12 @@ export async function loadMarkers() {
                                     <span class="citizen-marker-popup-chip status ${statusMeta.className}">
                                         <i class="fas ${statusMeta.icon}"></i>
                                         ${escapeCitizenModalHtml(statusLabel)}
+                                    </span>
+                                ` : ''}
+                                ${hydrantCondition ? `
+                                    <span class="citizen-marker-popup-chip status ${hydrantConditionMeta.className}">
+                                        <i class="fas ${hydrantConditionMeta.icon}"></i>
+                                        ${escapeCitizenModalHtml(`Condition: ${hydrantCondition}`)}
                                     </span>
                                 ` : ''}
                             </div>
